@@ -53,20 +53,22 @@ ocean = ocean_simulation(grid, closure=nothing)
 # Now that we have an atmosphere and ocean, we `set!` the ocean temperature and salinity
 # to the ECCO2 data by first creating T, S metadata objects,
 
-T_metadata = ECCOMetadatum(:temperature; date=DateTime(1993, 1, 1))
-S_metadata = ECCOMetadatum(:salinity;    date=DateTime(1993, 1, 1))
+ecco_set = MetadataSet(:temperature, :salinity;
+                       dataset = ECCO4Monthly(),
+                       date    = DateTime(1993, 1, 1))
 
 # Note that if a date is not provided to `Metadata`, then the default Jan 1st, 1992 is used.
 # To copy the ECCO state into `ocean.model`, we use `set!`,
 
-set!(ocean.model; T=T_metadata, S=S_metadata)
+set!(ocean.model, ecco_set)
 
 # Finally, we construct a coupled model, which will compute fluxes during construction.
-# We omit `sea_ice` so the model is ocean-only, and use the default `Radiation()` that
-# uses the two-band shortwave (visible and UV) + longwave (mid and far infrared)
-# decomposition of the radiation spectrum.
+# We omit `sea_ice` so the model is ocean-only, and pair the JRA55 atmosphere with a
+# matching `JRA55PrescribedRadiation` that supplies downwelling shortwave and
+# longwave radiation as well as ocean / sea-ice surface properties.
 
-coupled_model = OceanOnlyModel(ocean; atmosphere, radiation=Radiation(eltype))
+radiation = JRA55PrescribedRadiation(; backend = JRA55NetCDFBackend(2))
+coupled_model = OceanOnlyModel(ocean; atmosphere, radiation)
 
 # Now that the surface fluxes are computed, we can extract and visualize them.
 # The turbulent fluxes are stored in `coupled_model.interfaces.atmosphere_ocean_interface.fluxes`.

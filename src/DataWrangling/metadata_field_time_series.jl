@@ -1,9 +1,3 @@
-using Oceananigans.Architectures: AbstractArchitecture, architecture
-using Oceananigans.Grids: AbstractGrid
-using Oceananigans.Fields: interpolate!
-
-import Oceananigans.OutputReaders: update_field_time_series!, FieldTimeSeries
-
 """
     FieldTimeSeries(metadata::Metadata [, arch_or_grid=CPU() ];
                     time_indices_in_memory = 2,
@@ -35,31 +29,38 @@ Keyword Arguments
 - `cache_inpainted_data`: If `true`, the data is cached to disk after inpainting for later retrieving.
                           Default: `true`.
 """
-function FieldTimeSeries(metadata::Metadata, arch::AbstractArchitecture=CPU(); kw...)
-    download_dataset(metadata)
+function Oceananigans.OutputReaders.FieldTimeSeries(metadata::Metadata, arch::AbstractArchitecture=CPU(); kw...)
+    Downloads.download(metadata)
     grid = native_grid(metadata, arch)
     return FieldTimeSeries(metadata, grid; kw...)
 end
 
-function FieldTimeSeries(metadata::Metadata, grid::AbstractGrid;
-                         time_indices_in_memory = 2,
-                         time_indexing = Cyclical(),
-                         inpainting = default_inpainting(metadata),
-                         cache_inpainted_data = true,
-                         prefetch = false)
+function Oceananigans.OutputReaders.FieldTimeSeries(metadata::Metadata, grid::AbstractGrid;
+                                                    time_indices_in_memory = 2,
+                                                    time_indexing = Cyclical(),
+                                                    inpainting = default_inpainting(metadata),
+                                                    cache_inpainted_data = true,
+                                                    prefetch = false)
 
-    download_dataset(metadata)
+    Downloads.download(metadata)
 
-    # Detect "the user's grid IS the native grid" structurally 
-    on_native_grid = grid == native_grid(metadata, architecture(grid))
-    times = native_times(metadata)
-    
+    # Match the time axis to the grid's float type. `native_times` returns `Float64` seconds, but with a
+    # Float32 grid that mismatch makes `interpolate`'s time weight `Float64`, so the interpolated value is
+    # `Union{Float32, Float64}` — a type instability that boxes inside GPU tendency/halo kernels.
+    times = convert.(eltype(grid), native_times(metadata))
+
     # Make sure we do not use more indices then the ones available!
     if length(times) < time_indices_in_memory
         time_indices_in_memory = length(times)
     end
 
     inpainting isa Int && (inpainting = NearestNeighborInpainting(inpainting))
+    # Grids of different type are never equal; the `typeof` guard short-circuits
+    # before the node comparison, which for a `PressureLevelGrid` reduces the whole
+    # geopotential to a column-mean profile (`mean_height_profile`) only to discard
+    # it whenever — as for any interpolation target — the grid isn't the native one.
+    native = native_grid(metadata, architecture(grid))
+    on_native_grid = typeof(grid) === typeof(native) && grid == native
     inner_backend = DatasetBackend(time_indices_in_memory, metadata; on_native_grid, inpainting, cache_inpainted_data)
 
     loc = LX, LY, LZ = location(metadata)
@@ -81,7 +82,7 @@ function FieldTimeSeries(metadata::Metadata, grid::AbstractGrid;
     return fts
 end
 
-function FieldTimeSeries(variable_name::Symbol;
+function Oceananigans.OutputReaders.FieldTimeSeries(variable_name::Symbol;
                          dataset, dir,
                          architecture = CPU(),
                          start_date = first_date(dataset, variable_name),

@@ -1,5 +1,4 @@
 using ClimaSeaIce.SeaIceThermodynamics: melting_temperature, LinearLiquidus, ConductiveFlux
-using Adapt
 
 #####
 ##### Ice Bath Heat Flux (bulk formulation)
@@ -113,8 +112,8 @@ References
 
 - [holland1999modeling](@citet): Holland, D. M., & Jenkins, A. (1999). Modeling thermodynamic ice–ocean interactions
   at the base of an ice shelf. *Journal of Physical Oceanography*, 29(8), 1787-1800.
-- [hieronymus2021comparison](@citet): Hieronymus, M., et al. (2021). A comparison of ocean-ice flux parametrizations.
-  *Geosci. Model Dev.*, 14, 4891-4908.
+- [shi2021sensitivity](@citet): Shi, X., Notz, D., Liu, J., Yang, H., & Lohmann, G. (2021). Sensitivity of Northern
+  Hemisphere climate to ice-ocean interface heat flux parameterizations. *Geosci. Model Dev.*, 14, 4891-4908.
 """
 struct ThreeEquationHeatFlux{F, T, FT, U}
     conductive_flux :: F
@@ -124,7 +123,7 @@ struct ThreeEquationHeatFlux{F, T, FT, U}
     friction_velocity :: U
 end
 
-Adapt.adapt_structure(to, f::ThreeEquationHeatFlux) = 
+Adapt.adapt_structure(to, f::ThreeEquationHeatFlux) =
     ThreeEquationHeatFlux(Adapt.adapt(to, f.conductive_flux),
                           Adapt.adapt(to, f.internal_temperature),
                           f.heat_transfer_coefficient,
@@ -139,7 +138,7 @@ Adapt.adapt_structure(to, f::ThreeEquationHeatFlux) =
 
 Construct a `ThreeEquationHeatFlux` with the specified parameters.
 
-Default values follow [hieronymus2021comparison](@citet) with ``R = \\alpha_h / \\alpha_s = 35``.
+Default values follow [shi2021sensitivity](@citet) with ``R = \\alpha_h / \\alpha_s = 35``.
 
 Keyword Arguments
 =================
@@ -169,10 +168,9 @@ ThreeEquationHeatFlux(::Nothing, FT::DataType = Oceananigans.defaults.FloatType;
 """
     compute_interface_heat_flux(flux::IceBathHeatFlux, ocean_state, ice_state, liquidus, ocean_properties, ℰ, u★)
 
-Compute the heat flux and melt rate at the sea ice-ocean interface using bulk formulation.
-Returns `(Q, q, Tᵦ, Sᵦ)` where:
+Compute the heat flux at the sea ice-ocean interface using bulk formulation.
+Returns `(Q, Tᵦ, Sᵦ)` where:
 - `Q > 0` means heat flux from ocean to ice (ocean cooling)
-- `q > 0` means melting (ice volume loss)
 - `Tᵦ, Sᵦ` are the interface temperature and salinity
 """
 @inline function compute_interface_heat_flux(flux::IceBathHeatFlux,
@@ -192,11 +190,8 @@ Returns `(Q, q, Tᵦ, Sᵦ)` where:
     # Heat flux: Q > 0 means heat flux from ocean to ice (ocean cooling)
     Qᵢₒ = ρᵒᶜ * cᵒᶜ * αₕ * u★ * (Tᵒᶜ - Tₘ) * ℵ
 
-    # Melt rate: q = Q / L (positive for melting)
-    q = Qᵢₒ / ℰ
-
     # For IceBathHeatFlux, interface is at ocean surface values
-    return Qᵢₒ, q, Tₘ, Sᵒᶜ
+    return Qᵢₒ, Tₘ, Sᵒᶜ
 end
 
 const NoInternalFluxTEF{FT} = ThreeEquationHeatFlux{<:Nothing, <:Nothing, FT} where FT
@@ -218,13 +213,12 @@ end
 """
     compute_interface_heat_flux(flux::ThreeEquationHeatFlux, ocean_state, ice_state, liquidus, ocean_properties, ℰ, u★)
 
-Compute the heat flux and melt rate at the sea ice-ocean interface using three-equation formulation.
+Compute the heat flux at the sea ice-ocean interface using three-equation formulation.
 Dispatches to the appropriate `solve_interface_conditions` based on whether the flux has internal
 conductive flux or not.
 
-Returns `(Q, q, Tᵦ, Sᵦ)` where:
+Returns `(Q, Tᵦ, Sᵦ)` where:
 - `Q > 0` means heat flux from ocean to ice (ocean cooling)
-- `q > 0` means melting (ice volume loss)
 - `Tᵦ, Sᵦ` are the interface temperature and salinity
 """
 @inline function compute_interface_heat_flux(flux::ThreeEquationHeatFlux,
@@ -246,10 +240,9 @@ Returns `(Q, q, Tᵦ, Sᵦ)` where:
     T★, S★, q = solve_interface_conditions(flux, Tᵒᶜ, Sᵒᶜ, ice_state, αₕ, αₛ, u★, ℰ, ρᵒᶜ, cᵒᶜ, liquidus)
 
     # Scale by ice concentration
-    q = q * ℵ
-    Qᵢₒ = ℰ * q
+    Qᵢₒ = ℰ * q * ℵ
 
-    return Qᵢₒ, q, T★, S★
+    return Qᵢₒ, T★, S★
 end
 
 # Helper to get conductive flux parameters (κ, Tˢⁱ) - dispatches on flux type
