@@ -1,11 +1,8 @@
 include("runtests_setup.jl")
 
-using NumericalEarth: stateindex
-using NumericalEarth.EarthSystemModels.InterfaceComputations: SeaIceAlbedo,
-                                                              InterfaceProperties,
-                                                              Radiation
-
 using Oceananigans.Units: Time
+using NumericalEarth: stateindex
+using NumericalEarth.Radiations: SeaIceAlbedo
 
 @testset "SeaIceAlbedo" begin
     for arch in test_architectures

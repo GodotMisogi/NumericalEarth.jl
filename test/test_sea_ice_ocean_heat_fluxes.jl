@@ -30,7 +30,7 @@ using ClimaSeaIce.SeaIceThermodynamics: LinearLiquidus, melting_temperature
 
     @testset "ThreeEquationHeatFlux construction" begin
         flux = ThreeEquationHeatFlux()
-        @test flux.heat_transfer_coefficient == 0.0095  # Default from Shi et al. (2021)
+        @test flux.heat_transfer_coefficient == 0.0095  # Default from Hieronymus et al. (2021)
         @test flux.salt_transfer_coefficient ≈ 0.0095 / 35  # R = 35
 
         flux2 = ThreeEquationHeatFlux(heat_transfer_coefficient = 0.01,
@@ -62,19 +62,19 @@ using ClimaSeaIce.SeaIceThermodynamics: LinearLiquidus, melting_temperature
         default_h = 1.0
         default_hc = 0.1
         default_ℵ = 1.0
-        default_Tⁱⁿᵗ = 0.0
+        default_Tⁱⁿ = 0.0
 
         @testset "Warm ocean (melting conditions)" begin
             Tᵒᶜ = 2.0    # Ocean temperature well above freezing
             Sᵒᶜ = 35.0   # Ocean salinity
             Sˢⁱ = 5.0    # Ice salinity
 
-            ice_state = (; S = Sˢⁱ, h = default_h, hc = default_hc, ℵ = default_ℵ, T = default_Tⁱⁿᵗ)
+            ice_state = (; S = Sˢⁱ, h = default_h, hc = default_hc, ℵ = default_ℵ, T = default_Tⁱⁿ)
             Tᵦ, Sᵦ, q = solve_interface_conditions(flux, Tᵒᶜ, Sᵒᶜ, ice_state, αₕ, αₛ, u★, L, ρᵒᶜ, cᵒᶜ, liquidus)
 
             # Interface salinity should be between ice and ocean salinity
-            @test Sᵦ >= Sˢⁱ
-            @test Sᵦ <= Sᵒᶜ
+            @test Sᵦ ≥ Sˢⁱ
+            @test Sᵦ ≤ Sᵒᶜ
 
             # Interface temperature should be at freezing point of interface salinity
             Tₘ = melting_temperature(liquidus, Sᵦ)
@@ -91,12 +91,12 @@ using ClimaSeaIce.SeaIceThermodynamics: LinearLiquidus, melting_temperature
             Tᵒᶜ = Tₘ_ocean + 0.5  # Ocean 0.5°C above freezing
             Sˢⁱ = 5.0
 
-            ice_state = (; S = Sˢⁱ, h = default_h, hc = default_hc, ℵ = default_ℵ, T = default_Tⁱⁿᵗ)
+            ice_state = (; S = Sˢⁱ, h = default_h, hc = default_hc, ℵ = default_ℵ, T = default_Tⁱⁿ)
             Tᵦ, Sᵦ, q = solve_interface_conditions(flux, Tᵒᶜ, Sᵒᶜ, ice_state, αₕ, αₛ, u★, L, ρᵒᶜ, cᵒᶜ, liquidus)
 
             # Interface salinity should be between ice and ocean salinity
-            @test Sᵦ >= Sˢⁱ
-            @test Sᵦ <= Sᵒᶜ
+            @test Sᵦ ≥ Sˢⁱ
+            @test Sᵦ ≤ Sᵒᶜ
 
             # Interface temperature should be at freezing point
             Tₘ = melting_temperature(liquidus, Sᵦ)
@@ -111,7 +111,7 @@ using ClimaSeaIce.SeaIceThermodynamics: LinearLiquidus, melting_temperature
             Tᵒᶜ = melting_temperature(liquidus, Sᵒᶜ)
             Sˢⁱ = 5.0
 
-            ice_state = (; S = Sˢⁱ, h = default_h, hc = default_hc, ℵ = default_ℵ, T = default_Tⁱⁿᵗ)
+            ice_state = (; S = Sˢⁱ, h = default_h, hc = default_hc, ℵ = default_ℵ, T = default_Tⁱⁿ)
             Tᵦ, Sᵦ, q = solve_interface_conditions(flux, Tᵒᶜ, Sᵒᶜ, ice_state, αₕ, αₛ, u★, L, ρᵒᶜ, cᵒᶜ, liquidus)
 
             @test Sᵦ ≈ Sᵒᶜ
@@ -124,12 +124,12 @@ using ClimaSeaIce.SeaIceThermodynamics: LinearLiquidus, melting_temperature
 
             for Sᵒᶜ in [30.0, 33.0, 35.0, 37.0, 40.0]
                 Sˢⁱ = 5.0
-                ice_state = (; S = Sˢⁱ, h = default_h, hc = default_hc, ℵ = default_ℵ, T = default_Tⁱⁿᵗ)
+                ice_state = (; S = Sˢⁱ, h = default_h, hc = default_hc, ℵ = default_ℵ, T = default_Tⁱⁿ)
                 Tᵦ, Sᵦ, q = solve_interface_conditions(flux, Tᵒᶜ, Sᵒᶜ, ice_state, αₕ, αₛ, u★, L, ρᵒᶜ, cᵒᶜ, liquidus)
 
                 # Interface salinity must always be bounded
-                @test Sᵦ >= Sˢⁱ
-                @test Sᵦ <= Sᵒᶜ
+                @test Sᵦ ≥ Sˢⁱ
+                @test Sᵦ ≤ Sᵒᶜ
 
                 # Interface temperature at freezing point
                 Tₘ = melting_temperature(liquidus, Sᵦ)
@@ -142,11 +142,11 @@ using ClimaSeaIce.SeaIceThermodynamics: LinearLiquidus, melting_temperature
             Sᵒᶜ = 35.0
             Sˢⁱ = 0.0  # Fresh ice
 
-            ice_state = (; S = Sˢⁱ, h = default_h, hc = default_hc, ℵ = default_ℵ, T = default_Tⁱⁿᵗ)
+            ice_state = (; S = Sˢⁱ, h = default_h, hc = default_hc, ℵ = default_ℵ, T = default_Tⁱⁿ)
             Tᵦ, Sᵦ, q = solve_interface_conditions(flux, Tᵒᶜ, Sᵒᶜ, ice_state, αₕ, αₛ, u★, L, ρᵒᶜ, cᵒᶜ, liquidus)
 
-            @test Sᵦ >= Sˢⁱ
-            @test Sᵦ <= Sᵒᶜ
+            @test Sᵦ ≥ Sˢⁱ
+            @test Sᵦ ≤ Sᵒᶜ
             @test Tᵦ ≈ melting_temperature(liquidus, Sᵦ)
         end
 
@@ -156,11 +156,11 @@ using ClimaSeaIce.SeaIceThermodynamics: LinearLiquidus, melting_temperature
             Sˢⁱ = 5.0
             u★_high = 0.1  # High turbulence
 
-            ice_state = (; S = Sˢⁱ, h = default_h, hc = default_hc, ℵ = default_ℵ, T = default_Tⁱⁿᵗ)
+            ice_state = (; S = Sˢⁱ, h = default_h, hc = default_hc, ℵ = default_ℵ, T = default_Tⁱⁿ)
             Tᵦ, Sᵦ, q = solve_interface_conditions(flux, Tᵒᶜ, Sᵒᶜ, ice_state, αₕ, αₛ, u★_high, L, ρᵒᶜ, cᵒᶜ, liquidus)
 
-            @test Sᵦ >= Sˢⁱ
-            @test Sᵦ <= Sᵒᶜ
+            @test Sᵦ ≥ Sˢⁱ
+            @test Sᵦ ≤ Sᵒᶜ
             @test Tᵦ ≈ melting_temperature(liquidus, Sᵦ)
         end
 
@@ -170,21 +170,22 @@ using ClimaSeaIce.SeaIceThermodynamics: LinearLiquidus, melting_temperature
             Sˢⁱ = 5.0
             u★_low = 0.0001  # Very low turbulence
 
-            ice_state = (; S = Sˢⁱ, h = default_h, hc = default_hc, ℵ = default_ℵ, T = default_Tⁱⁿᵗ)
+            ice_state = (; S = Sˢⁱ, h = default_h, hc = default_hc, ℵ = default_ℵ, T = default_Tⁱⁿ)
             Tᵦ, Sᵦ, q = solve_interface_conditions(flux, Tᵒᶜ, Sᵒᶜ, ice_state, αₕ, αₛ, u★_low, L, ρᵒᶜ, cᵒᶜ, liquidus)
 
-            @test Sᵦ >= Sˢⁱ
-            @test Sᵦ <= Sᵒᶜ
+            @test Sᵦ ≥ Sˢⁱ
+            @test Sᵦ ≤ Sᵒᶜ
             @test Tᵦ ≈ melting_temperature(liquidus, Sᵦ)
         end
     end
 end
 
 @testset "Salt flux sign conventions in coupled model" begin
-    # Test that computed salt fluxes have the correct sign based on ocean temperature:
-    # - Warm ocean (T > Tₘ) → melting → q > 0 → Jˢ > 0 (fresh meltwater dilutes ocean)
-    # - Cold ocean (T < Tₘ) → freezing → q < 0 → Jˢ < 0 (brine rejection adds salt)
-    # Sign convention: Jˢ > 0 means salinity is extracted from ocean
+    # The sea-ice/ocean exchange splits into a freshwater volume flux Jʷ and the salt the ice itself
+    # holds, Jˢ = Eᵢ Sˢⁱ / ρᵒᶜ. The Sᴺ-weighted dilution rides on Jʷ and is applied live in the ocean
+    # salinity boundary condition, so Jˢ carries the ice salinity alone.
+    # Sign conventions: Jˢ > 0 extracts salt from the ocean, Jʷ > 0 adds volume to it.
+    # - Warm ocean (T > Tₘ) → melting → Jʷ > 0, and the melting ice releases its salt, so Jˢ < 0
 
     for arch in test_architectures
         A = typeof(arch)
@@ -200,7 +201,7 @@ end
         sea_ice = sea_ice_simulation(grid, ocean)
 
         atmosphere = JRA55PrescribedAtmosphere(arch; time_indices_in_memory=4)
-        radiation = Radiation(arch)
+        radiation = JRA55PrescribedRadiation(arch; time_indices_in_memory=4)
 
         for sea_ice_ocean_heat_flux in [IceBathHeatFlux(), ThreeEquationHeatFlux()]
             @testset "Salt flux with $(nameof(typeof(sea_ice_ocean_heat_flux)))" begin
@@ -218,30 +219,33 @@ end
 
                 # Get the computed fluxes
                 Jˢ = coupled_model.interfaces.sea_ice_ocean_interface.fluxes.salt
-                𝒬ⁱⁿᵗ = coupled_model.interfaces.sea_ice_ocean_interface.fluxes.interface_heat
+                Jʷ = coupled_model.interfaces.sea_ice_ocean_interface.fluxes.freshwater
+                𝒬ⁱⁿ = coupled_model.interfaces.sea_ice_ocean_interface.fluxes.interface_heat
 
                 # Warm ocean should cause melting → Qᵢ > 0 (heat into ice)
-                𝒬ⁱⁿᵗ_cpu = Array(interior(𝒬ⁱⁿᵗ, :, :, 1))
-                @test all(𝒬ⁱⁿᵗ_cpu .> 0)
+                𝒬ⁱⁿ_cpu = Array(interior(𝒬ⁱⁿ, :, :, 1))
+                @test all(𝒬ⁱⁿ_cpu .> 0)
 
-                # During melting, fresh meltwater dilutes ocean → Jˢ > 0
+                # Melting adds meltwater volume to the ocean
+                Jʷ_cpu = Array(interior(Jʷ, :, :, 1))
+                @test all(Jʷ_cpu .> 0)
+
+                # ... and releases the salt held in the ice into it
                 Jˢ_cpu = Array(interior(Jˢ, :, :, 1))
-                @test all(Jˢ_cpu .> 0)
+                @test all(Jˢ_cpu .< 0)
             end
         end
     end
 end
 
 @testset "Salt flux unit consistency" begin
-    # This test verifies that the salt flux has correct units after the fix
-    # that adds the freshwater density conversion: Jˢ = (q / ρf) * (Sᵦ - S_ice)
+    # The salt flux Jˢ = Eᵢ Sˢⁱ / ρᵒᶜ must come out in psu m s⁻¹, consistent with the
+    # atmosphere-ocean salinity flux:
+    # - Eᵢ is a mass flux (kg m⁻² s⁻¹)
+    # - dividing by ρᵒᶜ (kg m⁻³) gives a volume flux (m s⁻¹)
+    # - multiplying by the ice salinity (psu) gives psu m s⁻¹
     #
-    # The key insight is that:
-    # - q is a mass flux (kg/m²/s)
-    # - Dividing by ρf (kg/m³) gives a volume flux (m/s)
-    # - Multiplying by salinity difference gives psu × m/s, consistent with atmosphere-ocean
-    #
-    # Without this fix, salt flux would be ~1000× too large, causing instability.
+    # Missing the density conversion would make the flux ~1000× too large and destabilize the ocean.
 
     for arch in test_architectures
         A = typeof(arch)
@@ -257,7 +261,7 @@ end
         sea_ice = sea_ice_simulation(grid, ocean)
 
         atmosphere = JRA55PrescribedAtmosphere(arch; time_indices_in_memory=4)
-        radiation = Radiation(arch)
+        radiation = JRA55PrescribedRadiation(arch; time_indices_in_memory=4)
 
         for sea_ice_ocean_heat_flux in [IceBathHeatFlux(), ThreeEquationHeatFlux()]
             @testset "Flux magnitude with $(nameof(typeof(sea_ice_ocean_heat_flux)))" begin
@@ -274,14 +278,14 @@ end
 
                 # Get the computed fluxes
                 Jˢ = coupled_model.interfaces.sea_ice_ocean_interface.fluxes.salt
-                𝒬ⁱⁿᵗ = coupled_model.interfaces.sea_ice_ocean_interface.fluxes.interface_heat
+                𝒬ⁱⁿ = coupled_model.interfaces.sea_ice_ocean_interface.fluxes.interface_heat
 
                 Jˢ_cpu = Array(interior(Jˢ, :, :, 1))
-                𝒬ⁱⁿᵗ_cpu = Array(interior(𝒬ⁱⁿᵗ, :, :, 1))
+                𝒬ⁱⁿ_cpu = Array(interior(𝒬ⁱⁿ, :, :, 1))
 
                 # Heat flux should be O(100-1000) W/m² for strong melting
-                @test all(𝒬ⁱⁿᵗ_cpu .> 0)
-                @test all(𝒬ⁱⁿᵗ_cpu .< 1e5)  # Should not be unreasonably large
+                @test all(𝒬ⁱⁿ_cpu .> 0)
+                @test all(𝒬ⁱⁿ_cpu .< 1e5)  # Should not be unreasonably large
 
                 # Salt flux (in psu × m/s) should be small: typical values O(1e-7 to 1e-5)
                 # Before the fix, salt flux was ~1000× too large
@@ -400,7 +404,7 @@ end
         sea_ice = sea_ice_simulation(grid, ocean)
 
         atmosphere = JRA55PrescribedAtmosphere(arch; time_indices_in_memory=4)
-        radiation = Radiation(arch)
+        radiation = JRA55PrescribedRadiation(arch; time_indices_in_memory=4)
 
         for sea_ice_ocean_heat_flux in [IceBathHeatFlux(), ThreeEquationHeatFlux()]
             @testset "Frazil with $(nameof(typeof(sea_ice_ocean_heat_flux)))" begin
@@ -450,7 +454,7 @@ end
         sea_ice = sea_ice_simulation(grid, ocean)
 
         atmosphere = JRA55PrescribedAtmosphere(arch; time_indices_in_memory=4)
-        radiation = Radiation(arch)
+        radiation = JRA55PrescribedRadiation(arch; time_indices_in_memory=4)
 
         # Test with ThreeEquationHeatFlux (default)
         @test begin
