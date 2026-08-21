@@ -10,6 +10,7 @@ using NumericalEarth.EarthSystemModels.InterfaceComputations: COARELogarithmicSi
                                                               MomentumBasedFrictionVelocity,
                                                               LargeYeagerTransferCoefficients,
                                                               FixedIterations,
+                                                              SeaIceAlbedo,
                                                               large_yeager_stability_functions
 
 #####
