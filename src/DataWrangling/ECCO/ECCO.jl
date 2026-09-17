@@ -164,6 +164,8 @@ ECCO4_dataset_variable_names = Dict(
     :rain_freshwater_flux   => "EXFpreci",
     :zonal_wind_stress      => "EXFtaue",
     :meridional_wind_stress => "EXFtaun",
+    :ocean_zonal_stress      => "oceTAUE",
+    :ocean_meridional_stress => "oceTAUN",
 )
 
 ECCO2_dataset_variable_names = Dict(
@@ -199,6 +201,8 @@ ECCO_location = Dict(
     :rain_freshwater_flux   => (Center, Center, Nothing),
     :zonal_wind_stress      => (Center, Center, Nothing),
     :meridional_wind_stress => (Center, Center, Nothing),
+    :ocean_zonal_stress      => (Center, Center, Nothing),
+    :ocean_meridional_stress => (Center, Center, Nothing),
 )
 
 const ECCOMetadata{D} = Metadata{<:ECCODataset, D}
