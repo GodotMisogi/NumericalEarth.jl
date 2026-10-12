@@ -1,0 +1,39 @@
+name = "OMIPAdjoint"
+uuid = "6a2eff0d-7356-483b-930e-f7406fc5671f"
+version = "0.1.0"
+authors = ["NumericalEarth contributors"]
+
+[deps]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+ClimaSeaIce = "6ba0ff68-24e6-4315-936c-2e99227c95a4"
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
+Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
+JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
+JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+NumericalEarth = "904d977b-046a-4731-8b86-9235c0d1ef02"
+OMIPSimulations = "5ac3a3a1-7b1f-4d7e-9c5e-1e6c9d9b2a4d"
+Oceananigans = "9e8cae18-63c1-5223-a75c-80ca9d6e9a09"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+Reactant = "3c362404-f566-11ee-1572-e11a4b42c853"
+SeawaterPolynomials = "d496a93d-167e-4197-9f49-d3af4ff8fe40"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[sources]
+SeawaterPolynomials = {rev = "ss/conversion-functions", url = "https://github.com/CliMA/SeawaterPolynomials.jl.git"}
+Oceananigans = {rev = "ss/for-omip", url = "https://github.com/CliMA/Oceananigans.jl.git"}
+ClimaSeaIce = {rev = "ss/for-omip", url = "https://github.com/CliMA/ClimaSeaIce.jl.git"}
+NumericalEarth = {path = "../../.."}
+OMIPSimulations = {path = ".."}
+
+[compat]
+CUDA = "5.11.0, 6"
+Enzyme = "0.13.138"
+JSON = "0.21, 1"
+Reactant = "0.2.286"
+julia = "1.10"
+
+[extras]
+CUDA_Runtime_jll = "76a88914-d11a-5bdc-97e0-2f5a05c973a2"
+Reactant_jll = "0192cb87-2b54-54ad-80e0-3be72ad8a3c0"
