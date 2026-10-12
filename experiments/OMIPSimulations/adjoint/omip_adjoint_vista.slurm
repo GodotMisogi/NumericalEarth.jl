@@ -41,6 +41,9 @@ BIND=""
 for d in /work /work2 /scratch; do [ -d "$d" ] && BIND="${BIND:+$BIND,}$d"; done
 RUN="apptainer exec --nv ${BIND:+--bind $BIND} $SIF julia --project=adjoint"
 
+# The CUDA 13.1 Reactant_jll build fails to load on the GH200 nodes (undefined CUDA symbol); select 12.9.
+[ -f adjoint/LocalPreferences.toml ] || printf '[Reactant_jll]\ngpu = "cuda"\ngpu_version = "12.9"\n' > adjoint/LocalPreferences.toml
+
 echo "=== environment ($(date +%T))"
 $RUN -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()' > "adjoint/logs/env.$SLURM_JOB_ID.log" 2>&1 ||
     { echo "Environment failed; see adjoint/logs/env.$SLURM_JOB_ID.log" >&2; exit 1; }
