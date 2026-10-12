@@ -10,7 +10,7 @@ using Oceananigans
 using Oceananigans: prognostic_state, restore_prognostic_state!
 using Oceananigans.Units: days
 using Oceananigans.Architectures: CPU, ReactantState, architecture, on_architecture, convert_to_device
-using Oceananigans.Grids: AbstractGrid, ExponentialDiscretization, inactive_node, φnode, znode,
+using Oceananigans.Grids: AbstractGrid, ExponentialDiscretization, inactive_node, λnode, φnode, znode,
                           Center, Face
 using Oceananigans.Operators: Δxᶜᶠᶜ, Δzᶜᶠᶜ
 using Oceananigans.Fields: Field, CenterField, interior
@@ -25,7 +25,7 @@ using Oceananigans.Models.HydrostaticFreeSurfaceModels.SplitExplicitFreeSurfaces
     _split_explicit_barotropic_velocity!, _split_explicit_free_surface!
 
 using NumericalEarth: OceanOnlyModel, PrescribedAtmosphere, PrescribedRadiation, SurfaceRadiationProperties,
-                      regrid_bathymetry, atlantic_ocean_basin
+                      regrid_bathymetry
 using NumericalEarth.Oceans: ocean_simulation
 using NumericalEarth.DataWrangling: Metadatum
 using NumericalEarth.DataWrangling.WOA: WOAAnnual

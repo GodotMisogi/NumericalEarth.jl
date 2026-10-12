@@ -1,16 +1,17 @@
 #####
 ##### Overturning strength at a latitude: the AMOC objective
 #####
-# ψ(k) = -Σ_{k'≤k} Σ_i AW[i,k'] v(i,k') in m³ s⁻¹ on the model row nearest `latitude`, with the
-# Atlantic-masked face area AW precomputed on a CPU twin of the grid. The traced functor is a pure
-# reduction (no element indexing of traced arrays).
+# ψ(k) = -Σ_{k'≤k} Σ_i AW[i,k'] v(i,k') in m³ s⁻¹ on the model row nearest `latitude`, with the face
+# area AW of the wet cells inside the section's longitude span precomputed on a CPU twin of the grid.
+# The traced functor is a pure reduction (no element indexing of traced arrays).
 
 """
     OverturningStrength
 
-Overturning streamfunction objective on the model row nearest `latitude`, in Sverdrups. `mode` is
-`:fixed_residual` (ψ at `reference_depth` after removing the section's net barotropic transport,
-smooth in the control) or `:fixed_depth` (no residual correction).
+Overturning streamfunction objective on the model row nearest `latitude`, over the wet cells whose
+longitude lies in `longitudes` (degrees east), in Sverdrups. `mode` is `:fixed_residual` (ψ at
+`reference_depth` after removing the section's net barotropic transport, smooth in the control) or
+`:fixed_depth` (no residual correction).
 """
 struct OverturningStrength{A, L, E}
     row :: Int
@@ -31,14 +32,15 @@ function nearest_row(grid, latitude)
     return argmin(distances)
 end
 
-# Face-area weight AW[i, k] = atlantic · wet · Δxᶜᶠᶜ · Δzᶜᶠᶜ at the transect (m²), on a CPU grid.
-function transect_area_weight(cpu_grid, row)
+# Face-area weight AW[i, k] = in_section · wet · Δxᶜᶠᶜ · Δzᶜᶠᶜ at the transect (m²), on a CPU grid.
+function transect_area_weight(cpu_grid, row, longitudes)
     Nx, Ny, Nz = size(cpu_grid)
-    atlantic = Array(interior(atlantic_ocean_basin(cpu_grid).mask, :, :, 1))
     AW = zeros(Float64, Nx, Nz)
     for k in 1:Nz, i in 1:Nx
+        λ = mod(λnode(i, row, k, cpu_grid, Center(), Face(), Center()), 360)
+        in_section = longitudes[1] <= λ <= longitudes[2]
         wet = !inactive_node(i, row, k, cpu_grid, Center(), Face(), Center())
-        AW[i, k] = (atlantic[i, row] && wet) * Δxᶜᶠᶜ(i, row, k, cpu_grid) * Δzᶜᶠᶜ(i, row, k, cpu_grid)
+        AW[i, k] = (in_section && wet) * Δxᶜᶠᶜ(i, row, k, cpu_grid) * Δzᶜᶠᶜ(i, row, k, cpu_grid)
     end
     return AW
 end
@@ -47,13 +49,15 @@ end
 $(TYPEDSIGNATURES)
 
 Build an [`OverturningStrength`](@ref) objective for the ocean on `cpu_grid` (a `CPU` twin of the
-model grid, used for the host-side geometry).
+model grid, used for the host-side geometry). The default section is the RAPID line at 26.5°N from
+Florida (80°W) to Africa (14°W).
 """
-function OverturningStrength(cpu_grid; latitude = 26.5, reference_depth = 1000.0, mode = :fixed_residual)
+function OverturningStrength(cpu_grid; latitude = 26.5, longitudes = (280, 346), reference_depth = 1000.0,
+                             mode = :fixed_residual)
     mode in overturning_modes || throw(ArgumentError("mode must be one of $overturning_modes, got $mode"))
     Nz = size(cpu_grid, 3)
     row = nearest_row(cpu_grid, latitude)
-    AW = transect_area_weight(cpu_grid, row)
+    AW = transect_area_weight(cpu_grid, row, longitudes)
     cumulative = Float64[k2 <= k1 for k1 in 1:Nz, k2 in 1:Nz]
     z_centers = [znode(1, 1, k, cpu_grid, Center(), Center(), Center()) for k in 1:Nz]
     k_ref = argmin(abs.(z_centers .+ reference_depth))

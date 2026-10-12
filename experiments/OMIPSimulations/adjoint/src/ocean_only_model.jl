@@ -7,6 +7,18 @@
 # `ReactantState()`: the forcing window is loaded into memory up front and nothing reads from disk
 # during a time step.
 
+# The 2° regridded bathymetry leaves a wet path through Panama; land the isthmus so the Atlantic and
+# Pacific are separate basins.
+function close_central_american_isthmus!(bottom_height)
+    grid = bottom_height.grid
+    for j in 1:size(grid, 2), i in 1:size(grid, 1)
+        λ = λnode(i, j, 1, grid, Center(), Center(), Center())
+        φ = φnode(i, j, 1, grid, Center(), Center(), Center())
+        (276 <= λ <= 284 && 7 <= φ <= 12) && (bottom_height[i, j, 1] = 0)
+    end
+    return bottom_height
+end
+
 """
 $(TYPEDSIGNATURES)
 
@@ -19,6 +31,7 @@ function omip_adjoint_grid(arch; Nx = 180, Ny = 60, Nz = 20, depth = 5500)
 
     cpu_underlying = TripolarGrid(CPU(); size, z, halo)
     cpu_bottom = regrid_bathymetry(cpu_underlying; minimum_depth = 20, major_basins = 1, interpolation_passes = 25)
+    close_central_american_isthmus!(cpu_bottom)
     cpu_grid = ImmersedBoundaryGrid(cpu_underlying, GridFittedBottom(cpu_bottom))
     arch isa CPU && return (; grid = cpu_grid, cpu_grid)
 
