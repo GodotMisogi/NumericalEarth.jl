@@ -119,13 +119,14 @@ end
 
     fi = indices_tuple.i
     fj = indices_tuple.j
+    FT = eltype(source_grid)
     @inbounds begin
         if !isnothing(fi)
-            fi[i, j, 1] = clamp_fractional_index(fractional_indices_ij.i, TX(), Nx, Hx, halo_column)
+            fi[i, j, 1] = clamp_fractional_index(FT, fractional_indices_ij.i, TX(), Nx, Hx, halo_column)
         end
 
         if !isnothing(fj)
-            fj[i, j, 1] = clamp_fractional_index(fractional_indices_ij.j, TY(), Ny, Hy, halo_column)
+            fj[i, j, 1] = clamp_fractional_index(FT, fractional_indices_ij.j, TY(), Ny, Hy, halo_column)
         end
     end
 end
@@ -150,14 +151,14 @@ end
 
 # Halo columns read the component's own halo, so the index is held where interpolation can
 # reach: `⌊f⌋` and `⌊f⌋ + 1` must both lie within `1 - H` and `N + H`.
-@inline clamp_fractional_index(::Nothing, topo, N, H, halo_column) = nothing
+@inline clamp_fractional_index(FT, ::Nothing, topo, N, H, halo_column) = nothing
 
-@inline function clamp_fractional_index(fractional_index, topo, N, H, halo_column)
-    FT = typeof(fractional_index)
+# min/max rather than clamp: Base.clamp promotes the index type dynamically, which Reactant's CUDA codegen rejects.
+@inline function clamp_fractional_index(FT, fractional_index, topo, N, H, halo_column)
     lowest = convert(FT, 1 - H)
     highest = prevfloat(convert(FT, N + H))
     clamped = halo_column & !(topo isa Periodic)
-    return ifelse(clamped, clamp(fractional_index, lowest, highest), fractional_index)
+    return ifelse(clamped, min(max(fractional_index, lowest), highest), fractional_index)
 end
 
 # 2-D (surface) specialization of `NumericalEarth.stateindex`, pinning k = 1: a scalar
