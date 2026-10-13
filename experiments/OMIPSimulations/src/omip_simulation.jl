@@ -1291,8 +1291,9 @@ divergence_damping_forcing(τ) =
 @inline νh(i, j, k, grid, ℓx, ℓy, ℓz, clock, fields, Uv) =
     Uv * sqrt(Oceananigans.Operators.Az(i, j, k, grid, ℓx, ℓy, ℓz)) / 2
 
-# Background tracer diffusivity following Henyey et al. (1986).
-@inline henyey_diffusivity(x, y, z, t) = max(2e-6, 1e-5 * abs(sind(y)))
+# Background tracer diffusivity following Henyey et al. (1986). `sin(deg2rad(y))`, not `sind`: the
+# latter's domain check is a trap that Reactant cannot raise.
+@inline henyey_diffusivity(x, y, z, t) = max(2e-6, 1e-5 * abs(sin(deg2rad(y))))
 @inline henyey2x_diffusivity(x, y, z, t) = 2 * henyey_diffusivity(x, y, z, t)
 
 # Bryan & Lewis (1979) depth-dependent background diffusivity, in the form GFDL models carry:
