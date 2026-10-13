@@ -50,7 +50,8 @@ function update_net_ocean_fluxes!(coupled_model, ocean_model, grid)
 
     ice_concentration = sea_ice_concentration(sea_ice)
     intercepted_snowfall_flux = intercepted_snowfall(sea_ice)
-    ocean_surface_temperature = EarthSystemModels.ocean_surface_temperature(ocean_model)
+    # The 3-D tracer, indexed at the surface in the kernel: a view of the top level does not raise under Reactant.
+    ocean_temperature = EarthSystemModels.ocean_temperature(ocean_model)
     ocean_properties = coupled_model.interfaces.ocean_properties
 
     launch!(arch, grid, :xy,
@@ -60,7 +61,7 @@ function update_net_ocean_fluxes!(coupled_model, ocean_model, grid)
             clock,
             atmos_ocean_fluxes,
             sea_ice_ocean_fluxes,
-            ocean_surface_temperature,
+            ocean_temperature,
             ice_concentration,
             rainfall,
             snowfall,
@@ -87,7 +88,7 @@ Base.@propagate_inbounds get_land_freshwater_flux(i, j, flux) = flux[i, j, 1]
                                              clock,
                                              atmos_ocean_fluxes,
                                              sea_ice_ocean_fluxes,
-                                             ocean_surface_temperature,
+                                             ocean_temperature,
                                              sea_ice_concentration,
                                              rainfall_flux,
                                              snowfall_flux,
@@ -107,7 +108,7 @@ Base.@propagate_inbounds get_land_freshwater_flux(i, j, flux) = flux[i, j, 1]
 
     @inbounds begin
         ℵᵢ = sea_ice_concentration[i, j, 1]
-        Tᵒᶜ = ocean_surface_temperature[i, j, 1]
+        Tᵒᶜ = ocean_temperature[i, j, kᴺ]
 
         Jʳⁿ = rainfall_flux[i, j, 1]
         Jˢⁿ = snowfall_flux[i, j, 1]
