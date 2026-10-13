@@ -56,6 +56,11 @@ SMI_PID=$!
 $RUN -O0 adjoint/test_omip_adjoint.jl "$CONFIG"
 STATUS=$?
 
+# Reactant writes the MLIR module of a failed compile to the node's /tmp; keep it with the logs.
+if [ $STATUS -ne 0 ]; then
+    for d in /tmp/reactant_*; do [ -d "$d" ] && cp -r "$d" "adjoint/logs/reactant_dump.$SLURM_JOB_ID.$(basename "$d")"; done
+fi
+
 kill $SMI_PID 2>/dev/null
 date
 exit $STATUS
