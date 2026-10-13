@@ -1,10 +1,13 @@
 #!/bin/bash
 #----------------------------------------------------
-# Differentiable OMIP ocean test on one Vista GH200 (NumericalEarth.jl/experiments/OMIPSimulations).
+# Differentiable OMIP ocean test on one TACC GPU: Vista GH200 or Lonestar6 A100/H100
+# (NumericalEarth.jl/experiments/OMIPSimulations).
 #
 # Usage, from experiments/OMIPSimulations:
-#   sbatch adjoint/omip_adjoint_vista.slurm                                   # default config, gh, 8 h
-#   CONFIG=adjoint/configs/<cfg>.json sbatch -p gh-dev -t 02:00:00 adjoint/omip_adjoint_vista.slurm
+#   sbatch adjoint/omip_adjoint.slurm                                         # Vista, default config, gh, 8 h
+#   CONFIG=adjoint/configs/<cfg>.json sbatch -p gh-dev -t 02:00:00 adjoint/omip_adjoint.slurm
+#   sbatch -p gpu-a100 adjoint/omip_adjoint.slurm                             # LS6 (or gpu-h100, gpu-a100-dev)
+# The container defaults to $WORK/containers/julia_1.12_$TACC_SYSTEM.sif; override with SIF=.
 # The job instantiates and precompiles the adjoint environment inside the container first (idempotent),
 # then runs the test. Datasets come from NumericalEarth's cache in the depot (`adjoint/prepare_data.jl`
 # fills it; compute nodes have internet, login nodes cannot run the container).
@@ -32,11 +35,13 @@ set -uo pipefail
 export JULIA_NUM_PRECOMPILE_TASKS=${SLURM_CPUS_PER_TASK:-16}
 
 CONFIG=${CONFIG:-adjoint/configs/twodegree_nz20_1step.json}
-SIF=${SIF:-$WORK/.julia/dev/ReactOcean/vi_julia.sif}
+SIF=${SIF:-$WORK/containers/julia_1.12_${TACC_SYSTEM}.sif}
 [ -f "$SIF" ] || { echo "Missing container $SIF" >&2; exit 1; }
 [ -f "$CONFIG" ] || { echo "Config not found: $CONFIG" >&2; exit 1; }
 echo "config: $CONFIG  container: $SIF"; date; hostname
-nvidia-smi --query-gpu=name,memory.total --format=csv
+# LS6 A100 nodes have three GPUs; the test uses one.
+export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
+nvidia-smi -i 0 --query-gpu=name,driver_version,memory.total --format=csv
 cp adjoint/Manifest.toml "adjoint/logs/Manifest.$SLURM_JOB_ID.toml" 2>/dev/null || true
 
 BIND=""
@@ -44,6 +49,7 @@ for d in /work /work2 /scratch; do [ -d "$d" ] && BIND="${BIND:+$BIND,}$d"; done
 RUN="apptainer exec --nv ${BIND:+--bind $BIND} $SIF julia --project=adjoint"
 
 # The CUDA 13.1 Reactant_jll build fails to load on the GH200 nodes (undefined CUDA symbol); select 12.9.
+# LS6 shares this worktree, and so this file, through /work; its 570 driver (CUDA 12.8) runs 12.9 builds.
 [ -f adjoint/LocalPreferences.toml ] || printf '[Reactant_jll]\ngpu = "cuda"\ngpu_version = "12.9"\n' > adjoint/LocalPreferences.toml
 
 echo "=== environment ($(date +%T))"
@@ -52,7 +58,7 @@ $RUN -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()' > "adjoint/logs/env.$SL
 echo "=== test ($(date +%T))"
 
 # GPU utilization every 5 min: tells a device-bound evaluation from a host-side hang.
-nvidia-smi --query-gpu=timestamp,utilization.gpu,memory.used --format=csv -l 300 > "adjoint/logs/gpu.$SLURM_JOB_ID.csv" 2>&1 &
+nvidia-smi -i 0 --query-gpu=timestamp,utilization.gpu,memory.used --format=csv -l 300 > "adjoint/logs/gpu.$SLURM_JOB_ID.csv" 2>&1 &
 SMI_PID=$!
 
 $RUN -O0 adjoint/test_omip_adjoint.jl "$CONFIG"
