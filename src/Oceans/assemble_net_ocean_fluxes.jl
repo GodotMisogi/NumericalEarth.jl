@@ -175,7 +175,7 @@ Base.@propagate_inbounds get_land_freshwater_flux(i, j, flux) = flux[i, j, 1]
         # ice meltwater term, which is zero unless the meltwater is delivered at the interface
         # temperature rather than at Conservative Temperature 0.
         Jᵀ[i, j, 1] = ifelse(inactive, zero(grid), Jᵀao + Jᵀio)
-        Jˢ[i, j, 1] = ifelse(inactive, zero(grid), Jˢio)
+        Jˢ[i, j, 1] = ifelse(inactive, zero(grid), convert(eltype(grid), Jˢio))   # Jˢio is an Int zero without sea ice
         Jʷ[i, j, 1] = ifelse(inactive, zero(grid), Jʷao + Jʷio)
         Jᴴ[i, j, 1] = ifelse(inactive, zero(grid), Tᵒᶜ * Jʷao + Jᴴio)
     end
