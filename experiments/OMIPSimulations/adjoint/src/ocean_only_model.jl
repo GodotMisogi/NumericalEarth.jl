@@ -107,25 +107,36 @@ const ocean_surface_radiation = SurfaceRadiationProperties(0.06, 1.0)
 $(TYPEDSIGNATURES)
 
 JRA55 repeat-year atmosphere and downwelling radiation for `n_slices` three-hourly slices from
-`start_date`, loaded on the CPU and copied slice by slice into in-memory `PrescribedAtmosphere` and
-`PrescribedRadiation` objects on `arch`, so that the coupled time step does no file I/O.
+`start_date`, loaded on the CPU, interpolated onto a regular latitude-longitude grid of the same size
+and copied slice by slice into in-memory `PrescribedAtmosphere` and `PrescribedRadiation` objects on
+`arch`, so that the coupled time step does no file I/O and no search over Gaussian latitudes.
 """
 function omip_adjoint_forcing(arch; start_date = DateTime(1990, 1, 1), n_slices = 16)
     dataset  = RepeatYearJRA55()
     end_date = start_date + Hour(3 * (n_slices - 1))
     kw = (; dataset, start_date, end_date, time_indices_in_memory = n_slices)
 
-    cpu_atmosphere = JRA55PrescribedAtmosphere(CPU(); kw..., prefetch = false)
-    cpu_radiation  = JRA55PrescribedRadiation(CPU(); kw..., ocean_surface = ocean_surface_radiation,
-                                              sea_ice_surface = nothing)
+    jra55_atmosphere = JRA55PrescribedAtmosphere(CPU(); kw..., prefetch = false)
+    jra55_radiation  = JRA55PrescribedRadiation(CPU(); kw..., ocean_surface = ocean_surface_radiation,
+                                                sea_ice_surface = nothing)
 
-    times = cpu_atmosphere.velocities.u.times
-    grid  = on_architecture(arch, cpu_atmosphere.velocities.u.grid)
+    times = jra55_atmosphere.velocities.u.times
+    jra55_grid = jra55_atmosphere.velocities.u.grid
+    Nx, Ny, _ = size(jra55_grid)
+    cpu_grid = LatitudeLongitudeGrid(CPU(), eltype(jra55_grid); size = (Nx, Ny), longitude = (0, 360),
+                                     latitude = (-90, 90), topology = (Periodic, Bounded, Flat))
 
-    atmosphere = PrescribedAtmosphere(grid, times; surface_layer_height = cpu_atmosphere.surface_layer_height,
-                                      boundary_layer_height = cpu_atmosphere.boundary_layer_height)
-    radiation  = PrescribedRadiation(grid, times; ocean_surface = ocean_surface_radiation, sea_ice_surface = nothing)
+    atmosphere_kw = (; surface_layer_height = jra55_atmosphere.surface_layer_height,
+                       boundary_layer_height = jra55_atmosphere.boundary_layer_height)
+    radiation_kw  = (; ocean_surface = ocean_surface_radiation, sea_ice_surface = nothing)
 
+    cpu_atmosphere = PrescribedAtmosphere(cpu_grid, times; atmosphere_kw...)
+    cpu_radiation  = PrescribedRadiation(cpu_grid, times; radiation_kw...)
+    map_forcing_slices!(interpolate!, times, cpu_atmosphere, cpu_radiation, jra55_atmosphere, jra55_radiation)
+
+    grid = on_architecture(arch, cpu_grid)
+    atmosphere = PrescribedAtmosphere(grid, times; atmosphere_kw...)
+    radiation  = PrescribedRadiation(grid, times; radiation_kw...)
     map_forcing_slices!(copy_slice!, times, atmosphere, radiation, cpu_atmosphere, cpu_radiation)
     update_state!(atmosphere)
     update_state!(radiation)

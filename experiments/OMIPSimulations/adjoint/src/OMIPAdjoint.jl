@@ -10,10 +10,10 @@ using Oceananigans
 using Oceananigans: prognostic_state, restore_prognostic_state!
 using Oceananigans.Units: days
 using Oceananigans.Architectures: CPU, ReactantState, architecture, on_architecture, convert_to_device
-using Oceananigans.Grids: AbstractGrid, ExponentialDiscretization, inactive_node, λnode, φnode, znode,
-                          Center, Face
+using Oceananigans.Grids: AbstractGrid, ExponentialDiscretization, LatitudeLongitudeGrid, inactive_node,
+                          λnode, φnode, znode, Center, Face, Periodic, Bounded, Flat
 using Oceananigans.Operators: Δxᶜᶠᶜ, Δzᶜᶠᶜ
-using Oceananigans.Fields: Field, CenterField, interior
+using Oceananigans.Fields: Field, CenterField, interior, interpolate!
 using Oceananigans.ImmersedBoundaries: ImmersedBoundaryGrid, GridFittedBottom
 using Oceananigans.OrthogonalSphericalShellGrids: TripolarGrid
 using Oceananigans.Coriolis: HydrostaticSphericalCoriolis, EnstrophyConserving
