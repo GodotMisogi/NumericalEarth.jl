@@ -19,9 +19,10 @@ const ReactantESM{R, A, L, I, O, F, C} = Union{
     EarthSystemModel{R, A, L, I, O, F, C, <:Distributed{ReactantState}},
 }
 
+# Raised kernel compilation: the CUDA codegen path rejects the exchanger's fractional-index kernel.
 function reconcile_state!(model::ReactantESM)
-    @jit Oceananigans.initialize!(model.interfaces.exchanger, model)
-    @jit Oceananigans.TimeSteppers.update_state!(model)
+    @jit raise=true raise_first=true Oceananigans.initialize!(model.interfaces.exchanger, model)
+    @jit raise=true raise_first=true Oceananigans.TimeSteppers.update_state!(model)
     return nothing
 end
 
