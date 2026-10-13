@@ -76,16 +76,24 @@ function restore_state!(model, state)
     return nothing
 end
 
+# Interface fluxes first: the ocean tendencies read them. The ocean's own `update_state!` refreshes the
+# diagnostics and the SplitRK3 stage-1 tendencies, which `prognostic_state` does not cover.
+function refresh_diagnostics!(model)
+    update_state!(model)
+    update_state!(ocean_model(model))
+    return nothing
+end
+
 """
 $(TYPEDSIGNATURES)
 
 Return `reset!()`, which restores `model` to `state` and recomputes its diagnostic state with a
-separately compiled `update_state!` (plain Julia on a CPU model).
+separately compiled [`refresh_diagnostics!`](@ref) (plain Julia on a CPU model).
 """
 function build_reset(model, state)
-    update! = architecture(ocean_model(model).grid) isa ReactantState ?
-        (@compile raise = true raise_first = true update_state!(model)) : update_state!
-    return () -> (restore_state!(model, state); update!(model); nothing)
+    refresh! = architecture(ocean_model(model).grid) isa ReactantState ?
+        (@compile raise = true raise_first = true refresh_diagnostics!(model)) : refresh_diagnostics!
+    return () -> (restore_state!(model, state); refresh!(model); nothing)
 end
 
 function window_objective(model, obj, n_steps, Δt)
