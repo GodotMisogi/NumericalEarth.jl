@@ -109,7 +109,7 @@ function gradient_core!(model, dmodel, obj, n_steps, Δt)
 end
 
 # The wind controls: the 10-m velocity slices of the in-memory atmosphere.
-wind_fields(model) = (model.atmosphere.velocities.u, model.atmosphere.velocities.v)
+wind_fields(model) = (u = model.atmosphere.velocities.u, v = model.atmosphere.velocities.v)
 
 # Interior parent index ranges of a surface field time series.
 function interior_ranges(fts)
