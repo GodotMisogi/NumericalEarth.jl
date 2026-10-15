@@ -179,16 +179,18 @@ function field_census(name, f, wet)
     nan = isnan.(a)
     n_nan = count(nan)
     levels = Int[]
+    columns = Tuple{Int, Int}[]
     nan_wet = nan_dry = 0
     if n_nan > 0 && size(a, 3) > 1
-        Hz = f.grid.Hz
+        Hx, Hy, Hz = f.grid.Hx, f.grid.Hy, f.grid.Hz
         levels = [k - Hz for k in axes(a, 3) if any(view(nan, :, :, k))]   # interior k; ≤ 0 or > Nz is halo
+        columns = [(i - Hx, j - Hy) for i in axes(a, 1), j in axes(a, 2) if any(view(nan, i, j, :))]
     elseif n_nan > 0 && wet !== nothing && size(wet) == size(a)[1:2]
         nan_wet = count(view(nan, :, :, 1) .& wet)
         nan_dry = n_nan - nan_wet
     end
     return (; name, size = size(a), n_nan, n_inf = count(isinf, a),
-              n_nonzero = count(x -> isfinite(x) && x != 0, a), levels, nan_wet, nan_dry)
+              n_nonzero = count(x -> isfinite(x) && x != 0, a), levels, columns, nan_wet, nan_dry)
 end
 
 # Wet surface cells of the ocean grid on its parent (halo-inclusive) index range.
@@ -207,8 +209,9 @@ $(TYPEDSIGNATURES)
 
 Per-field census of the Enzyme shadows in `dmodel`: ocean velocities, tracers and free-surface
 displacement, and the atmosphere and radiation slices. Each entry holds the counts of NaN, Inf and
-non-zero finite entries, the interior vertical levels holding NaN (3-D fields) and, for ocean surface
-fields with `cpu_grid` given, the wet/dry split of the NaN cells.
+non-zero finite entries, the vertical levels and `(i, j)` columns holding NaN (3-D fields, interior
+indices; out-of-range ones are halo) and, for ocean surface fields with `cpu_grid` given, the
+wet/dry split of the NaN cells.
 """
 function shadow_census(dmodel; cpu_grid = nothing)
     wet = cpu_grid === nothing ? nothing : surface_wet_mask(cpu_grid)
@@ -238,6 +241,8 @@ function print_shadow_census(io::IO, census)
                 (c.nan_wet + c.nan_dry > 0 ? "wet $(c.nan_wet), dry $(c.nan_dry)" : "")
         println(io, "  ", rpad(c.name, 20), " NaN ", lpad(c.n_nan, 8), "  Inf ", lpad(c.n_inf, 8),
                 "  nonzero ", lpad(c.n_nonzero, 9), "  of ", prod(c.size), "  ", where)
+        isempty(c.columns) || println(io, "    columns (i, j): ", join(first(c.columns, 20), " "),
+                                      length(c.columns) > 20 ? " … ($(length(c.columns)) in all)" : "")
     end
     bad = count(c -> c.n_nan > 0 || c.n_inf > 0, census)
     finite = [c.name for c in census if c.n_nan == 0 && c.n_inf == 0 && c.n_nonzero > 0]
@@ -272,7 +277,7 @@ $(TYPEDSIGNATURES)
 Taylor-remainder check of the compiled gradient `evaluate!` (from [`build_gradient`](@ref)) along
 the gradient direction: for `h = h0 / 2ⁱ`, `i = 0:nh-1`, compares `Δf = f(x₀ + h d) − f(x₀)` with
 `h gᵀd` and reports the successive-difference slope, which cancels any constant offset in `Δf` and
-must match `gᵀd` to `tolerance` ("GRADIENT VERIFIED"). Returns the rows and the verdict.
+must match a non-zero `gᵀd` to `tolerance` ("GRADIENT VERIFIED"). Returns the rows and the verdict.
 """
 function taylor_remainder_check(model, evaluate!; h0 = 1.0, nh = 6, tolerance = 1e-3)
     x0 = wind_control(model)
@@ -300,7 +305,7 @@ function taylor_remainder_check(model, evaluate!; h0 = 1.0, nh = 6, tolerance = 
     slopes = [(rows[i].Δf - rows[i+1].Δf) / (rows[i].h - rows[i+1].h) for i in 1:(length(rows) - 1)]
     slope = sum(slopes) / length(slopes)
     relative_error = abs(slope - gd) / max(abs(gd), eps())
-    verified = relative_error < tolerance
+    verified = gd != 0 && relative_error < tolerance   # a zero gradient gives d = 0, so Δf = 0 proves nothing
     @printf("  FD slope = %+.8e   adjoint gᵀd = %+.8e   rel_err = %.3e\n", slope, gd, relative_error)
     println("  => ", verified ? "GRADIENT VERIFIED" : "MISMATCH")
     return (; rows, slope, gd, relative_error, verified)

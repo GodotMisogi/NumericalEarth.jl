@@ -1,0 +1,14 @@
+{
+  "_comment": "Second rung: 2 steps, so the winds reach the AMOC inside the window (step 2 uses the fluxes computed at the end of step 1; a 1-step gradient is exactly zero).",
+  "Nz": 20,
+  "steps": 2,
+  "dt": 7200.0,
+  "substeps": 50,
+  "n_atmosphere_slices": 16,
+  "backend": "gpu",
+  "stages": "cpu,primal,gradient",
+  "roll_barotropic_substeps": true,
+  "taylor_h0": 1.0,
+  "taylor_nh": 6,
+  "output": "results/omip_adjoint_twodegree_nz20_2step.jld2"
+}
