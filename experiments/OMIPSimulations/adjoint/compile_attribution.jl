@@ -134,7 +134,6 @@ end
 
 # XLA code generation of an optimized module, as in `Reactant.Compiler.compile_xla`.
 function xla_compile(mod, fn, compile_options)
-    fn.is_sharded && error("the attribution covers single-device modules only")
     client, device = Reactant.Compiler.__resolve_device_and_client(XLA.default_backend(), fn.seen_args,
                                                                     fn.linear_args, fn.is_sharded)
     options = XLA.make_compile_options(; device_id = Int64(XLA.device_ordinal(device)),
