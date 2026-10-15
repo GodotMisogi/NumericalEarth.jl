@@ -7,6 +7,7 @@
 #   sbatch adjoint/omip_adjoint.slurm                                         # Vista, default config, gh, 8 h
 #   CONFIG=adjoint/configs/<cfg>.json sbatch -p gh-dev -t 02:00:00 adjoint/omip_adjoint.slurm
 #   sbatch -p gpu-a100 adjoint/omip_adjoint.slurm                             # LS6 (or gpu-h100, gpu-a100-dev)
+#   SCRIPT=adjoint/compile_attribution.jl CONFIG=adjoint/configs/compile_attribution_nz20_1step.json sbatch ...
 # The container defaults to $WORK/containers/julia_1.12_$TACC_SYSTEM.sif; override with SIF=.
 # The job instantiates and precompiles the adjoint environment inside the container first (idempotent),
 # then runs the test. Datasets come from NumericalEarth's cache in the depot (`adjoint/prepare_data.jl`
@@ -35,10 +36,11 @@ set -uo pipefail
 export JULIA_NUM_PRECOMPILE_TASKS=${SLURM_CPUS_PER_TASK:-16}
 
 CONFIG=${CONFIG:-adjoint/configs/twodegree_nz20_1step.json}
+SCRIPT=${SCRIPT:-adjoint/test_omip_adjoint.jl}
 SIF=${SIF:-$WORK/containers/julia_1.12_${TACC_SYSTEM}.sif}
 [ -f "$SIF" ] || { echo "Missing container $SIF" >&2; exit 1; }
 [ -f "$CONFIG" ] || { echo "Config not found: $CONFIG" >&2; exit 1; }
-echo "config: $CONFIG  container: $SIF"; date; hostname
+echo "script: $SCRIPT  config: $CONFIG  container: $SIF"; date; hostname
 # LS6 A100 nodes have three GPUs; the test uses one.
 export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
 nvidia-smi -i 0 --query-gpu=name,driver_version,memory.total --format=csv
@@ -61,7 +63,7 @@ echo "=== test ($(date +%T))"
 nvidia-smi -i 0 --query-gpu=timestamp,utilization.gpu,memory.used --format=csv -l 300 > "adjoint/logs/gpu.$SLURM_JOB_ID.csv" 2>&1 &
 SMI_PID=$!
 
-$RUN -O0 adjoint/test_omip_adjoint.jl "$CONFIG"
+$RUN -O0 "$SCRIPT" "$CONFIG"
 STATUS=$?
 
 # Reactant writes the MLIR module of a failed compile to the node's /tmp; keep it with the logs.

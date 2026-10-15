@@ -1,0 +1,14 @@
+{
+  "_comment": "Compile-time attribution of the 1-step Nz=20 gradient (compile_attribution.jl): MLIR stage vs XLA code generation for the flux computation, the ocean step and the coupled window. Cheapest first; results are saved after each.",
+  "Nz": 20,
+  "steps": 1,
+  "dt": 7200.0,
+  "substeps": 50,
+  "n_atmosphere_slices": 16,
+  "backend": "gpu",
+  "roll_barotropic_substeps": true,
+  "variants": ["fluxes", "ocean", "coupled"],
+  "modes": ["primal", "gradient"],
+  "xla": true,
+  "output": "results/compile_attribution_nz20_1step.jld2"
+}
