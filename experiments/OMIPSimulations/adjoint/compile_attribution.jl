@@ -5,6 +5,10 @@
 #   mlir  Julia tracing, Enzyme and the MLIR pass pipeline (Reactant.Compiler.compile_mlir)
 #   xla   XLA backend code generation of that module (Reactant.XLA.compile; ptxas/LLVM)
 # with the Julia method-compile time inside each stage and an op histogram of the optimized module.
+# Two finer views of the MLIR stage, each switched on in the config:
+#   pass_timing  MLIR's per-pass execution time report after every pass pipeline (on stderr)
+#   dump_stages  the module after every pass pipeline (Reactant's dump directory, kept under logs/),
+#                with an op count per stage, to see which pass grows the module
 # Variants, each differentiated with respect to the whole model like the production gradient:
 #   coupled  `steps` coupled `time_step!`s, then the AMOC (the production window)
 #   ocean    `steps` ocean-only `time_step!`s (no interface fluxes), then the AMOC
@@ -183,20 +187,49 @@ function xla_compile(mod, fn, compile_options)
                        num_replicas = fn.num_replicas, num_partitions = fn.num_partitions)
 end
 
+# Reactant dumps the module before and after every pass pipeline into `dir` (file names carry a
+# counter and the pipeline key). Returns the op count per stage, in pipeline order.
+function stage_census(dir)
+    isdir(dir) || return NamedTuple[]
+    # The post-pipeline modules, plus the first pre-pipeline one: the module as traced.
+    files = sort(filter(f -> endswith(f, ".mlir") && (!occursin("_pre_", f) || startswith(f, "module_000_")), readdir(dir)))
+    stages = NamedTuple[]
+    for file in files
+        ops, _ = module_census(joinpath(dir, file))
+        key = replace(file, r"^module_\d+_.*?(?=pre_|post_)" => "", r"_pm\.mlir$" => "", r"\.mlir$" => "")
+        push!(stages, (; key, n_ops = sum(values(ops); init = 0), n_while = get(ops, "stablehlo.while", 0),
+                        bytes = filesize(joinpath(dir, file))))
+    end
+    return stages
+end
+
 function attribute(variant, mode)
     f, args = compile_target(variant, mode)
-    module_path = joinpath(@__DIR__, "logs", "attribution_$(variant)_$(mode)_$(n_steps)step.mlir")
+    tag = "$(variant)_$(mode)_$(n_steps)step"
+    module_path = joinpath(@__DIR__, "logs", "attribution_$tag.mlir")
+    stage_dir = joinpath(@__DIR__, "logs", "attribution_stages_$tag")
     empty!(pass_seconds)
+    if get(P, "dump_stages", false)
+        MLIR.IR.DUMP_MLIR_DIR[] = stage_dir
+        MLIR.IR.MLIR_DUMP_COUNTER[] = 0
+        MLIR.IR.DUMP_MLIR_ALWAYS[] = true
+    end
     MLIR.IR.@dispose ctx = Reactant.ReactantContext() begin
         (mod, fn), mlir_seconds, mlir_julia = with_while_unroll_threshold(0) do
             timed_stage(() -> Reactant.Compiler.compile_mlir(ctx, f, args; compile_options,
                                                              drop_unsupported_attributes = true))
         end
+        MLIR.IR.DUMP_MLIR_ALWAYS[] = false
         stamp(@sprintf("%-7s %-8s mlir %8.1f s (Julia compile %7.1f s)", variant, mode, mlir_seconds, mlir_julia))
         passes = sort(collect(pass_seconds); by = last, rev = true)
         @printf("  pass pipelines %.1f s, outside them (tracing) %.1f s; slowest:\n",
                 sum(last, passes; init = 0.0), mlir_seconds - sum(last, passes; init = 0.0))
         foreach(((key, s),) -> @printf("    %9.1f s  %s\n", s, key), first(passes, 10))
+        stages = stage_census(stage_dir)
+        if !isempty(stages)
+            println("  module after each pass pipeline (ops, while loops, MB):")
+            foreach(s -> @printf("    %9d  %4d  %8.1f  %s\n", s.n_ops, s.n_while, s.bytes / 2^20, s.key), stages)
+        end
 
         MLIR.IR.activate(ctx)
         try
@@ -212,7 +245,7 @@ function attribute(variant, mode)
             foreach(t -> @printf("    %10.1f  %6d  %s\n", tensor_bytes(t) / 2^20, tensors[t], t), largest)
 
             row = Dict{String, Any}("mlir_seconds" => mlir_seconds, "mlir_julia_seconds" => mlir_julia,
-                                    "pass_seconds" => Dict(passes),
+                                    "pass_seconds" => Dict(passes), "stages" => stages,
                                     "ops" => ops, "tensors" => tensors, "module_bytes" => filesize(module_path))
             if P["xla"]
                 _, xla_seconds, xla_julia = timed_stage(() -> xla_compile(mod, fn, compile_options))

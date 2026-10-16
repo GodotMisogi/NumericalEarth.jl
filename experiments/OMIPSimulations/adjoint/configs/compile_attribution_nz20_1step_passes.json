@@ -1,0 +1,16 @@
+{
+  "_comment": "Per-pass view of the 1-step Nz=20 gradient's MLIR stage (3093 s ocean-only, 6272 s coupled in job 3512868, under 2 s of Julia compile): MLIR's per-pass timing report and the module after every pass pipeline. No XLA.",
+  "Nz": 20,
+  "steps": 1,
+  "dt": 7200.0,
+  "substeps": 50,
+  "n_atmosphere_slices": 16,
+  "backend": "gpu",
+  "roll_barotropic_substeps": true,
+  "variants": ["ocean", "coupled"],
+  "modes": ["gradient"],
+  "xla": false,
+  "pass_timing": true,
+  "dump_stages": true,
+  "output": "results/compile_attribution_nz20_1step_passes.jld2"
+}

@@ -11,5 +11,6 @@
   "modes": ["gradient"],
   "xla": false,
   "pass_timing": true,
+  "dump_stages": true,
   "output": "results/compile_attribution_nz20_2step.jld2"
 }
