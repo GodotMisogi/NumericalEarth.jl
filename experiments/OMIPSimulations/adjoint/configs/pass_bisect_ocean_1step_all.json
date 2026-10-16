@@ -1,0 +1,20 @@
+{
+  "_comment": "Reactant's `all` pipeline on the traced 1-step ocean gradient module (job 3515041 dump), one segment per stage, so Enzyme, each pattern-rewrite application and the cleanup are timed apart. The module after each segment is kept under logs/bisect_ocean_1step_all/ for the pattern-level bisect.",
+  "tag": "ocean_1step_all",
+  "module": "logs/attribution_stages_ocean_gradient_1step/module_000_nxc9_pre_raise_triton_custom_call_pm.mlir",
+  "backend": "gpu",
+  "pass_timing": true,
+  "segments": [
+    {"name": "memory_effects_opt", "pipeline": "mark-func-memory-effects,{opt_passes}"},
+    {"name": "kernel_raise", "pipeline": "{kern},{raise_passes}"},
+    {"name": "batch_opt2", "pipeline": "enzyme-batch,{opt_passes2}"},
+    {"name": "enzyme", "pipeline": "{enzyme_pass}"},
+    {"name": "post_enzyme_inline", "pipeline": "inline{default-pipeline=canonicalize max-iterations=4},canonicalize,cse,canonicalize"},
+    {"name": "post_enzyme_main_patterns", "pipeline": "{main_patterns}"},
+    {"name": "post_enzyme_lower_patterns", "pipeline": "{lower_patterns}"},
+    {"name": "enzyme_cleanup", "pipeline": "canonicalize,remove-unnecessary-enzyme-ops,enzyme-simplify-math"},
+    {"name": "opt2_again", "pipeline": "{opt_passes2}"},
+    {"name": "lower_jit", "pipeline": "{lower_enzymexla_passes},{jit}"}
+  ],
+  "output": "results/pass_bisect_ocean_1step_all.jld2"
+}

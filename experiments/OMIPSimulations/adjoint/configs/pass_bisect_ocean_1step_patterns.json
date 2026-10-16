@@ -1,0 +1,12 @@
+{
+  "_comment": "The first post-Enzyme pattern-rewrite application (1578 s in job 3515041) split into 8 consecutive chunks of the main pattern list, on the module after the inline/canonicalize segment of pass_bisect_ocean_1step_all. Chunk times do not add up to the full application (patterns interact), but a slow chunk names the suspects.",
+  "tag": "ocean_1step_patterns",
+  "module": "logs/bisect_ocean_1step_all/05_post_enzyme_inline.mlir",
+  "backend": "gpu",
+  "pass_timing": true,
+  "segments": [
+    {"name": "patterns", "patterns_split": 8},
+    {"name": "lower_patterns", "pipeline": "{lower_patterns}"}
+  ],
+  "output": "results/pass_bisect_ocean_1step_patterns.jld2"
+}
