@@ -122,6 +122,27 @@ end
 # %%
 ##### Stage split
 
+# Wall time per pass-pipeline key (Reactant's `run_pass_pipeline!` keys), recorded by a timed copy of
+# Reactant 0.2.290's `MLIR.IR.run!`. With `time_passes[]` (config `pass_timing`) MLIR also prints its
+# per-pass timing report to stderr.
+const pass_seconds = Dict{String, Float64}()
+const time_passes = Ref{Bool}(get(P, "pass_timing", false))
+record_pass(key, seconds) = (pass_seconds[key] = get(pass_seconds, key, 0.0) + seconds; nothing)
+
+@eval Reactant.MLIR.IR function run!(pm::PassManager, operation, key::String="")
+    $time_passes[] && API.mlirPassManagerEnableTiming(pm)   # per-pass report on stderr when `pm` is disposed
+    t0 = time()
+    DUMP_MLIR_ALWAYS[] && dump_mlir(operation, pm, isempty(key) ? "pre_pm" : "pre_$(key)_pm")
+    status = LogicalResult(API.mlirPassManagerRunOnOp(pm, operation))
+    failed = isfailure(status)
+    if failed || DUMP_MLIR_ALWAYS[]
+        dump_mlir(operation, pm, isempty(key) ? "post_pm" : "post_$(key)_pm"; failed)
+    end
+    $record_pass(isempty(key) ? "(unnamed)" : key, time() - t0)
+    failed && throw("failed to run pass manager on module")
+    return operation
+end
+
 const element_bytes = Dict("f64" => 8, "f32" => 4, "i64" => 8, "i32" => 4, "i1" => 1)
 
 # Op name → count and ranked tensor type → occurrences over the printed module, streamed so a large
@@ -165,12 +186,17 @@ end
 function attribute(variant, mode)
     f, args = compile_target(variant, mode)
     module_path = joinpath(@__DIR__, "logs", "attribution_$(variant)_$(mode)_$(n_steps)step.mlir")
+    empty!(pass_seconds)
     MLIR.IR.@dispose ctx = Reactant.ReactantContext() begin
         (mod, fn), mlir_seconds, mlir_julia = with_while_unroll_threshold(0) do
             timed_stage(() -> Reactant.Compiler.compile_mlir(ctx, f, args; compile_options,
                                                              drop_unsupported_attributes = true))
         end
         stamp(@sprintf("%-7s %-8s mlir %8.1f s (Julia compile %7.1f s)", variant, mode, mlir_seconds, mlir_julia))
+        passes = sort(collect(pass_seconds); by = last, rev = true)
+        @printf("  pass pipelines %.1f s, outside them (tracing) %.1f s; slowest:\n",
+                sum(last, passes; init = 0.0), mlir_seconds - sum(last, passes; init = 0.0))
+        foreach(((key, s),) -> @printf("    %9.1f s  %s\n", s, key), first(passes, 10))
 
         MLIR.IR.activate(ctx)
         try
@@ -186,6 +212,7 @@ function attribute(variant, mode)
             foreach(t -> @printf("    %10.1f  %6d  %s\n", tensor_bytes(t) / 2^20, tensors[t], t), largest)
 
             row = Dict{String, Any}("mlir_seconds" => mlir_seconds, "mlir_julia_seconds" => mlir_julia,
+                                    "pass_seconds" => Dict(passes),
                                     "ops" => ops, "tensors" => tensors, "module_bytes" => filesize(module_path))
             if P["xla"]
                 _, xla_seconds, xla_julia = timed_stage(() -> xla_compile(mod, fn, compile_options))
