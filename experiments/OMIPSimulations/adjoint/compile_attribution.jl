@@ -122,14 +122,26 @@ end
 # %%
 ##### Stage split
 
-# Op name → count over the printed module, streamed so a large module never sits in memory as one string.
-function op_histogram(path)
-    counts = Dict{String, Int}()
+const element_bytes = Dict("f64" => 8, "f32" => 4, "i64" => 8, "i32" => 4, "i1" => 1)
+
+# Op name → count and ranked tensor type → occurrences over the printed module, streamed so a large
+# module never sits in memory as one string. The largest tensor types show what the reverse pass caches.
+function module_census(path)
+    ops = Dict{String, Int}()
+    tensors = Dict{String, Int}()
     for line in eachline(path)
         m = match(r"^\s*(?:%[^=]*=\s*)?\"?([a-z_]+\.[a-z_][A-Za-z_0-9.]*)", line)
-        m === nothing || (counts[m[1]] = get(counts, m[1], 0) + 1)
+        m === nothing || (ops[m[1]] = get(ops, m[1], 0) + 1)
+        for t in eachmatch(r"tensor<([0-9x]+)x([a-z]+[0-9]+)>", line)
+            tensors[t.match] = get(tensors, t.match, 0) + 1
+        end
     end
-    return counts
+    return ops, tensors
+end
+
+function tensor_bytes(type)
+    t = match(r"tensor<([0-9x]+)x([a-z]+[0-9]+)>", type)
+    return prod(parse.(Int, split(t[1], "x"))) * get(element_bytes, t[2], 8)
 end
 
 # XLA code generation of an optimized module, as in `Reactant.Compiler.compile_xla`.
@@ -152,7 +164,7 @@ end
 
 function attribute(variant, mode)
     f, args = compile_target(variant, mode)
-    module_path = joinpath(@__DIR__, "logs", "attribution_$(variant)_$(mode).mlir")
+    module_path = joinpath(@__DIR__, "logs", "attribution_$(variant)_$(mode)_$(n_steps)step.mlir")
     MLIR.IR.@dispose ctx = Reactant.ReactantContext() begin
         (mod, fn), mlir_seconds, mlir_julia = with_while_unroll_threshold(0) do
             timed_stage(() -> Reactant.Compiler.compile_mlir(ctx, f, args; compile_options,
@@ -163,15 +175,18 @@ function attribute(variant, mode)
         MLIR.IR.activate(ctx)
         try
             open(io -> show(io, mod), module_path, "w")
-            ops = op_histogram(module_path)
+            ops, tensors = module_census(module_path)
             n_ops = sum(values(ops); init = 0)
             top = first(sort(collect(ops); by = last, rev = true), 12)
             stamp(@sprintf("%-7s %-8s module %d ops, %.1f MB; ", variant, mode, n_ops, filesize(module_path) / 2^20),
                   "while ", get(ops, "stablehlo.while", 0), ", kernel_call ", get(ops, "enzymexla.kernel_call", 0),
                   ", llvm.func ", get(ops, "llvm.func", 0), "; top: ", join(("$k $v" for (k, v) in top), ", "))
+            largest = first(sort(collect(keys(tensors)); by = tensor_bytes, rev = true), 15)
+            println("  largest tensor types (MiB, occurrences):")
+            foreach(t -> @printf("    %10.1f  %6d  %s\n", tensor_bytes(t) / 2^20, tensors[t], t), largest)
 
             row = Dict{String, Any}("mlir_seconds" => mlir_seconds, "mlir_julia_seconds" => mlir_julia,
-                                    "ops" => ops, "module_bytes" => filesize(module_path))
+                                    "ops" => ops, "tensors" => tensors, "module_bytes" => filesize(module_path))
             if P["xla"]
                 _, xla_seconds, xla_julia = timed_stage(() -> xla_compile(mod, fn, compile_options))
                 stamp(@sprintf("%-7s %-8s xla  %8.1f s (Julia compile %7.1f s)", variant, mode, xla_seconds, xla_julia))

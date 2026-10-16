@@ -1,0 +1,14 @@
+{
+  "_comment": "MLIR stage only (no XLA) of the 2-step Nz=20 gradient: XLA estimated 145.6 GiB peak for the coupled 2-step gradient (job 3511683), so this looks for the oversized reverse-pass cache in the largest tensor types, for the ocean-only step and the coupled window.",
+  "Nz": 20,
+  "steps": 2,
+  "dt": 7200.0,
+  "substeps": 50,
+  "n_atmosphere_slices": 16,
+  "backend": "gpu",
+  "roll_barotropic_substeps": true,
+  "variants": ["ocean", "coupled"],
+  "modes": ["gradient"],
+  "xla": false,
+  "output": "results/compile_attribution_nz20_2step.jld2"
+}
