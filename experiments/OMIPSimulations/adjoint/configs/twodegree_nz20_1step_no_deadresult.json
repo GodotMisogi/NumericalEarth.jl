@@ -1,0 +1,15 @@
+{
+  "_comment": "The first rung again with the `while_deadresult` pattern excluded from Reactant's rewrites (the pass bisect's 25-minute pattern). Pass criteria: the same gᵀd as job 3510442 and 'GRADIENT VERIFIED', with the gradient compile well under its 122 minutes.",
+  "Nz": 20,
+  "steps": 1,
+  "dt": 7200.0,
+  "substeps": 50,
+  "n_atmosphere_slices": 16,
+  "backend": "gpu",
+  "stages": "cpu,primal,gradient",
+  "roll_barotropic_substeps": true,
+  "excluded_passes": ["while_deadresult"],
+  "taylor_h0": 1.0,
+  "taylor_nh": 6,
+  "output": "results/omip_adjoint_twodegree_nz20_1step_no_deadresult.jld2"
+}

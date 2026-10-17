@@ -9,6 +9,7 @@
 #   cpu       build the model on CPU(), step it, record the host objective (the forward twin)
 #   primal    compile the window objective on ReactantState(), compare with the CPU twin, check repeats
 #   gradient  compile the gradient, evaluate twice, shadow census, Taylor remainder check
+# Optional `excluded_passes`: pattern names left out of Reactant's rewrite lists.
 # ==============================================================================
 
 using OMIPAdjoint
@@ -76,7 +77,7 @@ if any(in(stages), reactant_stages)
         error("Reactant lowers Oceananigans kernels through NVPTX; this Julia's LLVM lacks it (macOS). Run on the GPU cluster.")
     Reactant.set_default_backend(P["backend"])
     roll_barotropic_substeps!(P["roll_barotropic_substeps"])
-    options = adjoint_compile_options()
+    options = adjoint_compile_options(; excluded_passes = String.(get(P, "excluded_passes", String[])))
 
     t0 = time()
     setup = omip_adjoint_setup(ReactantState(); Nz, Δt, substeps, n_atmosphere_slices = n_slices)
