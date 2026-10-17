@@ -13,7 +13,10 @@
 #   {opt_passes} {opt_passes2} {kern} {raise_passes} {enzyme_pass} {lower_enzymexla_passes} {jit}
 #   {main_patterns} {lower_patterns}   the two pattern-rewrite applications of opt_passes2
 # or {"name", "patterns": [i, j]}: entries i:j of the main pattern list as one rewrite application,
+# or {"name", "patterns_except": [i, j]}: the main pattern list without entries i:j,
 # or {"name", "patterns_split": n}: the main pattern list in n consecutive chunks, one segment each.
+# A segment with "module" starts from that dumped module (path relative to adjoint/) instead of the module
+# left by the previous segment, so one run can try independent variants from the same starting point.
 #
 #   julia --project=adjoint adjoint/pass_bisect.jl adjoint/configs/pass_bisect_ocean_1step_all.json
 # ==============================================================================
@@ -88,27 +91,34 @@ stamp("main pattern list: ", length(blocks.pattern_list), " patterns")
 rewrite_of(patterns) = "enzyme-hlo-generate-td{patterns=" * join(patterns, ";") * "},transform-interpreter,enzyme-hlo-remove-transform"
 
 function expand_segments(specs, blocks)
-    segments = NamedTuple{(:name, :pipeline), Tuple{String, String}}[]
+    segments = NamedTuple{(:name, :pipeline, :start), Tuple{String, String, Union{Nothing, String}}}[]
     for spec in specs
+        start = haskey(spec, "module") ? joinpath(@__DIR__, spec["module"]) : nothing
+        start === nothing || isfile(start) || error("module not found: $start")
         if haskey(spec, "pipeline")
             pipeline = spec["pipeline"]
             for key in (:opt_passes, :opt_passes2, :kern, :raise_passes, :enzyme_pass, :lower_enzymexla_passes,
                         :jit, :main_patterns, :lower_patterns)
                 pipeline = replace(pipeline, "{$key}" => getproperty(blocks, key))
             end
-            push!(segments, (; name = spec["name"], pipeline))
+            push!(segments, (; name = spec["name"], pipeline, start))
         elseif haskey(spec, "patterns")
             i, j = spec["patterns"]
-            push!(segments, (; name = spec["name"], pipeline = rewrite_of(blocks.pattern_list[i:j])))
+            push!(segments, (; name = spec["name"], pipeline = rewrite_of(blocks.pattern_list[i:j]), start))
+        elseif haskey(spec, "patterns_except")
+            i, j = spec["patterns_except"]
+            kept = blocks.pattern_list[setdiff(eachindex(blocks.pattern_list), i:j)]
+            push!(segments, (; name = spec["name"], pipeline = rewrite_of(kept), start))
         elseif haskey(spec, "patterns_split")
             n = spec["patterns_split"]
             bounds = round.(Int, range(0, length(blocks.pattern_list); length = n + 1))
             for c in 1:n
                 i, j = bounds[c] + 1, bounds[c + 1]
-                push!(segments, (; name = "$(spec["name"])_$c", pipeline = rewrite_of(blocks.pattern_list[i:j])))
+                push!(segments, (; name = "$(spec["name"])_$c", pipeline = rewrite_of(blocks.pattern_list[i:j]),
+                                  start = c == 1 ? start : nothing))
             end
         else
-            error("segment needs pipeline, patterns or patterns_split: $spec")
+            error("segment needs pipeline, patterns, patterns_except or patterns_split: $spec")
         end
     end
     return segments
@@ -132,6 +142,10 @@ MLIR.IR.@with_context Reactant.ReactantContext() begin
     @printf("  start: %d ops, %d while loops\n", n_ops(ops), get(ops, "stablehlo.while", 0))
 
     for (k, segment) in enumerate(segments)
+        if segment.start !== nothing
+            mod = parse(MLIR.IR.Module, read(segment.start, String))
+            stamp("segment $k starts from ", basename(segment.start))
+        end
         stamp("segment $k $(segment.name)...")
         empty!(pass_seconds)
         t0 = time()

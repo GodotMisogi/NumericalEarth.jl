@@ -1,0 +1,19 @@
+{
+  "_comment": "Chunk 3 of the main pattern list (patterns 121:181 of 482: slice/concat, broadcast splat, while_*, dus_* and hoist/sink patterns) was the only slow chunk of pass_bisect_ocean_1step_patterns (246 s; the other seven under 14 s). Split it in 8 on the module after chunk 2, then the control: the whole main list without chunk 3 on the module before any of it (the full list took 1570 s there).",
+  "tag": "ocean_1step_chunk3",
+  "module": "logs/bisect_ocean_1step_patterns/02_patterns_2.mlir",
+  "backend": "gpu",
+  "pass_timing": true,
+  "segments": [
+    {"name": "p121_128", "patterns": [121, 128]},
+    {"name": "p129_135", "patterns": [129, 135]},
+    {"name": "p136_143", "patterns": [136, 143]},
+    {"name": "p144_150", "patterns": [144, 150]},
+    {"name": "p151_158", "patterns": [151, 158]},
+    {"name": "p159_166", "patterns": [159, 166]},
+    {"name": "p167_173", "patterns": [167, 173]},
+    {"name": "p174_181", "patterns": [174, 181]},
+    {"name": "all_but_chunk3", "patterns_except": [121, 181], "module": "logs/bisect_ocean_1step_all/05_post_enzyme_inline.mlir"}
+  ],
+  "output": "results/pass_bisect_ocean_1step_chunk3.jld2"
+}
