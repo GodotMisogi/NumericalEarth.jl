@@ -11,6 +11,8 @@
 #                with an op count per stage, to see which pass grows the module
 #   excluded_passes  pattern names left out of Reactant's rewrite lists, replacing adjoint_compile_options'
 #                    default (["while_deadresult"]); [] runs every pattern
+#   xla_debug_options  XLA DebugOptions fields by name for the xla stage, e.g. xla_dump_to (relative to
+#                      adjoint/), xla_dump_hlo_as_text, xla_disable_hlo_passes
 # Variants, each differentiated with respect to the whole model like the production gradient:
 #   coupled  `steps` coupled `time_step!`s, then the AMOC (the production window)
 #   ocean    `steps` ocean-only `time_step!`s (no interface fluxes), then the AMOC
@@ -72,8 +74,15 @@ save_results() = (mkpath(dirname(output_path)); jldsave(output_path; results); n
 
 Reactant.set_default_backend(P["backend"])
 roll_barotropic_substeps!(P["roll_barotropic_substeps"])
-compile_options = haskey(P, "excluded_passes") ? adjoint_compile_options(; excluded_passes = String.(P["excluded_passes"])) :
-                                                 adjoint_compile_options()
+# Config overrides of adjoint_compile_options; `xla_dump_to` is relative to adjoint/ like the other paths.
+option_overrides = Dict{Symbol, Any}()
+haskey(P, "excluded_passes") && (option_overrides[:excluded_passes] = String.(P["excluded_passes"]))
+if haskey(P, "xla_debug_options")
+    debug = Dict{Symbol, Any}(Symbol(k) => v isa Vector ? String.(v) : v for (k, v) in P["xla_debug_options"])
+    haskey(debug, :xla_dump_to) && (debug[:xla_dump_to] = joinpath(@__DIR__, debug[:xla_dump_to]))
+    option_overrides[:xla_debug_options] = (; debug...)
+end
+compile_options = adjoint_compile_options(; option_overrides...)
 
 build = Dict{String, Any}()
 function timed_build(f, name)
