@@ -1,0 +1,15 @@
+{
+  "_comment": "The 2-step rung with the time-step loop unrolled before differentiation (while_unroll_threshold 2). Rolled, Enzyme's reverse step loop carries a shadow slot for every forward intermediate of a step as loop state (64,134 elements, 72.9 GiB, counted twice by XLA: the 145.6 GiB of job 3511683); straight-line code lets XLA schedule and free them, as at 1 step. Primal reference from the rolled run 3511683: -5.3233 Sv.",
+  "Nz": 20,
+  "steps": 2,
+  "dt": 7200.0,
+  "substeps": 50,
+  "n_atmosphere_slices": 16,
+  "backend": "gpu",
+  "stages": "primal,gradient",
+  "roll_barotropic_substeps": true,
+  "while_unroll_threshold": 2,
+  "taylor_h0": 1.0,
+  "taylor_nh": 6,
+  "output": "results/omip_adjoint_twodegree_nz20_2step_unrolled.jld2"
+}
