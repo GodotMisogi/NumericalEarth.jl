@@ -9,7 +9,8 @@
 #   pass_timing  MLIR's per-pass execution time report after every pass pipeline (on stderr)
 #   dump_stages  the module after every pass pipeline (Reactant's dump directory, kept under logs/),
 #                with an op count per stage, to see which pass grows the module
-#   excluded_passes  pattern names left out of Reactant's rewrite lists (CompileOptions.excluded_passes)
+#   excluded_passes  pattern names left out of Reactant's rewrite lists, replacing adjoint_compile_options'
+#                    default (["while_deadresult"]); [] runs every pattern
 # Variants, each differentiated with respect to the whole model like the production gradient:
 #   coupled  `steps` coupled `time_step!`s, then the AMOC (the production window)
 #   ocean    `steps` ocean-only `time_step!`s (no interface fluxes), then the AMOC
@@ -71,7 +72,8 @@ save_results() = (mkpath(dirname(output_path)); jldsave(output_path; results); n
 
 Reactant.set_default_backend(P["backend"])
 roll_barotropic_substeps!(P["roll_barotropic_substeps"])
-compile_options = adjoint_compile_options(; excluded_passes = String.(get(P, "excluded_passes", String[])))
+compile_options = haskey(P, "excluded_passes") ? adjoint_compile_options(; excluded_passes = String.(P["excluded_passes"])) :
+                                                 adjoint_compile_options()
 
 build = Dict{String, Any}()
 function timed_build(f, name)
