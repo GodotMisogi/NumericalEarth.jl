@@ -13,6 +13,8 @@
 #                    default (["while_deadresult"]); [] runs every pattern
 #   xla_debug_options  XLA DebugOptions fields by name for the xla stage, e.g. xla_dump_to (relative to
 #                      adjoint/), xla_dump_hlo_as_text, xla_disable_hlo_passes
+#   while_unroll_threshold  Reactant unrolls traced loops of at most this many iterations (default 0,
+#                           every loop rolled); the tag of the kept module and stage dumps records it
 # Variants, each differentiated with respect to the whole model like the production gradient:
 #   coupled  `steps` coupled `time_step!`s, then the AMOC (the production window)
 #   ocean    `steps` ocean-only `time_step!`s (no interface fluxes), then the AMOC
@@ -140,6 +142,7 @@ end
 
 include("mlir_diagnostics.jl")
 time_passes[] = get(P, "pass_timing", false)
+unroll_threshold = get(P, "while_unroll_threshold", 0)
 
 # XLA code generation of an optimized module, as in `Reactant.Compiler.compile_xla`.
 function xla_compile(mod, fn, compile_options)
@@ -161,7 +164,7 @@ end
 
 function attribute(variant, mode)
     f, args = compile_target(variant, mode)
-    tag = "$(variant)_$(mode)_$(n_steps)step"
+    tag = "$(variant)_$(mode)_$(n_steps)step" * (unroll_threshold > 0 ? "_unroll$(unroll_threshold)" : "")
     module_path = joinpath(@__DIR__, "logs", "attribution_$tag.mlir")
     stage_dir = joinpath(@__DIR__, "logs", "attribution_stages_$tag")
     empty!(pass_seconds)
@@ -171,7 +174,7 @@ function attribute(variant, mode)
         MLIR.IR.DUMP_MLIR_ALWAYS[] = true
     end
     MLIR.IR.@dispose ctx = Reactant.ReactantContext() begin
-        (mod, fn), mlir_seconds, mlir_julia = with_while_unroll_threshold(0) do
+        (mod, fn), mlir_seconds, mlir_julia = with_while_unroll_threshold(unroll_threshold) do
             timed_stage(() -> Reactant.Compiler.compile_mlir(ctx, f, args; compile_options,
                                                              drop_unsupported_attributes = true))
         end
