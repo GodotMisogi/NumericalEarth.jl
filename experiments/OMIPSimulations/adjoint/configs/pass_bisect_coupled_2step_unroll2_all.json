@@ -1,0 +1,22 @@
+{
+  "_comment": "Reactant's `all` pipeline on the traced coupled 2-step gradient module (job 3520929 dump) with the time-step loop unrolled by the patterns (while_unroll_threshold 2) and while_deadresult excluded, as the production compile: `all` ran past 4 h 29 min there against 732 s at 1 step. One segment per stage, so the pre-Enzyme unroll, Enzyme on the doubled module and the post-Enzyme rewriter are timed apart; the module after each segment is kept under logs/bisect_coupled_2step_unroll2_all/ to resume from.",
+  "tag": "coupled_2step_unroll2_all",
+  "module": "logs/attribution_stages_coupled_gradient_2step_unroll2/module_002_8Gmb_pre_all_pm.mlir",
+  "backend": "gpu",
+  "pass_timing": true,
+  "while_unroll_threshold": 2,
+  "excluded_passes": ["while_deadresult"],
+  "segments": [
+    {"name": "memory_effects_opt", "pipeline": "mark-func-memory-effects,{opt_passes}"},
+    {"name": "kernel_raise", "pipeline": "{kern},{raise_passes}"},
+    {"name": "batch_opt2", "pipeline": "enzyme-batch,{opt_passes2}"},
+    {"name": "enzyme", "pipeline": "{enzyme_pass}"},
+    {"name": "post_enzyme_inline", "pipeline": "inline{default-pipeline=canonicalize max-iterations=4},canonicalize,cse,canonicalize"},
+    {"name": "post_enzyme_main_patterns", "pipeline": "{main_patterns}"},
+    {"name": "post_enzyme_lower_patterns", "pipeline": "{lower_patterns}"},
+    {"name": "enzyme_cleanup", "pipeline": "canonicalize,remove-unnecessary-enzyme-ops,enzyme-simplify-math"},
+    {"name": "opt2_again", "pipeline": "{opt_passes2}"},
+    {"name": "lower_jit", "pipeline": "{lower_enzymexla_passes},{jit}"}
+  ],
+  "output": "results/pass_bisect_coupled_2step_unroll2_all.jld2"
+}
