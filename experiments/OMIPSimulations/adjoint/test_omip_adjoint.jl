@@ -11,8 +11,10 @@
 #   gradient  compile the gradient, evaluate twice, shadow census, Taylor remainder check
 # Optional `excluded_passes`: pattern names left out of Reactant's rewrite lists, replacing
 # adjoint_compile_options' default (["while_deadresult"]); [] runs every pattern.
-# Optional `while_unroll_threshold` (default 0, every loop rolled): Reactant unrolls traced loops of at
-# most this many iterations before differentiating, so `steps` or more unrolls the time-step loop.
+# Optional `while_unroll_threshold` (default 0, every loop rolled): Reactant's unroll pattern acts on
+# loops of at most this many iterations in every rewrite application, before and after Enzyme.
+# Optional `unroll_steps` (default false): unroll the time-step loop at trace time instead of tracing
+# it, so Enzyme's reverse pass is straight-line too (no loop-carried shadow state).
 # ==============================================================================
 
 using OMIPAdjoint
@@ -83,6 +85,7 @@ if any(in(stages), reactant_stages)
     options = haskey(P, "excluded_passes") ? adjoint_compile_options(; excluded_passes = String.(P["excluded_passes"])) :
                                              adjoint_compile_options()
     while_unroll_threshold = get(P, "while_unroll_threshold", 0)
+    unroll_steps = get(P, "unroll_steps", false)
 
     t0 = time()
     setup = omip_adjoint_setup(ReactantState(); Nz, Δt, substeps, n_atmosphere_slices = n_slices)
@@ -95,7 +98,7 @@ end
 
 if :primal in stages
     t0 = time()
-    primal! = build_primal(model, state, obj; n_steps, Δt, compile_options = options, while_unroll_threshold)
+    primal! = build_primal(model, state, obj; n_steps, Δt, compile_options = options, while_unroll_threshold, unroll_steps)
     stamp("primal window compiled in ", elapsed(t0))
     t1 = time(); J1 = primal!(); stamp(@sprintf("primal 1: AMOC %.4f Sv in %s", J1, elapsed(t1)))
     t2 = time(); J2 = primal!(); stamp(@sprintf("primal 2: AMOC %.4f Sv in %s, repeat |ΔJ| %.2e", J2, elapsed(t2), abs(J2 - J1)))
@@ -112,7 +115,7 @@ end
 
 if :gradient in stages
     t0 = time()
-    evaluate! = build_gradient(model, state, obj; n_steps, Δt, compile_options = options, while_unroll_threshold)
+    evaluate! = build_gradient(model, state, obj; n_steps, Δt, compile_options = options, while_unroll_threshold, unroll_steps)
     compile_seconds = time() - t0
     stamp(@sprintf("COMPILED %d-step gradient in %.1f min", n_steps, compile_seconds / 60))
 

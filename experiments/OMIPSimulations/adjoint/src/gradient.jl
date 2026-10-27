@@ -1,7 +1,9 @@
 #####
 ##### Reactant + Enzyme gradient of a short window of the coupled model
 #####
-# The differentiated function is a `@trace` loop of `time_step!` followed by the objective. The state
+# The differentiated function is a loop of `time_step!` followed by the objective: a `@trace` loop
+# (one traced step, Enzyme's reverse pass is a loop too) or, with `unroll_steps`, a plain Julia loop
+# unrolled at trace time, so both the forward and the reverse code are straight-line. The state
 # reset (prognostic fields back to their snapshot, clocks back, `update_state!`) runs outside the
 # differentiated window, before every evaluation, so the window starts from a consistent diagnostic
 # state without carrying `update_state!` in the gradient graph.
@@ -107,8 +109,18 @@ function window_objective(model, obj, n_steps, Δt)
     return obj(model)
 end
 
-function gradient_core!(model, dmodel, obj, n_steps, Δt)
-    return autodiff(set_strong_zero(ReverseWithPrimal), window_objective, Active,
+# Same window with the steps unrolled while tracing (n_steps is a Julia integer here).
+function unrolled_window_objective(model, obj, n_steps, Δt)
+    for _ in 1:n_steps
+        time_step!(model, Δt)
+    end
+    return obj(model)
+end
+
+window_function(unroll_steps) = unroll_steps ? unrolled_window_objective : window_objective
+
+function gradient_core!(window, model, dmodel, obj, n_steps, Δt)
+    return autodiff(set_strong_zero(ReverseWithPrimal), window, Active,
                     Duplicated(model, dmodel), Const(obj), Const(n_steps), Const(Δt))
 end
 
@@ -140,13 +152,15 @@ wind_gradient(dmodel) = map(interior_slices, wind_fields(dmodel))
 $(TYPEDSIGNATURES)
 
 Compile the `n_steps`-step window objective (no derivatives) and return `primal!()`, which resets
-the state and returns the objective as a host number.
+the state and returns the objective as a host number. `unroll_steps` unrolls the steps at trace time
+instead of tracing one loop.
 """
 function build_primal(model, state, obj; n_steps, Δt, compile_options = adjoint_compile_options(),
-                      while_unroll_threshold = 0)
+                      while_unroll_threshold = 0, unroll_steps = false)
     reset! = build_reset(model, state)
+    window = window_function(unroll_steps)
     compiled = with_while_unroll_threshold(while_unroll_threshold) do
-        @compile compile_options = compile_options window_objective(model, obj, n_steps, Δt)
+        @compile compile_options = compile_options window(model, obj, n_steps, Δt)
     end
     return () -> (reset!(); host_number(compiled(model, obj, n_steps, Δt)))
 end
@@ -157,18 +171,20 @@ $(TYPEDSIGNATURES)
 Compile the reverse-mode gradient of the `n_steps`-step window objective and return `evaluate!()`,
 which resets the state, evaluates, and returns `(J, gradient, dmodel)`: the objective, the wind
 gradient from [`wind_gradient`](@ref) and the full shadow model (for [`shadow_census`](@ref)).
+`unroll_steps` unrolls the steps at trace time instead of tracing one loop.
 """
 function build_gradient(model, state, obj; n_steps, Δt, compile_options = adjoint_compile_options(),
-                        while_unroll_threshold = 0)
+                        while_unroll_threshold = 0, unroll_steps = false)
     reset! = build_reset(model, state)
+    window = window_function(unroll_steps)
     compiled = with_while_unroll_threshold(while_unroll_threshold) do
         dmodel = make_zero(model)
-        @compile compile_options = compile_options gradient_core!(model, dmodel, obj, n_steps, Δt)
+        @compile compile_options = compile_options gradient_core!(window, model, dmodel, obj, n_steps, Δt)
     end
     function evaluate!()
         reset!()
         dmodel = make_zero(model)      # fresh zero shadows each call; `make_zero!` does not trace
-        result = compiled(model, dmodel, obj, n_steps, Δt)
+        result = compiled(window, model, dmodel, obj, n_steps, Δt)
         return host_number(result[2]), wind_gradient(dmodel), dmodel
     end
     return evaluate!
