@@ -9,7 +9,9 @@ export omip_adjoint_setup,
 using Oceananigans
 using Oceananigans: prognostic_state, restore_prognostic_state!
 using Oceananigans.Units: days
-using Oceananigans.Architectures: CPU, ReactantState, architecture, on_architecture, convert_to_device
+using Oceananigans.Architectures: AbstractArchitecture, CPU, ReactantState, architecture, on_architecture,
+                                  convert_to_device
+using Oceananigans.BoundaryConditions: BoundaryConditions, ZBC, NotFluxBC
 using Oceananigans.Grids: AbstractGrid, ExponentialDiscretization, LatitudeLongitudeGrid, inactive_node,
                           λnode, φnode, znode, Center, Face, Periodic, Bounded, Flat
 using Oceananigans.Operators: Δxᶜᶠᶜ, Δzᶜᶠᶜ
@@ -45,6 +47,7 @@ using DocStringExtensions: TYPEDSIGNATURES
 include("ocean_only_model.jl")
 include("overturning.jl")
 include("rolled_substeps.jl")
+include("zipper_flux_bcs.jl")
 include("gradient.jl")
 
 end # module OMIPAdjoint
