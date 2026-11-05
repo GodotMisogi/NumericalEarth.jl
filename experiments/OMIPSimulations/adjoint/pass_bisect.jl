@@ -9,9 +9,10 @@
 # it. No model build and no GPU work: the whole run is MLIR passes on the CPU of the node.
 #
 # A segment is {"name", "pipeline"} with a pass pipeline string in which these placeholders expand to
-# the strings Reactant 0.2.290 builds in `compile_mlir!` for the adjoint's compile options:
+# the strings Reactant (0.2.290 or 0.2.303) builds in `compile_mlir!` for the adjoint's compile options:
 #   {opt_passes} {opt_passes2} {kern} {raise_passes} {enzyme_pass} {lower_enzymexla_passes} {jit}
 #   {main_patterns} {lower_patterns}   the two pattern-rewrite applications of opt_passes2
+#   {opt_passes_down} {opt_passes_up}  the passes of `post_op_transpose_reshape` (down, up, down)
 # or {"name", "patterns": [i, j]}: entries i:j of the main pattern list as one rewrite application,
 # or {"name", "patterns_except": [i, j]}: the main pattern list without entries i:j,
 # or {"name", "patterns_split": n}: the main pattern list in n consecutive chunks, one segment each.
@@ -54,30 +55,51 @@ opts = Reactant.CompileOptions(; raise = true, raise_first = true, transpose_pro
 # %%
 ##### Reactant's pipeline building blocks, as `compile_mlir!` assembles them for a raising GPU compile
 
+# The pipeline strings are copied from `compile_mlir!` of these two versions; 0.2.303 dropped the `backend`
+# keyword of `optimization_passes` and lowers kernels through `convert-polygeist-to-llvm`.
+reactant_version = pkgversion(Reactant)
+reactant_version in (v"0.2.290", v"0.2.303") ||
+    error("pass_bisect.jl reproduces the pipelines of Reactant 0.2.290 and 0.2.303, not $reactant_version")
+legacy_pipeline = reactant_version == v"0.2.290"
+
 function pipeline_blocks(opts, backend)
     client = XLA.default_backend()
     platform = backend == "gpu" ? "GPU" : "cpu"
-    opt_passes  = optimization_passes(opts; sroa = true,  backend = platform)
-    opt_passes2 = optimization_passes(opts; sroa = false, backend = platform)
+    platform_kw = legacy_pipeline ? (; backend = platform) : (;)
+    opt_passes  = optimization_passes(opts; sroa = true,  platform_kw...)
+    opt_passes2 = optimization_passes(opts; sroa = false, platform_kw...)
+    post_op_kw = (; raise_shlo_to_blas_lapack = false, platform_kw...)
+    opt_passes_down = optimization_passes(Reactant.__compile_options_with_reversed_propagation(opts); post_op_kw...)
+    opt_passes_up   = optimization_passes(opts; post_op_kw...)
     speculate = opts.speculate_partial_ifs
     raise_passes = "canonicalize,llvm-to-memref-access,canonicalize,convert-llvm-to-cf,canonicalize,enzyme-lift-cf-to-scf,canonicalize,func.func(canonicalize-loops{speculate_partial_if=$speculate}),canonicalize-scf-for,canonicalize,libdevice-funcs-raise,canonicalize,affine-cfg,canonicalize,func.func(canonicalize-loops{speculate_partial_if=$speculate}),canonicalize,llvm-to-affine-access,canonicalize,delinearize-indexing,canonicalize,simplify-affine-exprs,affine-cfg,canonicalize,func.func(affine-loop-invariant-code-motion),canonicalize,sort-memory,func.func(kernelcast),raise-affine-to-stablehlo{strip_llvm_debuginfo=$(opts.strip_llvm_debuginfo) prefer_while_raising=false dump_failed_lockstep=$(Reactant.Compiler.DUMP_FAILED_LOCKSTEP[])},canonicalize,arith-raise{stablehlo=true}," * opt_passes2
     if Reactant.Compiler.DUS_TO_CONCAT[]
         raise_passes *= "," * optimization_passes(opts; sroa = false, dus_to_concat = true, backend = platform)
     end
     blas_int_width = sizeof(Reactant.Compiler.BlasInt) * 8
-    lower_enzymexla_passes = join(["lower-enzymexla-linalg{backend=$platform blas_int_width=$blas_int_width}",
-                                   "lower-enzymexla-blas{backend=$platform blas_int_width=$blas_int_width}",
-                                   "lower-enzymexla-lapack{backend=$platform blas_int_width=$blas_int_width}",
-                                   "lower-enzymexla-math", "lower-enzymexla-mpi{backend=$platform}"], ",")
+    C = Reactant.Compiler
+    linalg_platform = legacy_pipeline ? platform : XLA.platform_name(client)
+    lower_enzymexla_passes = join(["lower-enzymexla-linalg{backend=$linalg_platform blas_int_width=$blas_int_width}",
+                                   "lower-enzymexla-blas{backend=$linalg_platform blas_int_width=$blas_int_width}",
+                                   "lower-enzymexla-lapack{backend=$linalg_platform blas_int_width=$blas_int_width}",
+                                   "lower-enzymexla-math",
+                                   legacy_pipeline ? "lower-enzymexla-mpi{backend=$platform}" :
+                                                     "lower-comm-to-jit{mpi_request_width=$(C.MPI_REQUEST_WIDTH[])}"], ",")
     if backend == "gpu"
         kern = "lower-kernel{backend=cpu},symbol-dce,canonicalize"
         properties = XLA.device_properties(XLA.default_device(client))
         chip = "sm_$(properties.major)$(properties.minor)"
-        C = Reactant.Compiler
-        jit = "lower-jit{cuOptLevel=$(C.cuOptLevel[]) cubinFormat=$(C.cubinFormat[]) indexBitWidth=$(C.cuindexBitWidth[])  cubinChip=$chip cubinFeatures=$(C.cubinFeatures()) run_init=true toolkitPath=$(XLA.CUDA_DATA_DIR[])},symbol-dce"
+        toolkit = XLA.CUDA_DATA_DIR[]
+        jit = if legacy_pipeline
+            "lower-jit{cuOptLevel=$(C.cuOptLevel[]) cubinFormat=$(C.cubinFormat[]) indexBitWidth=$(C.cuindexBitWidth[])  cubinChip=$chip cubinFeatures=$(C.cubinFeatures()) run_init=true toolkitPath=$toolkit},symbol-dce"
+        else
+            cuda_get_kernel = div(MLIR.API.ReactantHermeticCudaGetVersion(), 1000) == 12
+            "convert-polygeist-to-llvm{backend=cuda preserve-xla-funcs=true cuda-get-kernel=$cuda_get_kernel},strip-gpu-info,nvvm-attach-target{chip=$chip features=$(C.cubinFeatures()) O=$(C.cuOptLevel[])},enzymexla-gpu-module-to-binary{format=$(C.cubinFormat[]) toolkit=$toolkit},lower-jit,symbol-dce"
+        end
     else
         kern = "lower-kernel{backend=cpu},canonicalize"
-        jit = "lower-jit{openmp=$(Reactant.Compiler.OpenMP[]) backend=cpu},symbol-dce"
+        jit = legacy_pipeline ? "lower-jit{openmp=$(C.OpenMP[]) backend=cpu},symbol-dce" :
+              "lower-affine,$(C.OpenMP[] ? "convert-scf-to-openmp" : "convert-scf-to-cf"),convert-polygeist-to-llvm{backend=cpu preserve-xla-funcs=true},lower-jit,symbol-dce"
     end
     # The two pattern-rewrite applications inside opt_passes2: the main set, then the lowering set.
     rewrites = [m.match for m in eachmatch(r"enzyme-hlo-generate-td\{patterns=[^}]*\},transform-interpreter,enzyme-hlo-remove-transform", opt_passes2)]
@@ -85,7 +107,7 @@ function pipeline_blocks(opts, backend)
     main_patterns, lower_patterns = rewrites[1], rewrites[2]
     pattern_list = split(match(r"patterns=([^}]*)\}", main_patterns)[1], ";"; keepempty = false)
     return (; opt_passes, opt_passes2, kern, raise_passes, enzyme_pass, lower_enzymexla_passes, jit,
-              main_patterns, lower_patterns, pattern_list)
+              main_patterns, lower_patterns, pattern_list, opt_passes_down, opt_passes_up)
 end
 
 blocks = pipeline_blocks(opts, backend)
@@ -101,7 +123,7 @@ function expand_segments(specs, blocks)
         if haskey(spec, "pipeline")
             pipeline = spec["pipeline"]
             for key in (:opt_passes, :opt_passes2, :kern, :raise_passes, :enzyme_pass, :lower_enzymexla_passes,
-                        :jit, :main_patterns, :lower_patterns)
+                        :jit, :main_patterns, :lower_patterns, :opt_passes_down, :opt_passes_up)
                 pipeline = replace(pipeline, "{$key}" => getproperty(blocks, key))
             end
             push!(segments, (; name = spec["name"], pipeline, start))
