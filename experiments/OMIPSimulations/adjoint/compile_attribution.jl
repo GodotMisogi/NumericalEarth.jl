@@ -15,6 +15,8 @@
 #                      adjoint/), xla_dump_hlo_as_text, xla_disable_hlo_passes
 #   while_unroll_threshold  Reactant unrolls traced loops of at most this many iterations (default 0,
 #                           every loop rolled); the tag of the kept module and stage dumps records it
+#   unroll_steps  unroll the coupled and ocean time-step loops at trace time instead of tracing them
+#                 (default false), as `build_gradient`'s keyword; the tag records it
 # Variants, each differentiated with respect to the whole model like the production gradient:
 #   coupled  `steps` coupled `time_step!`s, then the AMOC (the production window)
 #   ocean    `steps` ocean-only `time_step!`s (no interface fluxes), then the AMOC
@@ -23,13 +25,13 @@
 #
 #   julia --project=adjoint adjoint/compile_attribution.jl adjoint/configs/compile_attribution_nz20_1step.json
 #
-# Uses Reactant 0.2.290 compiler internals (compile_mlir, __resolve_device_and_client); the stage
+# Uses Reactant 0.2.290–0.2.303 compiler internals (compile_mlir, __resolve_device_and_client); the stage
 # split follows `Reactant.Compiler.compile_xla`.
 # ==============================================================================
 
 using OMIPAdjoint
 using OMIPAdjoint: omip_adjoint_grid, omip_adjoint_ocean, omip_adjoint_forcing, ocean_model,
-                   window_objective, with_while_unroll_threshold
+                   window_function, with_while_unroll_threshold
 using NumericalEarth: OceanOnlyModel
 using NumericalEarth.EarthSystemModels: default_sea_ice
 using NumericalEarth.EarthSystemModels.InterfaceComputations: ComponentInterfaces
@@ -118,13 +120,23 @@ function ocean_window_objective(model, obj, n_steps, Δt)
     return obj(model)
 end
 
+function unrolled_ocean_window_objective(model, obj, n_steps, Δt)
+    for _ in 1:n_steps
+        time_step!(ocean_model(model), Δt)
+    end
+    return obj(model)
+end
+
 function flux_objective(model, obj, n_steps, Δt)
     update_state!(model)
     fluxes = model.interfaces.net_fluxes.ocean
     return sum(abs2, interior(fluxes.u)) + sum(abs2, interior(fluxes.v)) + sum(abs2, interior(fluxes.T))
 end
 
-windows = (coupled = window_objective, ocean = ocean_window_objective, fluxes = flux_objective)
+unroll_steps = get(P, "unroll_steps", false)
+windows = (coupled = window_function(unroll_steps),
+           ocean = unroll_steps ? unrolled_ocean_window_objective : ocean_window_objective,
+           fluxes = flux_objective)
 
 function variant_gradient!(window, model, dmodel, obj, n_steps, Δt)
     return autodiff(set_strong_zero(ReverseWithPrimal), window, Active,
@@ -164,7 +176,8 @@ end
 
 function attribute(variant, mode)
     f, args = compile_target(variant, mode)
-    tag = "$(variant)_$(mode)_$(n_steps)step" * (unroll_threshold > 0 ? "_unroll$(unroll_threshold)" : "")
+    tag = "$(variant)_$(mode)_$(n_steps)step" * (unroll_threshold > 0 ? "_unroll$(unroll_threshold)" : "") *
+          (unroll_steps ? "_unrolled" : "")
     module_path = joinpath(@__DIR__, "logs", "attribution_$tag.mlir")
     stage_dir = joinpath(@__DIR__, "logs", "attribution_stages_$tag")
     empty!(pass_seconds)
