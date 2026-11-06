@@ -19,7 +19,8 @@
 # A segment with "module" starts from that dumped module (path relative to adjoint/) instead of the module
 # left by the previous segment, so one run can try independent variants from the same starting point.
 # Optional `while_unroll_threshold` (default 0) and `excluded_passes` (default none) set the pattern lists
-# as in the compile being reproduced.
+# as in the compile being reproduced; optional `compile_options` holds further `CompileOptions` keywords by
+# name, e.g. {"max_reused_const_prop_size": 0} (0.2.303).
 #
 #   julia --project=adjoint adjoint/pass_bisect.jl adjoint/configs/pass_bisect_ocean_1step_all.json
 # ==============================================================================
@@ -50,7 +51,8 @@ stamp(msg...) = (line = string("[", format(now(), "HH:MM:SS"), "] ", msg...);
 Reactant.set_default_backend(backend)
 Reactant.Compiler.WHILE_UNROLL_THRESHOLD[] = get(P, "while_unroll_threshold", 0)
 opts = Reactant.CompileOptions(; raise = true, raise_first = true, transpose_propagate = :up, reshape_propagate = :none,
-                                 excluded_passes = String.(get(P, "excluded_passes", String[])))
+                                 excluded_passes = String.(get(P, "excluded_passes", String[])),
+                                 (Symbol(k) => v for (k, v) in get(P, "compile_options", Dict()))...)
 
 # %%
 ##### Reactant's pipeline building blocks, as `compile_mlir!` assembles them for a raising GPU compile
