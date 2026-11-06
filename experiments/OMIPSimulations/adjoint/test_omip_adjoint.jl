@@ -10,7 +10,7 @@
 #   primal    compile the window objective on ReactantState(), compare with the CPU twin, check repeats
 #   gradient  compile the gradient, evaluate twice, shadow census, Taylor remainder check
 # Optional `excluded_passes`: pattern names left out of Reactant's rewrite lists, replacing
-# adjoint_compile_options' default (["while_deadresult"]); [] runs every pattern.
+# adjoint_compile_options' default (["while_deadresult", "cse_reduce_transposed"]); [] runs every pattern.
 # Optional `while_unroll_threshold` (default 0, every loop rolled): Reactant's unroll pattern acts on
 # loops of at most this many iterations in every rewrite application, before and after Enzyme.
 # Optional `unroll_steps` (default false): unroll the time-step loop at trace time instead of tracing

@@ -10,7 +10,7 @@
 #   dump_stages  the module after every pass pipeline (Reactant's dump directory, kept under logs/),
 #                with an op count per stage, to see which pass grows the module
 #   excluded_passes  pattern names left out of Reactant's rewrite lists, replacing adjoint_compile_options'
-#                    default (["while_deadresult"]); [] runs every pattern
+#                    default (["while_deadresult", "cse_reduce_transposed"]); [] runs every pattern
 #   xla_debug_options  XLA DebugOptions fields by name for the xla stage, e.g. xla_dump_to (relative to
 #                      adjoint/), xla_dump_hlo_as_text, xla_disable_hlo_passes
 #   while_unroll_threshold  Reactant unrolls traced loops of at most this many iterations (default 0,

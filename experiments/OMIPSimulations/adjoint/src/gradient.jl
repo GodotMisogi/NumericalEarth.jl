@@ -13,11 +13,13 @@ $(TYPEDSIGNATURES)
 
 Compile options for the gradient: kernel raising on, `reshape_propagate = :none` and
 `transpose_propagate = :up` by default. At least one propagation option must be `:up`.
-Reactant's `while_deadresult` rewrite pattern is excluded by default: on the differentiated
-module it takes 25 of the 26 minutes of the first post-Enzyme rewrite to remove 250 of 430k ops.
+Two of Reactant's rewrite patterns are excluded by default, for their cost on the differentiated module:
+`while_deadresult` takes 25 of the 26 minutes of the first post-Enzyme rewrite to remove 250 of 430k ops, and
+`cse_reduce_transposed` (Reactant 0.2.303) compares every reduce with every other reduce sharing its init value,
+which on the 2-step module makes each rewrite 7–20× slower without changing an op.
 """
 function adjoint_compile_options(; reshape_propagate = :none, transpose_propagate = :up,
-                                   excluded_passes = ["while_deadresult"], kw...)
+                                   excluded_passes = ["while_deadresult", "cse_reduce_transposed"], kw...)
     transpose_propagate == :up || reshape_propagate == :up ||
         throw(ArgumentError("one of transpose_propagate and reshape_propagate must be :up"))
     return Reactant.CompileOptions(; raise = true, raise_first = true, transpose_propagate, reshape_propagate,
