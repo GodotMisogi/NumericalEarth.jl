@@ -1,0 +1,44 @@
+{
+  "_comment": "Reactant 0.2.290 side of the 2-step unrolled gradient's post-Enzyme slowdown (0.2.303 against 0.2.290, jobs 3557934/3557933 dumps). post_op_transpose_reshape on this version's post-`all` module and, last, on the other version's: whether the module or the pattern code is slow. In between, this version's `all` from the traced module, split at Enzyme, keeping the post-Enzyme module.",
+  "tag": "coupled_2step_unrolled_290",
+  "module": "logs/attribution_stages_coupled_gradient_2step_unrolled/module_004_T6dv_pre_post_op_transpose_reshape_pm.mlir",
+  "backend": "gpu",
+  "pass_timing": true,
+  "while_unroll_threshold": 0,
+  "excluded_passes": [
+    "while_deadresult"
+  ],
+  "segments": [
+    {
+      "name": "post_op_own",
+      "pipeline": "{opt_passes_down},{opt_passes_up},{opt_passes_down}"
+    },
+    {
+      "name": "pre_enzyme",
+      "module": "logs/attribution_stages_coupled_gradient_2step_unrolled/module_002_8Gmb_pre_all_pm.mlir",
+      "pipeline": "mark-func-memory-effects,{opt_passes},{kern},{raise_passes},enzyme-batch,{opt_passes2}"
+    },
+    {
+      "name": "enzyme",
+      "pipeline": "{enzyme_pass}"
+    },
+    {
+      "name": "post_enzyme_opt2",
+      "pipeline": "{opt_passes2}"
+    },
+    {
+      "name": "enzyme_cleanup",
+      "pipeline": "canonicalize,remove-unnecessary-enzyme-ops,enzyme-simplify-math"
+    },
+    {
+      "name": "opt2_again",
+      "pipeline": "{opt_passes2}"
+    },
+    {
+      "name": "post_op_303_module",
+      "module": "/work/09603/ajseth/vista/.julia/dev/NumericalEarth-adjoint/experiments/OMIPSimulations/adjoint/logs/attribution_stages_coupled_gradient_2step_unrolled/module_004_T6dv_pre_post_op_transpose_reshape_pm.mlir",
+      "pipeline": "{opt_passes_down},{opt_passes_up},{opt_passes_down}"
+    }
+  ],
+  "output": "results/pass_bisect_coupled_2step_unrolled_290.jld2"
+}
