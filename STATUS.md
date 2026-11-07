@@ -24,8 +24,20 @@ not. The 1-step zero gradient was the same defect. Everything about the unrolled
 
 ## Running / waiting on
 
-Grad2Window 3560703 (`gpu-a100-dev`, submitted 11-07): the 2-step unrolled gradient-only config on
-`4cc69c3e`; 3559769's result file was moved to `..._2step_unrolled_gradient_3559769.jld2` first.
+Nothing queued. **Grad2Window 3560703** (11-07, 81 min, 2 unrolled steps, gradient only, `4cc69c3e`; 3559769's
+result kept as `..._2step_unrolled_gradient_3559769.jld2`): build 923 s, compile 47.3 min, first call 734 s,
+second 0.43 s, J −5.3233 Sv, max|g| 8.19e-3, same seam NaN census as at 1 step. Taylor reports MISMATCH
+(rel_err 3.0e-3) but the gradient is right: |Δf − h gᵀd| falls 4.0× per halving (second order) and
+(Δf − h gᵀd)/h² is constant (2.07–2.14e-4) over h = 1 … 1/32, so the check's averaged successive-difference
+slope carries the curvature c(hᵢ + hᵢ₊₁), which predicts the whole 3.0e-3; a quadratic fit Δf = a + g h + q h²
+gives rel 9.3e-5 (2.3e-4 at 1 step). The verdict needs that fit (or a remainder-order test).
+
+**The objective is not at 26.5°N in the Atlantic.** On the 2° `TripolarGrid` (180 × 60) the rows already curve
+at 26°N: `nearest_row` probes i = Nx ÷ 2 (111°W, Pacific) and picks row 41 (26.4°N there), which across the
+RAPID span (280–346°E) runs from 28.4°N at Florida to 33.8°N. The wind sensitivity map (2-step, local plot)
+follows that row: Ekman-signed ∂J/∂u < 0, ∂J/∂v > 0 along it; a uniform 1 m/s gives −0.35 Sv (u), +0.42 Sv (v);
+> 99.999 % of Σ|g| in the North Atlantic. Fix is open (probe the section's own longitudes, and/or a grid whose
+rows are latitude circles south of ~40°N).
 
 **First verified gradient: Grad1Window 3560476** (11-07, 56 min, 1 unrolled step, gradient only,
 `twodegree_nz20_1step_unrolled_gradient.json`, on `4cc69c3e`, which moves `refresh_diagnostics!` into the
