@@ -3,7 +3,7 @@ module OMIPAdjoint
 export omip_adjoint_setup,
        OverturningStrength, objective_host,
        roll_barotropic_substeps!,
-       adjoint_compile_options, snapshot_state, build_reset, build_primal, build_gradient,
+       adjoint_compile_options, snapshot_state, build_primal, build_gradient,
        wind_gradient, shadow_census, print_shadow_census, taylor_remainder_check
 
 using Oceananigans

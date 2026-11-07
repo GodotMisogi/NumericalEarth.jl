@@ -1,12 +1,12 @@
 #####
 ##### Reactant + Enzyme gradient of a short window of the coupled model
 #####
-# The differentiated function is a loop of `time_step!` followed by the objective: a `@trace` loop
-# (one traced step, Enzyme's reverse pass is a loop too) or, with `unroll_steps`, a plain Julia loop
-# unrolled at trace time, so both the forward and the reverse code are straight-line. The state
-# reset (prognostic fields back to their snapshot, clocks back, `update_state!`) runs outside the
-# differentiated window, before every evaluation, so the window starts from a consistent diagnostic
-# state without carrying `update_state!` in the gradient graph.
+# The differentiated function recomputes the diagnostic state (interface fluxes included) from the
+# prognostic state and the forcing, then runs a loop of `time_step!` followed by the objective: a
+# `@trace` loop (one traced step, Enzyme's reverse pass is a loop too) or, with `unroll_steps`, a plain
+# Julia loop unrolled at trace time, so both the forward and the reverse code are straight-line.
+# Recomputing inside the window puts the first step's fluxes in the gradient graph. Before every
+# evaluation the prognostic fields and clocks are written back to their snapshot on the host.
 
 """
 $(TYPEDSIGNATURES)
@@ -92,19 +92,8 @@ function refresh_diagnostics!(model)
     return nothing
 end
 
-"""
-$(TYPEDSIGNATURES)
-
-Return `reset!()`, which restores `model` to `state` and recomputes its diagnostic state with a
-separately compiled [`refresh_diagnostics!`](@ref) (plain Julia on a CPU model).
-"""
-function build_reset(model, state)
-    refresh! = architecture(ocean_model(model).grid) isa ReactantState ?
-        (@compile raise = true raise_first = true refresh_diagnostics!(model)) : refresh_diagnostics!
-    return () -> (restore_state!(model, state); refresh!(model); nothing)
-end
-
 function window_objective(model, obj, n_steps, Δt)
+    refresh_diagnostics!(model)
     @trace mincut = true checkpointing = true track_numbers = false for _ in 1:n_steps
         time_step!(model, Δt)
     end
@@ -113,6 +102,7 @@ end
 
 # Same window with the steps unrolled while tracing (n_steps is a Julia integer here).
 function unrolled_window_objective(model, obj, n_steps, Δt)
+    refresh_diagnostics!(model)
     for _ in 1:n_steps
         time_step!(model, Δt)
     end
@@ -153,38 +143,36 @@ wind_gradient(dmodel) = map(interior_slices, wind_fields(dmodel))
 """
 $(TYPEDSIGNATURES)
 
-Compile the `n_steps`-step window objective (no derivatives) and return `primal!()`, which resets
-the state and returns the objective as a host number. `unroll_steps` unrolls the steps at trace time
-instead of tracing one loop.
+Compile the `n_steps`-step window objective (no derivatives) and return `primal!()`, which restores
+the snapshot `state` and returns the objective as a host number. `unroll_steps` unrolls the steps at
+trace time instead of tracing one loop.
 """
 function build_primal(model, state, obj; n_steps, Δt, compile_options = adjoint_compile_options(),
                       while_unroll_threshold = 0, unroll_steps = false)
-    reset! = build_reset(model, state)
     window = window_function(unroll_steps)
     compiled = with_while_unroll_threshold(while_unroll_threshold) do
         @compile compile_options = compile_options window(model, obj, n_steps, Δt)
     end
-    return () -> (reset!(); host_number(compiled(model, obj, n_steps, Δt)))
+    return () -> (restore_state!(model, state); host_number(compiled(model, obj, n_steps, Δt)))
 end
 
 """
 $(TYPEDSIGNATURES)
 
 Compile the reverse-mode gradient of the `n_steps`-step window objective and return `evaluate!()`,
-which resets the state, evaluates, and returns `(J, gradient, dmodel)`: the objective, the wind
-gradient from [`wind_gradient`](@ref) and the full shadow model (for [`shadow_census`](@ref)).
+which restores the snapshot `state`, evaluates, and returns `(J, gradient, dmodel)`: the objective,
+the wind gradient from [`wind_gradient`](@ref) and the full shadow model (for [`shadow_census`](@ref)).
 `unroll_steps` unrolls the steps at trace time instead of tracing one loop.
 """
 function build_gradient(model, state, obj; n_steps, Δt, compile_options = adjoint_compile_options(),
                         while_unroll_threshold = 0, unroll_steps = false)
-    reset! = build_reset(model, state)
     window = window_function(unroll_steps)
     compiled = with_while_unroll_threshold(while_unroll_threshold) do
         dmodel = make_zero(model)
         @compile compile_options = compile_options gradient_core!(window, model, dmodel, obj, n_steps, Δt)
     end
     function evaluate!()
-        reset!()
+        restore_state!(model, state)
         dmodel = make_zero(model)      # fresh zero shadows each call; `make_zero!` does not trace
         result = compiled(window, model, dmodel, obj, n_steps, Δt)
         return host_number(result[2]), wind_gradient(dmodel), dmodel
