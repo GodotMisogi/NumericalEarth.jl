@@ -24,7 +24,12 @@ not. The 1-step zero gradient was the same defect. Everything about the unrolled
 
 ## Running / waiting on
 
-Nothing queued. **Grad2Window 3560703** (11-07, 81 min, 2 unrolled steps, gradient only, `4cc69c3e`; 3559769's
+Queued 11-07 on `4241f645` (staircase section `b0660e21`, quadratic-fit Taylor verdict `868dede1`):
+Grad1Section 3561032 (`gpu-a100`, `twodegree_nz20_1step.json`: CPU twin, primal against it, gradient) and
+Grad2Section 3561033 (`gpu-a100-dev`, 2-step unrolled gradient, for the map via `adjoint/plot_amoc_sensitivity.jl`).
+Old results kept on LS6 as `..._1step_row41_prewindow.jld2` and `..._2step_unrolled_gradient_3560703.jld2`.
+
+**Grad2Window 3560703** (11-07, 81 min, 2 unrolled steps, gradient only, `4cc69c3e`; 3559769's
 result kept as `..._2step_unrolled_gradient_3559769.jld2`): build 923 s, compile 47.3 min, first call 734 s,
 second 0.43 s, J −5.3233 Sv, max|g| 8.19e-3, same seam NaN census as at 1 step. Taylor reports MISMATCH
 (rel_err 3.0e-3) but the gradient is right: |Δf − h gᵀd| falls 4.0× per halving (second order) and
@@ -36,8 +41,8 @@ gives rel 9.3e-5 (2.3e-4 at 1 step). The verdict needs that fit (or a remainder-
 at 26°N: `nearest_row` probes i = Nx ÷ 2 (111°W, Pacific) and picks row 41 (26.4°N there), which across the
 RAPID span (280–346°E) runs from 28.4°N at Florida to 33.8°N. The wind sensitivity map (2-step, local plot)
 follows that row: Ekman-signed ∂J/∂u < 0, ∂J/∂v > 0 along it; a uniform 1 m/s gives −0.35 Sv (u), +0.42 Sv (v);
-> 99.999 % of Σ|g| in the North Atlantic. Fix is open (probe the section's own longitudes, and/or a grid whose
-rows are latitude circles south of ~40°N).
+> 99.999 % of Σ|g| in the North Atlantic. Fixed in `b0660e21`: a staircase of v- and u-faces along 26.5°N
+(rows 38–40, within ±1.4° of the line); every AMOC value before it is row 41's.
 
 **First verified gradient: Grad1Window 3560476** (11-07, 56 min, 1 unrolled step, gradient only,
 `twodegree_nz20_1step_unrolled_gradient.json`, on `4cc69c3e`, which moves `refresh_diagnostics!` into the
