@@ -286,10 +286,12 @@ $(TYPEDSIGNATURES)
 
 Taylor-remainder check of the compiled gradient `evaluate!` (from [`build_gradient`](@ref)) along
 the gradient direction: for `h = h0 / 2ⁱ`, `i = 0:nh-1`, compares `Δf = f(x₀ + h d) − f(x₀)` with
-`h gᵀd` and reports the successive-difference slope, which cancels any constant offset in `Δf` and
-must match a non-zero `gᵀd` to `tolerance` ("GRADIENT VERIFIED"). Returns the rows and the verdict.
+`h gᵀd`. The slope `g` of the least-squares fit `Δf ≈ a + g h + q h²` (free of a constant offset in `Δf`
+and of the curvature `q`) must match a non-zero `gᵀd` to `tolerance` ("GRADIENT VERIFIED"). Returns
+the rows and the verdict.
 """
 function taylor_remainder_check(model, evaluate!; h0 = 1.0, nh = 6, tolerance = 1e-3)
+    nh >= 3 || throw(ArgumentError("the quadratic fit needs nh ≥ 3 step sizes, got nh = $nh"))
     x0 = wind_control(model)
     set_wind_control!(model, x0)
     f0, g, _ = evaluate!()
@@ -312,8 +314,8 @@ function taylor_remainder_check(model, evaluate!; h0 = 1.0, nh = 6, tolerance = 
         previous = R1
     end
     set_wind_control!(model, x0)
-    slopes = [(rows[i].Δf - rows[i+1].Δf) / (rows[i].h - rows[i+1].h) for i in 1:(length(rows) - 1)]
-    slope = sum(slopes) / length(slopes)
+    hs = [r.h for r in rows]
+    _, slope, _ = [ones(nh) hs hs .^ 2] \ [r.Δf for r in rows]
     relative_error = abs(slope - gd) / max(abs(gd), eps())
     verified = gd != 0 && relative_error < tolerance   # a zero gradient gives d = 0, so Δf = 0 proves nothing
     @printf("  FD slope = %+.8e   adjoint gᵀd = %+.8e   rel_err = %.3e\n", slope, gd, relative_error)
