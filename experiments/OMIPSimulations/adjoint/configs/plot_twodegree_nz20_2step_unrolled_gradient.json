@@ -1,0 +1,7 @@
+{
+  "_comment": "AMOC sensitivity map of the 2-step unrolled gradient (job 3560703 integrated tripolar row 41, not the 26.5N staircase; rerun after the staircase section lands).",
+  "results": "results/omip_adjoint_twodegree_nz20_2step_unrolled_gradient.jld2",
+  "output": "results/amoc_sensitivity_twodegree_nz20_2step_unrolled.png",
+  "title": "AMOC sensitivity to the 10-m winds: 2 steps (4 h), 2° OMIP, Nz = 20",
+  "limits": [[-100, 10], [0, 60]]
+}
