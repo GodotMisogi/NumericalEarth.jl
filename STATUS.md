@@ -24,11 +24,19 @@ not. The 1-step zero gradient was the same defect. Everything about the unrolled
 
 ## Running / waiting on
 
-Nothing queued. **The 0.2.303 2-step regression is `cse_reduce_transposed`** (new Enzyme-JAX pattern): LS6
+Grad1Window 3560476 (`gpu-a100-dev`, submitted 11-06): 1 unrolled step, gradient only
+(`twodegree_nz20_1step_unrolled_gradient.json`) on `4cc69c3e`, which moves `refresh_diagnostics!` into the
+differentiated window (`reset!` only restores the snapshot; `build_reset` removed). Expect a non-zero
+gradient and the first passing Taylor check; then the 2-step unrolled rung.
+
+Grad2NoCSE 3559769 (done 11-06, `fb295782`, `cse_reduce_transposed` excluded): gradient compile **47.3 min**
+(99.6 with the pattern, 3543332; 53.2 on 0.2.290), build 939 s, first call 1073 s, second 0.43 s; J, gᵀd
+1.91137470e-2 and FD slope 2.87207311e-2 identical to 3543332, Taylor MISMATCH as before (finding 4).
+**The 0.2.303 2-step regression is `cse_reduce_transposed`** (new Enzyme-JAX pattern): LS6
 bisect 3558732/3 (pattern code, not module: 0.2.303 patterns 1189–1503 s on either module, 0.2.290 151–154 s),
 then local CPU bisects on the dumped modules: excluding that one pattern restores 0.2.290's times with identical
-output (it never fires; quadratic candidate search over reduces sharing one init). Next: add it to
-`adjoint_compile_options`' `excluded_passes`, confirm on LS6, report upstream.
+output (it never fires; quadratic candidate search over reduces sharing one init). Excluded by default
+(`fb295782`), confirmed by 3559769; upstream report pending.
 2-step regression attributed (3555512 vs 3555525): post-Enzyme pattern application 297 → 2549 s
 (the `InterpreterPass`es after `DifferentiatePass` in `all` and in `post_op_transpose_reshape`); Enzyme 666 → 266 s
 and XLA 1692 → 1538 s got faster. 0.2.290 worktree kept at
@@ -48,10 +56,9 @@ not attributed yet. Container: `$WORK/containers/julia_1.12_ls6.sif` links to a 
 
 ## Next
 
-1. Move `refresh_diagnostics!` into the window so every step's fluxes are differentiated; `reset!` only
-   restores state. Then rerun the 1-step rung on `gpu-a100-dev` (≈ 19 min build + 34 min compile + one
-   `update_state!` + 15 min first call) for the first meaningful Taylor check, then the 2-step unrolled rung
-   (8 h on `gpu-a100`).
+1. `refresh_diagnostics!` is in the window (`4cc69c3e`); 3560476 checks the 1-step rung. If the Taylor check
+   passes, rerun the 2-step unrolled rung (gradient only fits `gpu-a100-dev`), then map the AMOC sensitivity
+   to the winds.
 2. Optional confirmation for the upstream report: segment-6 sub-bisect on
    `logs/bisect_coupled_2step_unroll2_all/05_post_enzyme_inline.mlir`, main list except 257 and 257
    alone (`patterns_except: [257, 257]`, `patterns: [257, 257]`), dev queue.
