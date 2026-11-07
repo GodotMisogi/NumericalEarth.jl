@@ -60,7 +60,7 @@ if :cpu in stages
     t0 = time()
     cpu = omip_adjoint_setup(CPU(); Nz, Δt, substeps, n_atmosphere_slices = n_slices)
     obj_cpu = OverturningStrength(cpu.cpu_grid)
-    stamp("CPU model built in ", elapsed(t0), "; AMOC row ", obj_cpu.row, ", initial AMOC ",
+    stamp("CPU model built in ", elapsed(t0), "; AMOC section rows ", obj_cpu.rows, ", initial AMOC ",
           @sprintf("%.4f", objective_host(obj_cpu, cpu.model)), " Sv")
     t1 = time()
     for _ in 1:n_steps

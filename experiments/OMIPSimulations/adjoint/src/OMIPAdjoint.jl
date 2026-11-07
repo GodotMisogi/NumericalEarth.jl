@@ -14,7 +14,7 @@ using Oceananigans.Architectures: AbstractArchitecture, CPU, ReactantState, arch
 using Oceananigans.BoundaryConditions: BoundaryConditions, ZBC, NotFluxBC
 using Oceananigans.Grids: AbstractGrid, ExponentialDiscretization, LatitudeLongitudeGrid, inactive_node,
                           λnode, φnode, znode, Center, Face, Periodic, Bounded, Flat
-using Oceananigans.Operators: Δxᶜᶠᶜ, Δzᶜᶠᶜ
+using Oceananigans.Operators: Δxᶜᶠᶜ, Δzᶜᶠᶜ, Δyᶠᶜᶜ, Δzᶠᶜᶜ
 using Oceananigans.Fields: Field, CenterField, interior, interpolate!
 using Oceananigans.ImmersedBoundaries: ImmersedBoundaryGrid, GridFittedBottom
 using Oceananigans.OrthogonalSphericalShellGrids: TripolarGrid
