@@ -24,10 +24,16 @@ not. The 1-step zero gradient was the same defect. Everything about the unrolled
 
 ## Running / waiting on
 
-Grad1Window 3560476 (`gpu-a100-dev`, submitted 11-06): 1 unrolled step, gradient only
-(`twodegree_nz20_1step_unrolled_gradient.json`) on `4cc69c3e`, which moves `refresh_diagnostics!` into the
-differentiated window (`reset!` only restores the snapshot; `build_reset` removed). Expect a non-zero
-gradient and the first passing Taylor check; then the 2-step unrolled rung.
+Grad2Window 3560703 (`gpu-a100-dev`, submitted 11-07): the 2-step unrolled gradient-only config on
+`4cc69c3e`; 3559769's result file was moved to `..._2step_unrolled_gradient_3559769.jld2` first.
+
+**First verified gradient: Grad1Window 3560476** (11-07, 56 min, 1 unrolled step, gradient only,
+`twodegree_nz20_1step_unrolled_gradient.json`, on `4cc69c3e`, which moves `refresh_diagnostics!` into the
+differentiated window; `reset!` only restores the snapshot, `build_reset` removed): build 925 s, gradient
+compile 22.2 min, first call 680 s, second 0.31 s, J −1.3433 Sv, max|g| 7.22e-3 Sv per m/s, finite, repeat
+drift 0. Taylor: gᵀd 2.66807157e-2, FD slope 2.66993605e-2, rel_err 7.0e-4, **GRADIENT VERIFIED**; the
+remainder |Δf − h gᵀd| falls 4.5× per halving of h (second order). Census: NaN in 82 `u`, 160 `v`, 8 `S`
+state shadows, all on the fold seam (j = 60–61, i ∈ {0, 1, 2, 90, 91, 92, 180}), not reaching the winds.
 
 Grad2NoCSE 3559769 (done 11-06, `fb295782`, `cse_reduce_transposed` excluded): gradient compile **47.3 min**
 (99.6 with the pattern, 3543332; 53.2 on 0.2.290), build 939 s, first call 1073 s, second 0.43 s; J, gᵀd
