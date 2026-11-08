@@ -39,7 +39,13 @@ Queued on LS6 (11-07):
   7.5e-8 (relative), the fused unrolled gradient (3561033) by 3.6e-12; my `@test rel < 1e-8` aborted the job
   before the census, repeat and Taylor check, so no gradient was saved. The check now warns and records
   instead (`211728c9`). The old file is `..._2step_checkpointed_3565170.jld2`. Rerun 3565514 failed at model
-  build on `afcb086f` (below); rerun again as Grad2Ckpt 3565554 (dev, `1da8855f`).
+  build on `afcb086f` (below).
+- **Grad2Ckpt 3565554 VERIFIED** (11-08, `1da8855f`, 1:39:02): primal J −28.563087573790 (repeat exact),
+  gradient compile 27.1 min, first call 2368 s (the five Revolve thunks each pay a first-call cost), repeat
+  0.82 s with max|Δg| 6e-36; gradient vs primal J 1.6e-15; Taylor rel_err 2.0e-7, second-order remainder down
+  to h = 0.125. Against the unrolled 2-step gradient 3561033 (Float32 forcing): J 1.1e-8, cosine 0.9999999996,
+  norm ratio 0.999996, max|Δg| / max|g| 2.9e-5, i.e. the forcing precision. NaN shadows on the same seam
+  columns as before (82 u, 160 v, 8 S). File `results/omip_adjoint_twodegree_nz20_2step_checkpointed.jld2`.
 - **Host clocks baked into compiled functions** (StepConsist 3565513, `step_consistency.jl`, log kept as
   `StepConsist.o3565513.before_clock_fix`): under ReactantState the `EarthSystemModel`, `PrescribedAtmosphere`
   and `PrescribedRadiation` clocks were host `Clock{Float64}` (NumericalEarthReactantExt's `same_time_type`
