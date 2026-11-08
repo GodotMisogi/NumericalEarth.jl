@@ -130,7 +130,10 @@ function omip_adjoint_forcing(arch; start_date = DateTime(1990, 1, 1), n_slices 
     times = jra55_atmosphere.velocities.u.times
     jra55_grid = jra55_atmosphere.velocities.u.grid
     Nx, Ny, _ = size(jra55_grid)
-    cpu_grid = LatitudeLongitudeGrid(CPU(), eltype(jra55_grid); size = (Nx, Ny), longitude = (0, 360),
+    # Float64, not JRA55's Float32: with a traced clock, Oceananigans' time interpolation
+    # `ifelse(n₁ == n₂, ψ₁, ψ̃)` would mix the Float32 slice with the Float64-weighted blend, and Reactant
+    # cannot raise the resulting union. TODO: convert ψ₁ to eltype(ψ̃) in Oceananigans' `interpolate`.
+    cpu_grid = LatitudeLongitudeGrid(CPU(), Float64; size = (Nx, Ny), longitude = (0, 360),
                                      latitude = (-90, 90), topology = (Periodic, Bounded, Flat))
 
     atmosphere_kw = (; surface_layer_height = jra55_atmosphere.surface_layer_height,
