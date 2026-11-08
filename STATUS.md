@@ -53,8 +53,11 @@ Queued on LS6 (11-07):
   Fixed in OMIPAdjoint (`afcb086f`, `Clock(grid)` for all three). With the time traced, Oceananigans'
   `ifelse(n₁ == n₂, ψ₁, ψ̃)` returned `Union{Float32, Float64}` for the Float32 JRA55 slices and Reactant could
   not raise the atmospheric interpolation kernel (3565514, `reconcile_state!`); the in-memory forcing is now
-  Float64 (`1da8855f`; CPU 2-step J −28.5630876 vs −28.5630879 with Float32). Verification StepConsist
-  3565553 (dev; 3565543 cancelled, it had started on `afcb086f`). Upstream TODO: convert ψ₁ in Oceananigans'
+  Float64 (`1da8855f`; CPU 2-step J −28.5630876 vs −28.5630879 with Float32). **Verified** by StepConsist
+  3565553 (`1da8855f`; 3565543 cancelled, it had started on `afcb086f`): no host number changes during any
+  compile; separately compiled refresh + step vs window, J relative difference 2.2e-15 at 1 step and 1.1e-15
+  at 2 (window J −28.563087573790813, matching the CPU twin); every device array agrees to ≤ 6e-11 relative
+  (CATKE κ, the implicit solver's scratch). Upstream TODO: convert ψ₁ in Oceananigans'
   `interpolate`/`time_interpolated_getindex`.
   Upstream: NumericalEarth's `default_earth_system_clock` and the prescribed components' default
   `Clock{Float64}` should be device clocks on ReactantState.
