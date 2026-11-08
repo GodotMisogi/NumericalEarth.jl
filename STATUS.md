@@ -33,10 +33,15 @@ Queued on LS6 (11-07):
   FD slope 4.49959212e-2, rel_err 1.06e-4, **GRADIENT VERIFIED**, remainder second order (rate 4.0 → 3.7 until
   roundoff below h = 1/16). Freezing CATKE's κ costs 1e-4 at 1 step and saves no compile time here; the
   gradient-to-gradient comparison waits on 3561032.
-- Grad2Ckpt 3565170 (`gpu-a100-dev`, `twodegree_nz20_2step_checkpointed.json`, `444a432d`): the step-by-step
-  gradient on Checkpointing.jl's Revolve schedule, 1 checkpoint (step 1 recomputed). Must reproduce 3561033's
-  gradient and the primal window's J.
-- Grad8Ckpt 3565171 (`gpu-a100`, 8 steps, 3 checkpoints): compile time should equal the 2-step run's.
+- **Grad2Ckpt 3565170 failed its J check** (11-08, 1:36:45, Revolve, 1 checkpoint): build 916 s, primal
+  compile 484 s, primal J −28.563087893063496 (repeat exact), **gradient compile 27.1 min** (47.8 for the
+  unrolled 2-step window), first call 2230 s, max|g| 1.11e-2, finite. Its J differs from the primal's by
+  7.5e-8 (relative), the fused unrolled gradient (3561033) by 3.6e-12; my `@test rel < 1e-8` aborted the job
+  before the census, repeat and Taylor check, so no gradient was saved. The check now warns and records
+  instead (`211728c9`). Diagnostic StepConsist 3565513 (`step_consistency.jl`, dev): window vs separately
+  compiled refresh and step at 1 and 2 steps, array by array, plus host numbers tracing could bake in.
+  Rerun Grad2Ckpt 3565514 (dev, same config); the old file is `..._2step_checkpointed_3565170.jld2`.
+- Grad8Ckpt 3565171 (`gpu-a100`, 8 steps, 3 checkpoints, will run `211728c9`): compile time should equal the 2-step run's.
 - ECCO2Ckpt 3565218 (`gpu-a100`, `ecco4_nz20_2step_checkpointed.json`, runs `4fa86369`): `PrescribedFluxOcean`,
   ECCO4 1993-01 initial state and monthly stress, net heat and net freshwater fluxes, CPU twin, primal,
   2-step checkpointed gradient wrt the stress. Local CPU build checked (2 steps: J 0 → −35.0 Sv from rest,
