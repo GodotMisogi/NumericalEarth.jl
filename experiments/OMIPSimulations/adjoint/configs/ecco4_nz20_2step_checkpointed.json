@@ -1,0 +1,16 @@
+{
+  "_comment": "ECCO4 prescribed-flux ocean (1993-01 initial state, monthly stress and net heat flux): CPU twin, primal and 2-step AMOC gradient wrt the surface stress, one step at a time on Revolve's schedule.",
+  "forcing": "ecco4",
+  "n_months": 2,
+  "Nz": 20,
+  "steps": 2,
+  "dt": 7200.0,
+  "substeps": 50,
+  "backend": "gpu",
+  "stages": "cpu,primal,gradient",
+  "roll_barotropic_substeps": true,
+  "checkpoints": 1,
+  "taylor_h0": 0.1,
+  "taylor_nh": 6,
+  "output": "results/ecco4_adjoint_nz20_2step_checkpointed.jld2"
+}

@@ -48,10 +48,11 @@ The OMIP ocean simulation on `grid`: `omip_closure` (CATKE by default, GM/Redi w
 `κ_symmetric` are given, biharmonic viscosity from `biharmonic_timescale`), split WENO advection (explicit
 in the vertical), enstrophy-conserving Coriolis, `substeps` split-explicit
 barotropic substeps and SplitRK3 time stepping. The initial state is the WOA annual climatology
-converted to TEOS-10 variables on `cpu_grid` and copied onto `grid`.
+converted to TEOS-10 variables on `cpu_grid` and copied onto `grid`, or ECCO4's monthly mean for
+`initial_date` when one is given.
 """
 function omip_adjoint_ocean(grid, cpu_grid; Δt, substeps = 50, vertical_closure = :catke,
-                            κ_skew = 800, κ_symmetric = 800, biharmonic_timescale = 50days)
+                            κ_skew = 800, κ_symmetric = 800, biharmonic_timescale = 50days, initial_date = nothing)
 
     closure = omip_closure(vertical_closure; grid, κ_skew, κ_symmetric, biharmonic_timescale,
                            background_vertical_diffusivity = :henyey)
@@ -74,9 +75,15 @@ function omip_adjoint_ocean(grid, cpu_grid; Δt, substeps = 50, vertical_closure
 
     T_init = CenterField(cpu_grid)
     S_init = CenterField(cpu_grid)
-    set!(T_init, Metadatum(:temperature; dataset = WOAAnnual()))
-    set!(S_init, Metadatum(:salinity;    dataset = WOAAnnual()))
-    woa_to_teos10!(T_init, S_init)
+    if isnothing(initial_date)
+        set!(T_init, Metadatum(:temperature; dataset = WOAAnnual()))
+        set!(S_init, Metadatum(:salinity;    dataset = WOAAnnual()))
+        woa_to_teos10!(T_init, S_init)
+    else
+        set!(T_init, Metadatum(:temperature; dataset = ECCO4Monthly(), date = initial_date))
+        set!(S_init, Metadatum(:salinity;    dataset = ECCO4Monthly(), date = initial_date))
+        ecco_to_teos10!(T_init, S_init)
+    end
     parent(ocean.model.tracers.T) .= Array(parent(T_init))
     parent(ocean.model.tracers.S) .= Array(parent(S_init))
 

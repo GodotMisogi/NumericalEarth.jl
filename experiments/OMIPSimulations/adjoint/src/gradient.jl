@@ -116,7 +116,7 @@ function gradient_core!(window, model, dmodel, obj, n_steps, Δt)
                     Duplicated(model, dmodel), Const(obj), Const(n_steps), Const(Δt))
 end
 
-# The wind controls: the 10-m velocity slices of the in-memory atmosphere.
+# The wind controls: the 10-m velocity slices of the in-memory atmosphere (the stress of a `PrescribedFluxOcean`).
 wind_fields(model) = (u = model.atmosphere.velocities.u, v = model.atmosphere.velocities.v)
 
 # Interior parent index ranges of a surface field time series.
@@ -214,14 +214,20 @@ function surface_wet_mask(cpu_grid)
     return wet
 end
 
+forcing_shadows(dmodel) = (("atmosphere.u", dmodel.atmosphere.velocities.u), ("atmosphere.v", dmodel.atmosphere.velocities.v),
+                           ("atmosphere.T", dmodel.atmosphere.temperature), ("atmosphere.q", dmodel.atmosphere.specific_humidity),
+                           ("atmosphere.p", dmodel.atmosphere.pressure),
+                           ("radiation.sw", dmodel.radiation.downwelling_shortwave),
+                           ("radiation.lw", dmodel.radiation.downwelling_longwave))
+
 """
 $(TYPEDSIGNATURES)
 
 Per-field census of the Enzyme shadows in `dmodel`: ocean velocities, tracers and free-surface
-displacement, and the atmosphere and radiation slices. Each entry holds the counts of NaN, Inf and
-non-zero finite entries, the vertical levels and `(i, j)` columns holding NaN (3-D fields, interior
-indices; out-of-range ones are halo) and, for ocean surface fields with `cpu_grid` given, the
-wet/dry split of the NaN cells.
+displacement, and the forcing slices (atmosphere and radiation, or prescribed fluxes). Each entry holds
+the counts of NaN, Inf and non-zero finite entries, the vertical levels and `(i, j)` columns holding NaN
+(3-D fields, interior indices; out-of-range ones are halo) and, for ocean surface fields with `cpu_grid`
+given, the wet/dry split of the NaN cells.
 """
 function shadow_census(dmodel; cpu_grid = nothing)
     wet = cpu_grid === nothing ? nothing : surface_wet_mask(cpu_grid)
@@ -233,12 +239,7 @@ function shadow_census(dmodel; cpu_grid = nothing)
         end
     end
     push!(out, field_census("free_surface.η", om.free_surface.displacement, wet))
-    atmos = dmodel.atmosphere
-    for (name, f) in (("atmosphere.u", atmos.velocities.u), ("atmosphere.v", atmos.velocities.v),
-                      ("atmosphere.T", atmos.temperature), ("atmosphere.q", atmos.specific_humidity),
-                      ("atmosphere.p", atmos.pressure),
-                      ("radiation.sw", dmodel.radiation.downwelling_shortwave),
-                      ("radiation.lw", dmodel.radiation.downwelling_longwave))
+    for (name, f) in forcing_shadows(dmodel)
         push!(out, field_census(name, f, nothing))
     end
     return out

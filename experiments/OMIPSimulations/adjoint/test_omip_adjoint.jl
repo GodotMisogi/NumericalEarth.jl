@@ -2,6 +2,9 @@
 # ==============================================================================
 # Differentiable OMIP ocean test: Reactant + Enzyme gradient of the AMOC at 26.5°N with respect to
 # the 10-m winds for the ocean-only 2° OMIP model.
+# Optional `forcing` (default "jra55"): "ecco4" drives the ocean with ECCO4's monthly wind stress and net heat
+# flux for `n_months` from 1993-01 (`ecco_adjoint_setup`) instead of the JRA55 atmosphere and bulk formulae for
+# `n_atmosphere_slices`; the gradient is then with respect to the eastward and northward stress.
 #
 #   julia --project=adjoint adjoint/test_omip_adjoint.jl adjoint/configs/<config>.json
 #
@@ -40,8 +43,18 @@ config_path = length(ARGS) >= 1 ? ARGS[1] : joinpath(@__DIR__, "configs", "twode
 P = JSON.parsefile(config_path)
 stages = Symbol.(strip.(split(P["stages"], ",")))
 Nz, n_steps, Δt, substeps = P["Nz"], P["steps"], Float64(P["dt"]), P["substeps"]
-n_slices = P["n_atmosphere_slices"]
-n_slices * 3 * 3600 > n_steps * Δt || error("$(n_slices) three-hourly slices do not cover $(n_steps) steps of $(Δt) s")
+forcing = get(P, "forcing", "jra55")
+if forcing == "ecco4"
+    n_months = P["n_months"]
+    (n_months - 1) * 28 * 86400 > n_steps * Δt || error("$(n_months) monthly slices do not cover $(n_steps) steps of $(Δt) s")
+    model_setup = arch -> ecco_adjoint_setup(arch; Nz, Δt, substeps, n_months)
+elseif forcing == "jra55"
+    n_slices = P["n_atmosphere_slices"]
+    n_slices * 3 * 3600 > n_steps * Δt || error("$(n_slices) three-hourly slices do not cover $(n_steps) steps of $(Δt) s")
+    model_setup = arch -> omip_adjoint_setup(arch; Nz, Δt, substeps, n_atmosphere_slices = n_slices)
+else
+    error("forcing must be \"jra55\" or \"ecco4\", got \"$forcing\"")
+end
 
 stamp(msg...) = (println("[", format(now(), "HH:MM:SS"), "] ", msg...); flush(stdout))
 elapsed(t) = @sprintf("%.1f s", time() - t)
@@ -64,7 +77,7 @@ end
 J_cpu = NaN
 if :cpu in stages
     t0 = time()
-    cpu = omip_adjoint_setup(CPU(); Nz, Δt, substeps, n_atmosphere_slices = n_slices)
+    cpu = model_setup(CPU())
     obj_cpu = OverturningStrength(cpu.cpu_grid)
     stamp("CPU model built in ", elapsed(t0), "; AMOC section rows ", obj_cpu.rows, ", initial AMOC ",
           @sprintf("%.4f", objective_host(obj_cpu, cpu.model)), " Sv")
@@ -95,7 +108,7 @@ if any(in(stages), reactant_stages)
     unroll_steps = get(P, "unroll_steps", false)
 
     t0 = time()
-    setup = omip_adjoint_setup(ReactantState(); Nz, Δt, substeps, n_atmosphere_slices = n_slices)
+    setup = model_setup(ReactantState())
     model = setup.model
     obj = OverturningStrength(setup.cpu_grid)
     state = snapshot_state(model)
