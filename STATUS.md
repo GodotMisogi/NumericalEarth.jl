@@ -38,10 +38,22 @@ Queued on LS6 (11-07):
   unrolled 2-step window), first call 2230 s, max|g| 1.11e-2, finite. Its J differs from the primal's by
   7.5e-8 (relative), the fused unrolled gradient (3561033) by 3.6e-12; my `@test rel < 1e-8` aborted the job
   before the census, repeat and Taylor check, so no gradient was saved. The check now warns and records
-  instead (`211728c9`). Diagnostic StepConsist 3565513 (`step_consistency.jl`, dev): window vs separately
-  compiled refresh and step at 1 and 2 steps, array by array, plus host numbers tracing could bake in.
-  Rerun Grad2Ckpt 3565514 (dev, same config); the old file is `..._2step_checkpointed_3565170.jld2`.
-- Grad8Ckpt 3565171 (`gpu-a100`, 8 steps, 3 checkpoints, will run `211728c9`): compile time should equal the 2-step run's.
+  instead (`211728c9`). Rerun Grad2Ckpt 3565514 (dev, runs `afcb086f`); the old file is
+  `..._2step_checkpointed_3565170.jld2`.
+- **Host clocks baked into compiled functions** (StepConsist 3565513, `step_consistency.jl`, log kept as
+  `StepConsist.o3565513.before_clock_fix`): under ReactantState the `EarthSystemModel`, `PrescribedAtmosphere`
+  and `PrescribedRadiation` clocks were host `Clock{Float64}` (NumericalEarthReactantExt's `same_time_type`
+  accepts them beside the ocean's `ConcreteRNumber` clock). The atmospheric and radiative interpolation reads
+  `coupled_model.clock.time`, so each compiled function used the forcing time it was traced at, and tracing
+  ticked the host clocks (0 → 14400 s after compiling the 1- and 2-step windows). Separately compiled step vs
+  window: 5.2e-3 at 1 step, 6.5e-4 at 2; atmosphere state, CATKE and fluxes differ O(1). A rolled window gives
+  every iteration the forcing of its trace time. Earlier verified results stand: 1-step windows and the
+  unrolled 2-step window were traced from a fresh clock (unrolling advances the host clock step by step), and
+  the rolled 2-step primal's stale value only enters the fluxes after the last step, which J does not see.
+  Fixed in OMIPAdjoint (`afcb086f`, `Clock(grid)` for all three); verification StepConsist 3565543 (dev).
+  Upstream: NumericalEarth's `default_earth_system_clock` and the prescribed components' default
+  `Clock{Float64}` should be device clocks on ReactantState.
+- Grad8Ckpt 3565171 (`gpu-a100`, 8 steps, 3 checkpoints, will run `afcb086f`): compile time should equal the 2-step run's.
 - ECCO2Ckpt 3565218 (`gpu-a100`, `ecco4_nz20_2step_checkpointed.json`, runs `4fa86369`): `PrescribedFluxOcean`,
   ECCO4 1993-01 initial state and monthly stress, net heat and net freshwater fluxes, CPU twin, primal,
   2-step checkpointed gradient wrt the stress. Local CPU build checked (2 steps: J 0 → −35.0 Sv from rest,
