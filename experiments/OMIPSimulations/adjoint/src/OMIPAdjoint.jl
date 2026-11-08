@@ -3,7 +3,7 @@ module OMIPAdjoint
 export omip_adjoint_setup,
        OverturningStrength, objective_host,
        roll_barotropic_substeps!, freeze_mixing!,
-       adjoint_compile_options, snapshot_state, build_primal, build_gradient,
+       adjoint_compile_options, snapshot_state, build_primal, build_gradient, build_checkpointed_gradient,
        wind_gradient, shadow_census, print_shadow_census, taylor_remainder_check
 
 using Oceananigans
@@ -16,6 +16,7 @@ using Oceananigans.Grids: AbstractGrid, ExponentialDiscretization, LatitudeLongi
                           λnode, φnode, znode, Center, Face, Periodic, Bounded, Flat
 using Oceananigans.Operators: Δxᶜᶠᶜ, Δzᶜᶠᶜ, Δyᶠᶜᶜ, Δzᶠᶜᶜ
 using Oceananigans.Fields: Field, CenterField, interior, interpolate!
+using Oceananigans.OutputReaders: FieldTimeSeries
 using Oceananigans.ImmersedBoundaries: ImmersedBoundaryGrid, GridFittedBottom
 using Oceananigans.OrthogonalSphericalShellGrids: TripolarGrid
 using Oceananigans.Coriolis: HydrostaticSphericalCoriolis, EnstrophyConserving
@@ -41,7 +42,8 @@ using OMIPSimulations: omip_closure, split_momentum_advection, split_tracer_adve
                        ncar_atmosphere_ocean_fluxes, woa_to_teos10!
 
 using Reactant: Reactant, @compile, @trace, @allowscalar
-using Enzyme: autodiff, set_strong_zero, ReverseWithPrimal, Active, Duplicated, Const, make_zero, ignore_derivatives
+using Enzyme: autodiff, set_strong_zero, Reverse, ReverseWithPrimal, Active, Duplicated, Const, make_zero, ignore_derivatives
+using Checkpointing: Checkpointing, Revolve, next_action!
 using Dates: DateTime, Hour
 using Printf: @printf
 using DocStringExtensions: TYPEDSIGNATURES
@@ -52,5 +54,6 @@ include("rolled_substeps.jl")
 include("frozen_mixing.jl")
 include("zipper_flux_bcs.jl")
 include("gradient.jl")
+include("checkpointed_gradient.jl")
 
 end # module OMIPAdjoint

@@ -5,6 +5,7 @@ authors = ["NumericalEarth contributors"]
 
 [deps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+Checkpointing = "eb46d486-4f9c-4c3d-b445-a617f2a2f1ca"
 ClimaSeaIce = "6ba0ff68-24e6-4315-936c-2e99227c95a4"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
@@ -29,6 +30,7 @@ OMIPSimulations = {path = ".."}
 
 [compat]
 CUDA = "5.11.0, 6"
+Checkpointing = "0.13"
 Enzyme = "0.13.216"
 JSON = "0.21, 1"
 Reactant = "=0.2.303"
