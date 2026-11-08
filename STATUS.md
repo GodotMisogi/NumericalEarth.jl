@@ -33,10 +33,12 @@ Queued on LS6 (11-07):
   gradient on Checkpointing.jl's Revolve schedule, 1 checkpoint (step 1 recomputed). Must reproduce 3561033's
   gradient and the primal window's J.
 - Grad8Ckpt 3565171 (`gpu-a100`, 8 steps, 3 checkpoints): compile time should equal the 2-step run's.
-- ECCO2Ckpt 3565218 (`gpu-a100`, `ecco4_nz20_2step_checkpointed.json`, `89cd2ce5`): `PrescribedFluxOcean`,
-  ECCO4 1993-01 initial state and monthly stress and net heat flux (no freshwater flux: oceFWflx needs an
-  Earthdata login; none cached), CPU twin, primal, 2-step checkpointed gradient wrt the stress. Local CPU
-  build checked (2 steps: J 0 → −35.0 Sv from rest, stress ≤ 0.4 N m⁻², heat flux −530…+230 W m⁻²).
+- ECCO2Ckpt 3565218 (`gpu-a100`, `ecco4_nz20_2step_checkpointed.json`, runs `4fa86369`): `PrescribedFluxOcean`,
+  ECCO4 1993-01 initial state and monthly stress, net heat and net freshwater fluxes, CPU twin, primal,
+  2-step checkpointed gradient wrt the stress. Local CPU build checked (2 steps: J 0 → −35.0 Sv from rest,
+  stress ≤ 0.4 N m⁻², heat flux −530…+230 W m⁻², freshwater −37…+200 mm/day). The Earthdata credentials
+  (`ECCO_USERNAME`, `ECCO_WEBDAV_PASSWORD`) are now exported in LS6's `~/.bashrc` (copied from Vista);
+  oceFWflx for all of 1993 is cached (job 3565274).
 
 Checkpointing v0.13.0 was added to LS6's adjoint Manifest by a `development` job (3565146, `PRESERVE_ALL`)
 before pulling, so pending jobs kept a consistent environment.
