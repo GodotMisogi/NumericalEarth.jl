@@ -1,4 +1,4 @@
-# OMIP adjoint: status as of 2026-10-30
+# OMIP adjoint: status as of 2026-11-07
 
 Branch `ajs/omip-adjoint` (fork GodotMisogi), tip `1b8969ff`, pulled on LS6. Records: `LOGBOOK.md` (decisions,
 parameters, dead ends), `experiments/OMIPSimulations/adjoint/PROGRESS.md` (full detail). Both uncommitted.
@@ -24,10 +24,28 @@ not. The 1-step zero gradient was the same defect. Everything about the unrolled
 
 ## Running / waiting on
 
-Queued 11-07 on `4241f645` (staircase section `b0660e21`, quadratic-fit Taylor verdict `868dede1`):
-Grad1Section 3561032 (`gpu-a100`, `twodegree_nz20_1step.json`: CPU twin, primal against it, gradient) and
-Grad2Section 3561033 (`gpu-a100-dev`, 2-step unrolled gradient, for the map via `adjoint/plot_amoc_sensitivity.jl`).
-Old results kept on LS6 as `..._1step_row41_prewindow.jld2` and `..._2step_unrolled_gradient_3560703.jld2`.
+Queued on LS6 (11-07):
+
+- Grad1Section 3561032 (`gpu-a100`, `twodegree_nz20_1step.json`: CPU twin, primal against it, rolled 1-step gradient).
+- Grad1Frozen 3564718 (`gpu-a100-dev`, 1 step unrolled, `frozen_mixing`, `b0418df6`): compare direction and
+  size with the full 1-step gradient on the staircase section; its Taylor check measures the approximation.
+- Grad2Ckpt 3565170 (`gpu-a100-dev`, `twodegree_nz20_2step_checkpointed.json`, `444a432d`): the step-by-step
+  gradient on Checkpointing.jl's Revolve schedule, 1 checkpoint (step 1 recomputed). Must reproduce 3561033's
+  gradient and the primal window's J.
+- Grad8Ckpt 3565171 (`gpu-a100`, 8 steps, 3 checkpoints): compile time should equal the 2-step run's.
+- ECCO2Ckpt 3565218 (`gpu-a100`, `ecco4_nz20_2step_checkpointed.json`, `89cd2ce5`): `PrescribedFluxOcean`,
+  ECCO4 1993-01 initial state and monthly stress and net heat flux (no freshwater flux: oceFWflx needs an
+  Earthdata login; none cached), CPU twin, primal, 2-step checkpointed gradient wrt the stress. Local CPU
+  build checked (2 steps: J 0 → −35.0 Sv from rest, stress ≤ 0.4 N m⁻², heat flux −530…+230 W m⁻²).
+
+Checkpointing v0.13.0 was added to LS6's adjoint Manifest by a `development` job (3565146, `PRESERVE_ALL`)
+before pulling, so pending jobs kept a consistent environment.
+
+**Grad2Section 3561033** (11-07, 1:22:49, 2 unrolled steps on the staircase section, quadratic-fit verdict):
+build 920 s, compile 47.8 min, first call 761 s, J −28.5631 Sv, max|g| 1.18e-2 Sv per m/s, **GRADIENT
+VERIFIED** (rel_err 9.18e-7). Sensitivity sits on 26.5°N with peaks at the staircase steps (63°W, 28°W);
+uniform 1 m/s: −0.257 Sv (u), +0.658 Sv (v). J of −28.6 Sv 4 h from rest is likely the spin-up transient
+(row 41 gave −5.3); 3561032's CPU twin checks the traced objective.
 
 **Grad2Window 3560703** (11-07, 81 min, 2 unrolled steps, gradient only, `4cc69c3e`; 3559769's
 result kept as `..._2step_unrolled_gradient_3559769.jld2`): build 923 s, compile 47.3 min, first call 734 s,
