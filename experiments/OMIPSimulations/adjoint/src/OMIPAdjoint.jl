@@ -23,7 +23,7 @@ using Oceananigans.Coriolis: HydrostaticSphericalCoriolis, EnstrophyConserving
 using Oceananigans.TurbulenceClosures: TurbulenceClosures, ExplicitTimeDiscretization
 using Oceananigans.TurbulenceClosures.TKEBasedVerticalDiffusivities: FlavorOfCATKE
 using Oceananigans.Models.HydrostaticFreeSurfaceModels: HydrostaticFreeSurfaceModel
-using Oceananigans.TimeSteppers: TimeSteppers, time_step!, update_state!
+using Oceananigans.TimeSteppers: TimeSteppers, Clock, time_step!, update_state!
 using Oceananigans.Utils: configure_kernel, launch!
 using Oceananigans.Models.HydrostaticFreeSurfaceModels.SplitExplicitFreeSurfaces:
     SplitExplicitFreeSurfaces, SplitExplicitFreeSurface, ExtendedHalos,

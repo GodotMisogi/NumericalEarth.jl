@@ -141,9 +141,11 @@ function omip_adjoint_forcing(arch; start_date = DateTime(1990, 1, 1), n_slices 
     cpu_radiation  = PrescribedRadiation(cpu_grid, times; radiation_kw...)
     map_forcing_slices!(interpolate!, times, cpu_atmosphere, cpu_radiation, jra55_atmosphere, jra55_radiation)
 
+    # `Clock(grid)` keeps time on the device under ReactantState; the default host Float64 clock would be
+    # read as a constant, and ticked, at trace time.
     grid = on_architecture(arch, cpu_grid)
-    atmosphere = PrescribedAtmosphere(grid, times; atmosphere_kw...)
-    radiation  = PrescribedRadiation(grid, times; radiation_kw...)
+    atmosphere = PrescribedAtmosphere(grid, times; clock = Clock(grid), atmosphere_kw...)
+    radiation  = PrescribedRadiation(grid, times; clock = Clock(grid), radiation_kw...)
     map_forcing_slices!(copy_slice!, times, atmosphere, radiation, cpu_atmosphere, cpu_radiation)
     update_state!(atmosphere)
     update_state!(radiation)
@@ -174,7 +176,9 @@ function omip_adjoint_setup(arch; Nz = 20, depth = 5500, Δt = 7200.0, substeps 
                                      radiation = forcing.radiation,
                                      atmosphere_ocean_fluxes = ncar_atmosphere_ocean_fluxes(Float64))
 
-    model = OceanOnlyModel(ocean; atmosphere = forcing.atmosphere, radiation = forcing.radiation, interfaces)
+    # The coupled clock times the atmosphere and radiation interpolation; on the device for the same reason.
+    model = OceanOnlyModel(ocean; atmosphere = forcing.atmosphere, radiation = forcing.radiation, interfaces,
+                           clock = Clock(grid))
 
     return (; model, cpu_grid, Δt, times = forcing.times)
 end
