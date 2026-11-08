@@ -27,8 +27,12 @@ not. The 1-step zero gradient was the same defect. Everything about the unrolled
 Queued on LS6 (11-07):
 
 - Grad1Section 3561032 (`gpu-a100`, `twodegree_nz20_1step.json`: CPU twin, primal against it, rolled 1-step gradient).
-- Grad1Frozen 3564718 (`gpu-a100-dev`, 1 step unrolled, `frozen_mixing`, `b0418df6`): compare direction and
-  size with the full 1-step gradient on the staircase section; its Taylor check measures the approximation.
+- **Grad1Frozen 3564718 done** (11-08, 57.7 min, 1 step unrolled, `frozen_mixing`, `b0418df6`, staircase
+  section): build 916 s, compile 22.7 min (22.2 unfrozen, 3560476), first call 768 s, second 0.37 s, J −14.3509 Sv,
+  max|g| 1.09e-2 Sv per m/s, repeat drift 0. Against the full model's finite difference: gᵀd 4.49911511e-2,
+  FD slope 4.49959212e-2, rel_err 1.06e-4, **GRADIENT VERIFIED**, remainder second order (rate 4.0 → 3.7 until
+  roundoff below h = 1/16). Freezing CATKE's κ costs 1e-4 at 1 step and saves no compile time here; the
+  gradient-to-gradient comparison waits on 3561032.
 - Grad2Ckpt 3565170 (`gpu-a100-dev`, `twodegree_nz20_2step_checkpointed.json`, `444a432d`): the step-by-step
   gradient on Checkpointing.jl's Revolve schedule, 1 checkpoint (step 1 recomputed). Must reproduce 3561033's
   gradient and the primal window's J.
