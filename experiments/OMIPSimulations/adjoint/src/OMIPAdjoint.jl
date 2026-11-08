@@ -2,7 +2,7 @@ module OMIPAdjoint
 
 export omip_adjoint_setup,
        OverturningStrength, objective_host,
-       roll_barotropic_substeps!,
+       roll_barotropic_substeps!, freeze_mixing!,
        adjoint_compile_options, snapshot_state, build_primal, build_gradient,
        wind_gradient, shadow_census, print_shadow_census, taylor_remainder_check
 
@@ -19,7 +19,9 @@ using Oceananigans.Fields: Field, CenterField, interior, interpolate!
 using Oceananigans.ImmersedBoundaries: ImmersedBoundaryGrid, GridFittedBottom
 using Oceananigans.OrthogonalSphericalShellGrids: TripolarGrid
 using Oceananigans.Coriolis: HydrostaticSphericalCoriolis, EnstrophyConserving
-using Oceananigans.TurbulenceClosures: ExplicitTimeDiscretization
+using Oceananigans.TurbulenceClosures: TurbulenceClosures, ExplicitTimeDiscretization
+using Oceananigans.TurbulenceClosures.TKEBasedVerticalDiffusivities: FlavorOfCATKE
+using Oceananigans.Models.HydrostaticFreeSurfaceModels: HydrostaticFreeSurfaceModel
 using Oceananigans.TimeSteppers: time_step!, update_state!
 using Oceananigans.Utils: configure_kernel
 using Oceananigans.Models.HydrostaticFreeSurfaceModels.SplitExplicitFreeSurfaces:
@@ -39,7 +41,7 @@ using OMIPSimulations: omip_closure, split_momentum_advection, split_tracer_adve
                        ncar_atmosphere_ocean_fluxes, woa_to_teos10!
 
 using Reactant: Reactant, @compile, @trace, @allowscalar
-using Enzyme: autodiff, set_strong_zero, ReverseWithPrimal, Active, Duplicated, Const, make_zero
+using Enzyme: autodiff, set_strong_zero, ReverseWithPrimal, Active, Duplicated, Const, make_zero, ignore_derivatives
 using Dates: DateTime, Hour
 using Printf: @printf
 using DocStringExtensions: TYPEDSIGNATURES
@@ -47,6 +49,7 @@ using DocStringExtensions: TYPEDSIGNATURES
 include("ocean_only_model.jl")
 include("overturning.jl")
 include("rolled_substeps.jl")
+include("frozen_mixing.jl")
 include("zipper_flux_bcs.jl")
 include("gradient.jl")
 

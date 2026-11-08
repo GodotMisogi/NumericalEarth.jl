@@ -13,6 +13,9 @@
 # adjoint_compile_options' default (["while_deadresult", "cse_reduce_transposed"]); [] runs every pattern.
 # Optional `while_unroll_threshold` (default 0, every loop rolled): Reactant's unroll pattern acts on
 # loops of at most this many iterations in every rewrite application, before and after Enzyme.
+# Optional `frozen_mixing` (default false): the CATKE viscosity and diffusivities enter the gradient as
+# constants (`freeze_mixing!`); the forward model is unchanged, so the Taylor check then measures the
+# frozen-mixing approximation, not the adjoint's exactness.
 # Optional `unroll_steps` (default false): unroll the time-step loop at trace time instead of tracing
 # it, so Enzyme's reverse pass is straight-line too (no loop-carried shadow state).
 # ==============================================================================
@@ -82,6 +85,7 @@ if any(in(stages), reactant_stages)
         error("Reactant lowers Oceananigans kernels through NVPTX; this Julia's LLVM lacks it (macOS). Run on the GPU cluster.")
     Reactant.set_default_backend(P["backend"])
     roll_barotropic_substeps!(P["roll_barotropic_substeps"])
+    freeze_mixing!(get(P, "frozen_mixing", false))
     options = haskey(P, "excluded_passes") ? adjoint_compile_options(; excluded_passes = String.(P["excluded_passes"])) :
                                              adjoint_compile_options()
     while_unroll_threshold = get(P, "while_unroll_threshold", 0)

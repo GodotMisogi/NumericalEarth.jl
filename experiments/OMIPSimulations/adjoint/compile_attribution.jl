@@ -15,6 +15,7 @@
 #                      adjoint/), xla_dump_hlo_as_text, xla_disable_hlo_passes
 #   while_unroll_threshold  Reactant unrolls traced loops of at most this many iterations (default 0,
 #                           every loop rolled); the tag of the kept module and stage dumps records it
+#   frozen_mixing  hold the CATKE viscosity and diffusivities constant in derivatives (default false)
 #   unroll_steps  unroll the coupled and ocean time-step loops at trace time instead of tracing them
 #                 (default false), as `build_gradient`'s keyword; the tag records it
 # Variants, each differentiated with respect to the whole model like the production gradient:
@@ -78,6 +79,7 @@ save_results() = (mkpath(dirname(output_path)); jldsave(output_path; results); n
 
 Reactant.set_default_backend(P["backend"])
 roll_barotropic_substeps!(P["roll_barotropic_substeps"])
+freeze_mixing!(get(P, "frozen_mixing", false))
 # Config overrides of adjoint_compile_options; `xla_dump_to` is relative to adjoint/ like the other paths.
 option_overrides = Dict{Symbol, Any}()
 haskey(P, "excluded_passes") && (option_overrides[:excluded_passes] = String.(P["excluded_passes"]))
