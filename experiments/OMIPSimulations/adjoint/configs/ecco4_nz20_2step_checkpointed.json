@@ -1,5 +1,5 @@
 {
-  "_comment": "ECCO4 prescribed-flux ocean (1993-01 initial state, monthly stress and net heat flux): CPU twin, primal and 2-step AMOC gradient wrt the surface stress, one step at a time on Revolve's schedule.",
+  "_comment": "ECCO4 prescribed-flux ocean (1993-01 initial state, monthly stress, net heat and freshwater fluxes): CPU twin, primal and 2-step AMOC gradient wrt the surface stress, one step at a time on Revolve's schedule.",
   "forcing": "ecco4",
   "n_months": 2,
   "Nz": 20,

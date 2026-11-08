@@ -2,9 +2,10 @@
 # ==============================================================================
 # Differentiable OMIP ocean test: Reactant + Enzyme gradient of the AMOC at 26.5°N with respect to
 # the 10-m winds for the ocean-only 2° OMIP model.
-# Optional `forcing` (default "jra55"): "ecco4" drives the ocean with ECCO4's monthly wind stress and net heat
-# flux for `n_months` from 1993-01 (`ecco_adjoint_setup`) instead of the JRA55 atmosphere and bulk formulae for
-# `n_atmosphere_slices`; the gradient is then with respect to the eastward and northward stress.
+# Optional `forcing` (default "jra55"): "ecco4" drives the ocean with ECCO4's monthly wind stress, net heat
+# flux and net freshwater flux for `n_months` from 1993-01 (`ecco_adjoint_setup`) instead of the JRA55
+# atmosphere and bulk formulae for `n_atmosphere_slices`; the gradient is then with respect to the eastward
+# and northward stress.
 #
 #   julia --project=adjoint adjoint/test_omip_adjoint.jl adjoint/configs/<config>.json
 #
