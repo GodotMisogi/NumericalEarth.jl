@@ -24,15 +24,20 @@ not. The 1-step zero gradient was the same defect. Everything about the unrolled
 
 ## Running / waiting on
 
-Queued on LS6 (11-07):
+Queued on LS6 (11-07; results 11-08):
 
-- Grad1Section 3561032 (`gpu-a100`, `twodegree_nz20_1step.json`: CPU twin, primal against it, rolled 1-step gradient).
+- **Grad1Section 3566763 VERIFIED** (11-08, dev, `1da8855f`, 1:25:52; resubmitted from `gpu-a100` 3561032,
+  `twodegree_nz20_1step.json`): CPU twin J −14.3509 Sv, traced primal vs CPU twin 7.5e-13, rolled 1-step
+  gradient compile 31.9 min, first call 847 s, repeat 0.47 s exact; gradient vs primal J 3.7e-16; Taylor
+  rel_err 6.1e-5, second-order remainder. File `results/omip_adjoint_twodegree_nz20_1step.jld2`.
 - **Grad1Frozen 3564718 done** (11-08, 57.7 min, 1 step unrolled, `frozen_mixing`, `b0418df6`, staircase
   section): build 916 s, compile 22.7 min (22.2 unfrozen, 3560476), first call 768 s, second 0.37 s, J −14.3509 Sv,
   max|g| 1.09e-2 Sv per m/s, repeat drift 0. Against the full model's finite difference: gᵀd 4.49911511e-2,
   FD slope 4.49959212e-2, rel_err 1.06e-4, **GRADIENT VERIFIED**, remainder second order (rate 4.0 → 3.7 until
-  roundoff below h = 1/16). Freezing CATKE's κ costs 1e-4 at 1 step and saves no compile time here; the
-  gradient-to-gradient comparison waits on 3561032.
+  roundoff below h = 1/16). Freezing CATKE's κ costs 1e-4 at 1 step and saves no compile time here. Against
+  the full-mixing gradient 3566763 (Float64 forcing; J differs 2.9e-7 from the forcing precision alone):
+  cosine 0.99999968, norm ratio 0.99984, max|Δg| / max|g| 1.2e-3; the forcing precision accounts for ≲ 3e-5
+  (from the 2-step pair), so this is the frozen-mixing error.
 - **Grad2Ckpt 3565170 failed its J check** (11-08, 1:36:45, Revolve, 1 checkpoint): build 916 s, primal
   compile 484 s, primal J −28.563087893063496 (repeat exact), **gradient compile 27.1 min** (47.8 for the
   unrolled 2-step window), first call 2230 s, max|g| 1.11e-2, finite. Its J differs from the primal's by
@@ -68,7 +73,13 @@ Queued on LS6 (11-07):
   Upstream: NumericalEarth's `default_earth_system_clock` and the prescribed components' default
   `Clock{Float64}` should be device clocks on ReactantState.
 - Grad8Ckpt 3565171 (`gpu-a100`, 8 steps, 3 checkpoints, will run `1da8855f`): compile time should equal the 2-step run's.
-- ECCO2Ckpt 3565218 (`gpu-a100`, `ecco4_nz20_2step_checkpointed.json`, runs `4fa86369`): `PrescribedFluxOcean`,
+- **ECCO2Ckpt 3566764 VERIFIED** (11-08, dev, `1da8855f`, 1:04:54; resubmitted from `gpu-a100` 3565218):
+  build 292 s, CPU twin J −34.9752 Sv, primal vs CPU twin 2.9e-12, 2-step checkpointed gradient wrt the stress
+  compile 27.4 min, first call 753 s, repeat 0.54 s exact, gradient vs primal J 9.8e-15, max|g| 1.56 Sv per
+  N m⁻² (the log's "Sv per m/s" label is JRA55's). Taylor (h0 = 0.1) rel_err 7.1e-4 from the averaged slope,
+  which the h = 0.1 point dominates (remainder 6.5e-4, then 8e-6 at h = 0.05); at h = 3.1e-3 the remainder is
+  2.3e-6 of h gᵀd. Same seam NaN shadows. File `results/ecco4_adjoint_nz20_2step_checkpointed.jld2`.
+  Setup: `PrescribedFluxOcean`,
   ECCO4 1993-01 initial state and monthly stress, net heat and net freshwater fluxes, CPU twin, primal,
   2-step checkpointed gradient wrt the stress. Local CPU build checked (2 steps: J 0 → −35.0 Sv from rest,
   stress ≤ 0.4 N m⁻², heat flux −530…+230 W m⁻², freshwater −37…+200 mm/day). The Earthdata credentials
@@ -82,7 +93,8 @@ before pulling, so pending jobs kept a consistent environment.
 build 920 s, compile 47.8 min, first call 761 s, J −28.5631 Sv, max|g| 1.18e-2 Sv per m/s, **GRADIENT
 VERIFIED** (rel_err 9.18e-7). Sensitivity sits on 26.5°N with peaks at the staircase steps (63°W, 28°W);
 uniform 1 m/s: −0.257 Sv (u), +0.658 Sv (v). J of −28.6 Sv 4 h from rest is likely the spin-up transient
-(row 41 gave −5.3); 3561032's CPU twin checks the traced objective.
+(row 41 gave −5.3); the CPU twins of 3566763 (1 step) and StepConsist 3565553 (2 steps) match the traced
+objective, and ECCO4's initial state gives −35.0 Sv after 2 steps, so it is the spin-up from rest.
 
 **Grad2Window 3560703** (11-07, 81 min, 2 unrolled steps, gradient only, `4cc69c3e`; 3559769's
 result kept as `..._2step_unrolled_gradient_3559769.jld2`): build 923 s, compile 47.3 min, first call 734 s,
