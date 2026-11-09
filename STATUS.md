@@ -72,7 +72,12 @@ Queued on LS6 (11-07; results 11-08):
   `interpolate`/`time_interpolated_getindex`.
   Upstream: NumericalEarth's `default_earth_system_clock` and the prescribed components' default
   `Clock{Float64}` should be device clocks on ReactantState.
-- Grad8Ckpt 3565171 (`gpu-a100`, 8 steps, 3 checkpoints, will run `1da8855f`): compile time should equal the 2-step run's.
+- Longer rollouts on `gpu-a100-dev` (11-09, `3c70bde4`; 3565171 cancelled after a day in `gpu-a100` Priority):
+  Grad8Ckpt 3570013 (8 steps, 3 checkpoints), Grad84Ckpt 3570014 (1 week, 12 checkpoints, 60 slices) and
+  Grad360Ckpt 3570015 (30 days, 30 checkpoints, 248 slices, gradient stage only to fit 2 h). Checkpoints are
+  host copies and the 2-step repeat took 0.82 s, so the step count should change neither the 27-min compile
+  nor, beyond minutes, the run; what is untested is the first-call cost (2368 s at 2 steps) and the Taylor
+  check over long windows.
 - **ECCO2Ckpt 3566764 VERIFIED** (11-08, dev, `1da8855f`, 1:04:54; resubmitted from `gpu-a100` 3565218):
   build 292 s, CPU twin J −34.9752 Sv, primal vs CPU twin 2.9e-12, 2-step checkpointed gradient wrt the stress
   compile 27.4 min, first call 753 s, repeat 0.54 s exact, gradient vs primal J 9.8e-15, max|g| 1.56 Sv per
