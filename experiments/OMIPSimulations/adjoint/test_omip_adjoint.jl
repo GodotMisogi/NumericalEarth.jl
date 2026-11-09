@@ -49,10 +49,12 @@ if forcing == "ecco4"
     n_months = P["n_months"]
     (n_months - 1) * 28 * 86400 > n_steps * Δt || error("$(n_months) monthly slices do not cover $(n_steps) steps of $(Δt) s")
     model_setup = arch -> ecco_adjoint_setup(arch; Nz, Δt, substeps, n_months)
+    gradient_units = "Sv per N m⁻²"
 elseif forcing == "jra55"
     n_slices = P["n_atmosphere_slices"]
     n_slices * 3 * 3600 > n_steps * Δt || error("$(n_slices) three-hourly slices do not cover $(n_steps) steps of $(Δt) s")
     model_setup = arch -> omip_adjoint_setup(arch; Nz, Δt, substeps, n_atmosphere_slices = n_slices)
+    gradient_units = "Sv per m/s"
 else
     error("forcing must be \"jra55\" or \"ecco4\", got \"$forcing\"")
 end
@@ -147,7 +149,7 @@ if :gradient in stages
     t1 = time(); J, g, dmodel = evaluate!(); first_seconds = time() - t1
     finite = all(isfinite, g.u) && all(isfinite, g.v)
     max_g = max(maximum(abs, g.u), maximum(abs, g.v))
-    stamp(@sprintf("gradient 1 in %.1f s: AMOC %.4f Sv, max|g| %.3e Sv per m/s, finite %s", first_seconds, J, max_g, finite))
+    stamp(@sprintf("gradient 1 in %.1f s: AMOC %.4f Sv, max|g| %.3e %s, finite %s", first_seconds, J, max_g, gradient_units, finite))
     if haskey(results, "J_primal")
         rel = abs(J - results["J_primal"]) / max(abs(results["J_primal"]), 1e-12)
         stamp(@sprintf("gradient vs primal objective: relative difference %.2e", rel))
