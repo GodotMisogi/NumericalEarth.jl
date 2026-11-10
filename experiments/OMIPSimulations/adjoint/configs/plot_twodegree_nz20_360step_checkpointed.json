@@ -1,0 +1,7 @@
+{
+  "_comment": "AMOC sensitivity map of the 360-step checkpointed gradient (job 3570015).",
+  "results": "results/omip_adjoint_twodegree_nz20_360step_checkpointed.jld2",
+  "output": "papers/figures/amoc_sensitivity_twodegree_nz20_360step.png",
+  "title": "AMOC sensitivity to the 10-m winds: 360 steps (30 days), 2° OMIP, Nz = 20",
+  "limits": [[-100, 10], [0, 60]]
+}

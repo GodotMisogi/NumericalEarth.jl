@@ -1,0 +1,8 @@
+{
+  "_comment": "Finite-difference scans along the full-mixing checkpointed gradients (jobs 3571322-4).",
+  "scans": ["results/omip_adjoint_twodegree_nz20_8step_fd_scan.jld2",
+            "results/omip_adjoint_twodegree_nz20_84step_fd_scan.jld2",
+            "results/omip_adjoint_twodegree_nz20_360step_fd_scan.jld2"],
+  "labels": ["8 steps (16 h)", "84 steps (1 week)", "360 steps (30 days)"],
+  "output": "papers/figures/fd_scans_twodegree_nz20.png"
+}
