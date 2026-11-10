@@ -93,6 +93,10 @@ Queued on LS6 (11-07; results 11-08):
   not smooth: the remainder stops falling with h (84) or Δf keeps a ~8e-4 Sv jump as h → 0 (360), as if
   discrete switches (CATKE's convective/stable branches, `ifelse` limiters) flip under any perturbation.
   The adjoint differentiates the branch taken, so FD with h ≥ 1/32 m/s cannot check it there.
+  Queued (11-10, `62398b80`): FDScan8 3571246, FDScan84 3571247, FDScan360 3571248 on dev, stages
+  `primal,fd_scan`: forward and central differences of the compiled primal along each saved gradient for
+  h = 1 … 6e-8 m/s (25 octaves, ~1–6 s per evaluation), 8 steps as the smooth control. The user expects the
+  adjoint will in practice have to freeze the turbulence (`frozen_mixing`).
 - **ECCO2Ckpt 3566764 VERIFIED** (11-08, dev, `1da8855f`, 1:04:54; resubmitted from `gpu-a100` 3565218):
   build 292 s, CPU twin J −34.9752 Sv, primal vs CPU twin 2.9e-12, 2-step checkpointed gradient wrt the stress
   compile 27.4 min, first call 753 s, repeat 0.54 s exact, gradient vs primal J 9.8e-15, max|g| 1.56 Sv per
