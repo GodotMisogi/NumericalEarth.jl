@@ -102,6 +102,24 @@ Queued on LS6 (11-07; results 11-08):
   `primal,fd_scan`: forward and central differences of the compiled primal along each saved gradient for
   h = 1 … 6e-8 m/s (25 octaves, ~1–6 s per evaluation), 8 steps as the smooth control. The user expects the
   adjoint will in practice have to freeze the turbulence (`frozen_mixing`).
+  **Results (11-10, all three completed; f0 equals the saved J to 4e-14, 2e-11, 4e-12):** the adjoint is the
+  exact local derivative at every length; the objective is piecewise smooth with small jumps.
+
+  | steps | gᵀd (Sv per m/s) | smooth neighborhood along ±d | FD vs gᵀd there | jumps in f | central diff. at h = 0.25–1 |
+  |---|---|---|---|---|---|
+  | 8 | 0.1842 | all h ≤ 1 | central 4e-9 – 2e-8 (h = 2e-3 – 2e-2), forward O(h) | none | 4e-4 |
+  | 84 | 0.6766 | h ≤ 2.4e-4 | central 4e-9 (h = 1.2e-4), forward 2e-6 | 1e-6 – 3e-4 Sv for h ≥ 4.9e-4 | 5e-3 – 7e-3 |
+  | 360 | 0.7346 | +d: h ≤ 1.2e-4; −d: h ≤ 4.8e-7 | forward 1e-6 – 2e-5 (h = 2e-6 – 3e-5) | 2.6e-7 Sv at h ∈ (4.8e-7, 9.5e-7) along −d; up to ~1e-3 Sv for h ≥ 6e-5 | 2e-3 (h = 0.5), 5e-4 (h = 0.25) |
+
+  The jumps are discontinuities of f itself (constant offset over a range of h, e.g. −2.6e-7 Sv along −d at
+  360 steps from h = 9.5e-7 to 3e-5), not kinks: discrete switches in the forward model (CATKE's convective
+  and stable branches are the likely source). Their size grows with the window (none at 8 steps, ≤ 3e-4 Sv at
+  84, ~1e-3 Sv at 360), so the old Taylor checks (same direction, h ≤ 1e-2) failed on the jumps, not on the
+  gradient. At finite amplitude the jumps are negligible: over h = 0.25–1 m/s the secant slope matches gᵀd to
+  0.05–2 % at 30 days. Along d = g/|g| the signal is largest; along other directions the same jumps weigh more.
+  Freezing the mixing in the adjoint does not change f or its jumps; it changes what the gradient
+  approximates, so its check is the large-h secant, not small-h Taylor.
+  Files: `results/omip_adjoint_twodegree_nz20_{8,84,360}step_fd_scan.jld2`, logs `FDScan*.o357132{2,3,4}`.
 - **ECCO2Ckpt 3566764 VERIFIED** (11-08, dev, `1da8855f`, 1:04:54; resubmitted from `gpu-a100` 3565218):
   build 292 s, CPU twin J −34.9752 Sv, primal vs CPU twin 2.9e-12, 2-step checkpointed gradient wrt the stress
   compile 27.4 min, first call 753 s, repeat 0.54 s exact, gradient vs primal J 9.8e-15, max|g| 1.56 Sv per
