@@ -1,4 +1,4 @@
-# OMIP adjoint: status as of 2026-11-07
+# OMIP adjoint: status as of 2026-11-10
 
 Branch `ajs/omip-adjoint` (fork GodotMisogi), tip `1b8969ff`, pulled on LS6. Records: `LOGBOOK.md` (decisions,
 parameters, dead ends), `experiments/OMIPSimulations/adjoint/PROGRESS.md` (full detail). Both uncommitted.
