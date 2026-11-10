@@ -1,0 +1,19 @@
+{
+  "_comment": "Summaries of the 2° Nz = 20 JRA55 gradients for local plots: full-mixing checkpointed windows, the frozen-mixing 84/360-step pair (jobs 3572831/2), and the FD scans.",
+  "gradients": {
+    "2step_unrolled": "results/omip_adjoint_twodegree_nz20_2step_unrolled_gradient.jld2",
+    "2step": "results/omip_adjoint_twodegree_nz20_2step_checkpointed.jld2",
+    "8step": "results/omip_adjoint_twodegree_nz20_8step_checkpointed.jld2",
+    "84step": "results/omip_adjoint_twodegree_nz20_84step_checkpointed.jld2",
+    "360step": "results/omip_adjoint_twodegree_nz20_360step_checkpointed.jld2",
+    "84step_frozen": "results/omip_adjoint_twodegree_nz20_84step_frozen_checkpointed.jld2",
+    "360step_frozen": "results/omip_adjoint_twodegree_nz20_360step_frozen_checkpointed.jld2"
+  },
+  "pairs": [["84step", "84step_frozen"], ["360step", "360step_frozen"]],
+  "fd_scans": {
+    "8step": "results/omip_adjoint_twodegree_nz20_8step_fd_scan.jld2",
+    "84step": "results/omip_adjoint_twodegree_nz20_84step_fd_scan.jld2",
+    "360step": "results/omip_adjoint_twodegree_nz20_360step_fd_scan.jld2"
+  },
+  "output": "results/reduced_twodegree_nz20.jld2"
+}

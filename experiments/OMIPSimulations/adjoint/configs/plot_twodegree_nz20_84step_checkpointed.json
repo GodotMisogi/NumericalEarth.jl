@@ -1,6 +1,7 @@
 {
   "_comment": "AMOC sensitivity map of the 84-step checkpointed gradient (job 3570014).",
-  "results": "results/omip_adjoint_twodegree_nz20_84step_checkpointed.jld2",
+  "reduced": "results/reduced_twodegree_nz20.jld2",
+  "label": "84step",
   "output": "papers/figures/amoc_sensitivity_twodegree_nz20_84step.png",
   "title": "AMOC sensitivity to the 10-m winds: 84 steps (1 week), 2° OMIP, Nz = 20",
   "limits": [[-100, 10], [0, 60]]

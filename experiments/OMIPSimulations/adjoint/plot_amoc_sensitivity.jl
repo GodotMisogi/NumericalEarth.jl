@@ -1,11 +1,13 @@
 # %%
 # ==============================================================================
-# Map of the AMOC objective's sensitivity to the 10-m winds, from a test_omip_adjoint.jl results file.
+# Map of the AMOC objective's sensitivity to the 10-m winds, from a gradient summary written by
+# reduce_gradients.jl (run that next to the full results on the cluster; plot locally).
 #
 #   julia --project=adjoint/plots adjoint/plot_amoc_sensitivity.jl adjoint/configs/plot_<config>.json
 #
 # Config keys (paths relative to adjoint/):
-#   results  the results file (gradient_u, gradient_v, J)
+#   reduced  the reduce_gradients.jl output
+#   label    the gradient's label in it
 #   output   the image to write
 #   title    figure title
 #   limits   optional map limits [[west, east], [south, north]] in degrees (default the North Atlantic)
@@ -24,16 +26,8 @@ limits = Tuple(Tuple.(get(P, "limits", [[-100, 10], [0, 60]])))
 # %%
 ##### Gradient, summed over the forcing slices: the response to a wind perturbation held over the window
 
-results = jldopen(joinpath(@__DIR__, P["results"]))
-gu = dropdims(sum(results["gradient_u"], dims = (3, 4)), dims = (3, 4))
-gv = dropdims(sum(results["gradient_v"], dims = (3, 4)), dims = (3, 4))
-J = results["J"]
-close(results)
-
-# Each 2° ocean cell reads its 4 neighboring 0.5625° atmosphere cells, so the per-cell gradient is dotted.
-# 4 × 4 block sums give the response to a uniform perturbation over each 2.25° box instead.
-block_sum(g, b) = [sum(view(g, (i-1)*b+1:i*b, (j-1)*b+1:j*b)) for i in 1:size(g, 1)÷b, j in 1:size(g, 2)÷b]
-Gu, Gv = block_sum(gu, 4), block_sum(gv, 4)
+summary = jldopen(f -> f["gradient/" * P["label"]], joinpath(@__DIR__, P["reduced"]))
+Gu, Gv, J = summary.block_u, summary.block_v, summary.J
 
 # Cell centers of the regular 0–360° atmosphere grid, shifted to −180–180° for the projection.
 Nx, Ny = size(Gu)
@@ -52,7 +46,7 @@ coastlines = GeoMakie.coastlines()
 
 fig = Figure(size = (1500, 720), fontsize = 16)
 Label(fig[0, 1:2], P["title"]; fontsize = 20, font = :bold)
-panels = (("∂J/∂u₁₀, zonal wind", Gu, sum(gu)), ("∂J/∂v₁₀, meridional wind", Gv, sum(gv)))
+panels = (("∂J/∂u₁₀, zonal wind", Gu, summary.sum_u), ("∂J/∂v₁₀, meridional wind", Gv, summary.sum_v))
 for (column, (name, G, uniform)) in enumerate(panels)
     ax = GeoAxis(fig[1, column]; dest = "+proj=eqc", limits,
                  title = @sprintf("%s (uniform 1 m/s: %+.3f Sv)", name, uniform))
