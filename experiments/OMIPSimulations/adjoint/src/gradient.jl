@@ -325,3 +325,40 @@ function taylor_remainder_check(model, evaluate!; h0 = 1.0, nh = 6, tolerance = 
     println("  => ", verified ? "GRADIENT VERIFIED" : "MISMATCH")
     return (; rows, slope, gd, relative_error, verified)
 end
+
+"""
+$(TYPEDSIGNATURES)
+
+Finite differences of the objective `objective!()` (e.g. a compiled primal window) along the wind gradient
+`g = (u, v)` (as returned by [`wind_gradient`](@ref)) for `h = h0 / 2ⁱ`, `i = 0:nh-1`: the forward slope
+`(f(x₀ + h d) − f(x₀)) / h` and the central slope `(f(x₀ + h d) − f(x₀ − h d)) / 2h`, each relative to
+`gᵀd`, with `d = g / |g|`. Unlike [`taylor_remainder_check`](@ref) it needs no gradient evaluations, so `h`
+can span many octaves; it shows where the objective stops being smooth along `d`. Returns `f0`, `gᵀd` and
+the rows.
+"""
+function finite_difference_scan(model, objective!, g; h0 = 1.0, nh = 25)
+    x0 = wind_control(model)
+    gvec = vcat(vec(g.u), vec(g.v))
+    length(gvec) == length(x0) ||
+        throw(DimensionMismatch("gradient has $(length(gvec)) entries, the wind control $(length(x0))"))
+    gd = sqrt(sum(abs2, gvec))
+    gd > 0 || throw(ArgumentError("the gradient is zero, so it gives no direction to scan"))
+    d = gvec ./ gd
+    set_wind_control!(model, x0)
+    f0 = objective!()
+    println("finite_difference_scan (h0 = $h0, nh = $nh):")
+    @printf("  f0 = %.12e   gᵀd = %+.8e\n", f0, gd)
+    @printf("  %12s  %16s  %16s  %12s  %12s\n", "h", "f(x₀ + h d) − f0", "f(x₀ − h d) − f0", "fwd/gᵀd − 1", "ctr/gᵀd − 1")
+    rows = NamedTuple[]
+    for i in 0:(nh - 1)
+        h = h0 / 2.0^i
+        set_wind_control!(model, x0 .+ h .* d); Δplus = objective!() - f0
+        set_wind_control!(model, x0 .- h .* d); Δminus = objective!() - f0
+        forward = Δplus / h / gd - 1
+        central = (Δplus - Δminus) / 2h / gd - 1
+        @printf("  %12.4e  %+16.8e  %+16.8e  %+12.4e  %+12.4e\n", h, Δplus, Δminus, forward, central)
+        push!(rows, (; h, Δplus, Δminus, forward, central))
+    end
+    set_wind_control!(model, x0)
+    return (; f0, gd, rows)
+end

@@ -13,6 +13,8 @@
 #   cpu       build the model on CPU(), step it, record the host objective (the forward twin)
 #   primal    compile the window objective on ReactantState(), compare with the CPU twin, check repeats
 #   gradient  compile the gradient, evaluate twice, shadow census, Taylor remainder check
+#   fd_scan   finite differences of the primal window along a saved gradient (`fd_gradient`, a results file
+#             of the same configuration) for `fd_nh` step sizes halving from `fd_h0`; needs `primal`
 # Optional `excluded_passes`: pattern names left out of Reactant's rewrite lists, replacing
 # adjoint_compile_options' default (["while_deadresult", "cse_reduce_transposed"]); [] runs every pattern.
 # Optional `while_unroll_threshold` (default 0, every loop rolled): Reactant's unroll pattern acts on
@@ -133,6 +135,17 @@ if :primal in stages
         @test rel < 5e-2
     end
     results["J_primal"] = J1; results["J_primal_repeat"] = J2; results["primal_compile_seconds"] = time() - t0
+    save_results()
+end
+
+if :fd_scan in stages
+    :primal in stages || error("the fd_scan stage evaluates the compiled primal window; add \"primal\" to stages")
+    saved = jldopen(f -> (u = f["gradient_u"], v = f["gradient_v"], J = f["J"]), joinpath(@__DIR__, P["fd_gradient"]))
+    t0 = time()
+    scan = finite_difference_scan(model, primal!, saved; h0 = P["fd_h0"], nh = P["fd_nh"])
+    stamp(@sprintf("finite-difference scan in %s; f0 vs the saved gradient's J: relative difference %.2e",
+                   elapsed(t0), abs(scan.f0 - saved.J) / abs(saved.J)))
+    results["fd_scan"] = scan
     save_results()
 end
 

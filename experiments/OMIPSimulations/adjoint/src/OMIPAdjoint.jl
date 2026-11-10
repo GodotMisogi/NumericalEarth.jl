@@ -4,7 +4,7 @@ export omip_adjoint_setup, ecco_adjoint_setup, PrescribedFluxOcean,
        OverturningStrength, objective_host,
        roll_barotropic_substeps!, freeze_mixing!,
        adjoint_compile_options, snapshot_state, build_primal, build_gradient, build_checkpointed_gradient,
-       wind_gradient, shadow_census, print_shadow_census, taylor_remainder_check
+       wind_gradient, shadow_census, print_shadow_census, taylor_remainder_check, finite_difference_scan
 
 using Oceananigans
 using Oceananigans: prognostic_state, restore_prognostic_state!
