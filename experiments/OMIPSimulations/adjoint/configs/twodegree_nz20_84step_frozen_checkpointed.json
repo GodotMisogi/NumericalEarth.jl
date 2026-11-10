@@ -1,0 +1,16 @@
+{
+  "_comment": "84-step checkpointed AMOC gradient with the CATKE viscosity and diffusivities frozen in the adjoint (forward model unchanged); compare with twodegree_nz20_84step_checkpointed and its fd_scan.",
+  "Nz": 20,
+  "steps": 84,
+  "dt": 7200.0,
+  "substeps": 50,
+  "n_atmosphere_slices": 60,
+  "backend": "gpu",
+  "stages": "gradient",
+  "roll_barotropic_substeps": true,
+  "frozen_mixing": true,
+  "checkpoints": 12,
+  "taylor_h0": 1.0,
+  "taylor_nh": 6,
+  "output": "results/omip_adjoint_twodegree_nz20_84step_frozen_checkpointed.jld2"
+}
