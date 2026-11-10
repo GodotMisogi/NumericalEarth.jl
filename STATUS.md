@@ -74,10 +74,25 @@ Queued on LS6 (11-07; results 11-08):
   `Clock{Float64}` should be device clocks on ReactantState.
 - Longer rollouts on `gpu-a100-dev` (11-09, `3c70bde4`; 3565171 cancelled after a day in `gpu-a100` Priority):
   Grad8Ckpt 3570013 (8 steps, 3 checkpoints), Grad84Ckpt 3570014 (1 week, 12 checkpoints, 60 slices) and
-  Grad360Ckpt 3570015 (30 days, 30 checkpoints, 248 slices, gradient stage only to fit 2 h). Checkpoints are
-  host copies and the 2-step repeat took 0.82 s, so the step count should change neither the 27-min compile
-  nor, beyond minutes, the run; what is untested is the first-call cost (2368 s at 2 steps) and the Taylor
-  check over long windows.
+  Grad360Ckpt 3570015 (30 days, 30 checkpoints, 248 slices, gradient stage only to fit 2 h). All three ran
+  end to end and saved their gradients (8: 52 MB local; 84: 197 MB and 360: 813 MB on LS6 only); all three
+  failed the old Taylor verdict.
+
+  | steps | build | gradient compile | first call | repeat | J (Sv) | grad vs primal J | small-h Taylor |
+  |---|---|---|---|---|---|---|---|
+  | 8 | 931 s | 28.4 min | 2350 s | 3.5 s | −11.28 | 3.6e-14 | second order; Richardson 2.6e-6 |
+  | 84 | 1022 s | 27.3 min | 2241 s | 28 s | −15.97 | 2.1e-11 | noise ±2e-4 in Δf; agrees to ~3e-3 |
+  | 360 | 1423 s | 29.1 min | 2367 s | 104 s | +16.63 | (no primal) | Δf ≈ 8e-4 + h gᵀd; 1e-2 |
+
+  Compile and first call are flat in the step count; a full 30-day gradient costs 104 s once compiled.
+  The first call's ~39 min is host-side: XLA logs nothing between "COMPILED" and the end of the first call
+  (it does log every compile), so it is most likely Julia compiling the five thunks' call wrappers for the model
+  type (ECCO4's smaller model: 753 s). The old verdict's six-point fit was dominated by h = 1 (8 steps: rel_err
+  1.08e-3 though the remainder is O(h²) down to 6.5e-7); it now fits the three smallest h (`c1dcb8b1`;
+  earlier runs: 2-step 1.9e-6, 1-step 2.7e-6, ECCO4 8.1e-6). For 84 and 360 steps the finite difference is
+  not smooth: the remainder stops falling with h (84) or Δf keeps a ~8e-4 Sv jump as h → 0 (360), as if
+  discrete switches (CATKE's convective/stable branches, `ifelse` limiters) flip under any perturbation.
+  The adjoint differentiates the branch taken, so FD with h ≥ 1/32 m/s cannot check it there.
 - **ECCO2Ckpt 3566764 VERIFIED** (11-08, dev, `1da8855f`, 1:04:54; resubmitted from `gpu-a100` 3565218):
   build 292 s, CPU twin J −34.9752 Sv, primal vs CPU twin 2.9e-12, 2-step checkpointed gradient wrt the stress
   compile 27.4 min, first call 753 s, repeat 0.54 s exact, gradient vs primal J 9.8e-15, max|g| 1.56 Sv per
