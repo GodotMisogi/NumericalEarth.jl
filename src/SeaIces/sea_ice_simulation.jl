@@ -2,7 +2,7 @@ using ClimaSeaIce: ClimaSeaIce, SeaIceModel, PhaseTransitions, ConductiveFlux,
                    sea_ice_slab_thermodynamics, snow_slab_thermodynamics,
                    default_sea_ice_boundary_conditions
 using ClimaSeaIce.SeaIceThermodynamics.HeatBoundaryConditions: PrescribedTemperature
-using ClimaSeaIce.SeaIceThermodynamics: IceWaterThermalEquilibrium, IceSnowConductiveFlux
+using ClimaSeaIce.SeaIceThermodynamics: IceWaterThermalEquilibrium, IceSnowConductiveFlux, ThicknessDependentConductivity
 using ClimaSeaIce.SeaIceDynamics: SplitExplicitSolver, SemiImplicitStress, SeaIceMomentumEquation, StressBalanceFreeDrift,
                                   LandfastBasalStress, maybe_extended_grid
 using ClimaSeaIce.Rheologies: ElastoViscoPlasticRheology
@@ -90,7 +90,8 @@ end
                        conductivity = 2, # W m⁻¹ K⁻¹
                        thickness_categories = 1,
                        snow_thickness_categories = thickness_categories,
-                       internal_heat_flux = ConductiveFlux(; conductivity,
+                       itd_shape = nothing,
+                       internal_heat_flux = ConductiveFlux(; conductivity, itd_shape,
                                                            subgrid_conductivity_keyword(thickness_categories)...),
                        snow_thermodynamics = default_snow_thermodynamics(grid; thickness_categories = snow_thickness_categories))
 
@@ -163,7 +164,8 @@ function sea_ice_simulation(grid, ocean=nothing;
                             conductivity = 2, # W m⁻¹ K⁻¹
                             thickness_categories = 1,
                             snow_thickness_categories = thickness_categories,
-                            internal_heat_flux = ConductiveFlux(; conductivity,
+                            itd_shape = nothing,
+                            internal_heat_flux = ConductiveFlux(; conductivity, itd_shape,
                                                                 subgrid_conductivity_keyword(thickness_categories)...),
                             snow_thermodynamics = default_snow_thermodynamics(grid; thickness_categories = snow_thickness_categories))
 
@@ -297,7 +299,8 @@ function InterfaceComputations.default_ai_temperature(sea_ice::Simulation{<:SeaI
     internal_flux = if isnothing(snow_thermo)
         ice_flux
     else
-        IceSnowConductiveFlux(snow_thermo.internal_heat_flux.conductivity, ice_flux.conductivity)
+        IceSnowConductiveFlux(snow_thermo.internal_heat_flux.conductivity, ice_flux.conductivity,
+                              ice_flux.itd_shape)
     end
     return SkinTemperature(internal_flux)
 end
