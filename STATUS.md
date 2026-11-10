@@ -93,7 +93,12 @@ Queued on LS6 (11-07; results 11-08):
   not smooth: the remainder stops falling with h (84) or Δf keeps a ~8e-4 Sv jump as h → 0 (360), as if
   discrete switches (CATKE's convective/stable branches, `ifelse` limiters) flip under any perturbation.
   The adjoint differentiates the branch taken, so FD with h ≥ 1/32 m/s cannot check it there.
-  Queued (11-10, `62398b80`): FDScan8 3571246, FDScan84 3571247, FDScan360 3571248 on dev, stages
+  FD scans (11-10): the first submission (3571246–8) failed to precompile OMIPSimulations, because the 11-09
+  merge of upstream `ss/omip-prototype` (`ba7f0eeb`) brought `a44003cf`, which includes
+  `src/extended_halo_checkpoint_patch.jl` that upstream committed only in `c6eede8f` (with a fold-halo patch
+  and a `restore_prognostic_state!` override). At the user's choice the merge is reverted (`9f9c1f90`; the tree
+  outside `adjoint/` and STATUS equals `6c0d6357`, the code of the saved gradients); merge upstream again after
+  the scans and re-verify. Resubmitted as FDScan8 3571322, FDScan84 3571323, FDScan360 3571324 on dev, stages
   `primal,fd_scan`: forward and central differences of the compiled primal along each saved gradient for
   h = 1 … 6e-8 m/s (25 octaves, ~1–6 s per evaluation), 8 steps as the smooth control. The user expects the
   adjoint will in practice have to freeze the turbulence (`frozen_mixing`).
