@@ -55,7 +55,10 @@ function TimeSteppers.update_state!(model::PrescribedFluxOcean)
     grid = model.ocean.model.grid
     arch = architecture(grid)
     τᵉ, τⁿ = model.stress
-    itp = cpu_interpolating_time_indices(arch, τᵉ.times, τᵉ.time_indexing, model.ocean.model.clock.time)
+    # Calendar months are unevenly spaced, so beyond two slices `times` is not a range and Oceananigans' generic
+    # `find_time_index` reads `times[n]` at a traced index; under tracing that read is a dynamic slice.
+    # TODO: `cpu_interpolating_time_indices` in OceananigansReactantExt should allow it for traced vectors.
+    itp = @allowscalar cpu_interpolating_time_indices(arch, τᵉ.times, τᵉ.time_indexing, model.ocean.model.clock.time)
     launch!(arch, grid, :xy, _prescribe_surface_fluxes!, model.surface_fluxes, grid, model.ocean.model.tracers.T,
             τᵉ, τⁿ, model.heat_flux, model.freshwater_flux, itp, model.reference_density, model.heat_capacity)
     return nothing
