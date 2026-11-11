@@ -143,6 +143,15 @@ wind_gradient(dmodel) = map(interior_slices, wind_fields(dmodel))
 """
 $(TYPEDSIGNATURES)
 
+Gradient of the objective with respect to the forcing controls of `dmodel`'s model, as host arrays of size
+`(Nx, Ny, 1, Nt)`: `u` and `v` from [`wind_gradient`](@ref), plus the heat and freshwater flux for a
+[`PrescribedFluxOcean`](@ref).
+"""
+forcing_gradient(dmodel) = wind_gradient(dmodel)
+
+"""
+$(TYPEDSIGNATURES)
+
 Compile the `n_steps`-step window objective (no derivatives) and return `primal!()`, which restores
 the snapshot `state` and returns the objective as a host number. `unroll_steps` unrolls the steps at
 trace time instead of tracing one loop.
@@ -212,6 +221,21 @@ function surface_wet_mask(cpu_grid)
         wet[i + Hx, j + Hy] = !inactive_node(i, j, Nz, cpu_grid, Center(), Center(), Center())
     end
     return wet
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+Surface geometry of `cpu_grid` for maps of surface fields: cell-corner longitudes and latitudes, `(Nx + 1, Ny + 1)`
+in degrees, and the cell areas (m²) and land mask, `(Nx, Ny)`.
+"""
+function surface_geometry(cpu_grid)
+    Nx, Ny, Nz = size(cpu_grid)
+    λ = [λnode(i, j, Nz, cpu_grid, Face(), Face(), Center()) for i in 1:Nx+1, j in 1:Ny+1]
+    φ = [φnode(i, j, Nz, cpu_grid, Face(), Face(), Center()) for i in 1:Nx+1, j in 1:Ny+1]
+    area = [Azᶜᶜᶜ(i, j, Nz, cpu_grid) for i in 1:Nx, j in 1:Ny]
+    land = [inactive_node(i, j, Nz, cpu_grid, Center(), Center(), Center()) for i in 1:Nx, j in 1:Ny]
+    return (; λ, φ, area, land)
 end
 
 forcing_shadows(dmodel) = (("atmosphere.u", dmodel.atmosphere.velocities.u), ("atmosphere.v", dmodel.atmosphere.velocities.v),

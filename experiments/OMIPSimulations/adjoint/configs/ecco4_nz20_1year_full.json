@@ -1,0 +1,15 @@
+{
+  "_comment": "Lead-time sensitivity (Pillar et al. 2016, Fig. 1): ECCO4 prescribed-flux ocean from 1993-01, 365 days (4380 steps), AMOC averaged over the last 30 days, gradients wrt the monthly stress, heat and freshwater flux slices (leads ~1-12 months); full adjoint; no Taylor check (each evaluation is ~30 min).",
+  "forcing": "ecco4",
+  "n_months": 15,
+  "Nz": 20,
+  "steps": 4380,
+  "dt": 7200.0,
+  "substeps": 50,
+  "backend": "gpu",
+  "stages": "gradient",
+  "roll_barotropic_substeps": true,
+  "checkpoints": 60,
+  "average_days": 30,
+  "output": "results/ecco4_adjoint_nz20_1year_full.jld2"
+}

@@ -4,7 +4,8 @@ export omip_adjoint_setup, ecco_adjoint_setup, PrescribedFluxOcean,
        OverturningStrength, objective_host,
        roll_barotropic_substeps!, freeze_mixing!,
        adjoint_compile_options, snapshot_state, build_primal, build_gradient, build_checkpointed_gradient,
-       wind_gradient, shadow_census, print_shadow_census, taylor_remainder_check, finite_difference_scan
+       wind_gradient, forcing_gradient, surface_geometry, shadow_census, print_shadow_census,
+       taylor_remainder_check, finite_difference_scan
 
 using Oceananigans
 using Oceananigans: prognostic_state, restore_prognostic_state!
@@ -14,7 +15,7 @@ using Oceananigans.Architectures: AbstractArchitecture, CPU, ReactantState, arch
 using Oceananigans.BoundaryConditions: BoundaryConditions, ZBC, NotFluxBC
 using Oceananigans.Grids: AbstractGrid, ExponentialDiscretization, LatitudeLongitudeGrid, inactive_node,
                           λnode, φnode, znode, Center, Face, Periodic, Bounded, Flat
-using Oceananigans.Operators: Δxᶜᶠᶜ, Δzᶜᶠᶜ, Δyᶠᶜᶜ, Δzᶠᶜᶜ, ℑxᶠᵃᵃ, ℑyᵃᶠᵃ, intrinsic_vector
+using Oceananigans.Operators: Δxᶜᶠᶜ, Δzᶜᶠᶜ, Δyᶠᶜᶜ, Δzᶠᶜᶜ, Azᶜᶜᶜ, ℑxᶠᵃᵃ, ℑyᵃᶠᵃ, intrinsic_vector
 using Oceananigans.Fields: Field, CenterField, interior, interpolate!
 using Oceananigans.OutputReaders: FieldTimeSeries, cpu_interpolating_time_indices
 using Oceananigans.ImmersedBoundaries: ImmersedBoundaryGrid, GridFittedBottom

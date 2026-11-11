@@ -1,0 +1,17 @@
+{
+  "_comment": "Verification of the averaged objective: ECCO4 prescribed-flux ocean, 8 steps, AMOC averaged over the last 4 states (average_days = 4 steps of 2 h), Revolve with 3 checkpoints; Taylor check in the smooth regime.",
+  "forcing": "ecco4",
+  "n_months": 2,
+  "Nz": 20,
+  "steps": 8,
+  "dt": 7200.0,
+  "substeps": 50,
+  "backend": "gpu",
+  "stages": "gradient",
+  "roll_barotropic_substeps": true,
+  "checkpoints": 3,
+  "average_days": 0.3333333333333333,
+  "taylor_h0": 0.1,
+  "taylor_nh": 6,
+  "output": "results/ecco4_adjoint_nz20_8step_average4_checkpointed.jld2"
+}

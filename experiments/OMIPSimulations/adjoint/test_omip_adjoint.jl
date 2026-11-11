@@ -12,7 +12,8 @@
 # Stages (config `stages`, comma separated):
 #   cpu       build the model on CPU(), step it, record the host objective (the forward twin)
 #   primal    compile the window objective on ReactantState(), compare with the CPU twin, check repeats
-#   gradient  compile the gradient, evaluate twice, shadow census, Taylor remainder check
+#   gradient  compile the gradient, evaluate twice, shadow census, Taylor remainder check (when the config
+#             gives `taylor_h0` and `taylor_nh`)
 #   fd_scan   finite differences of the primal window along a saved gradient (`fd_gradient`, a results file
 #             of the same configuration) for `fd_nh` step sizes halving from `fd_h0`; needs `primal`
 # Optional `excluded_passes`: pattern names left out of Reactant's rewrite lists, replacing
@@ -27,6 +28,9 @@
 # Optional `checkpoints`: compile one step and its reverse pass instead of the whole window, and run them on
 # Revolve's binomial schedule with this many stored model copies (`build_checkpointed_gradient`);
 # `unroll_steps` then does not apply.
+# Optional `average_days` (needs `checkpoints`): the objective is averaged over the window's last
+# `average_days` instead of taken at its end; the primal and fd_scan stages evaluate the end value, so they
+# do not apply.
 # ==============================================================================
 
 using OMIPAdjoint
@@ -59,6 +63,13 @@ elseif forcing == "jra55"
     gradient_units = "Sv per m/s"
 else
     error("forcing must be \"jra55\" or \"ecco4\", got \"$forcing\"")
+end
+
+average_steps = haskey(P, "average_days") ? round(Int, P["average_days"] * 86400 / Δt) : 1
+if average_steps > 1
+    haskey(P, "checkpoints") || error("average_days needs the checkpointed gradient (config `checkpoints`)")
+    any(in(stages), (:primal, :fd_scan)) &&
+        error("the primal and fd_scan stages evaluate the window's end, not the average over average_days")
 end
 
 stamp(msg...) = (println("[", format(now(), "HH:MM:SS"), "] ", msg...); flush(stdout))
@@ -117,6 +128,10 @@ if any(in(stages), reactant_stages)
     model = setup.model
     obj = OverturningStrength(setup.cpu_grid)
     state = snapshot_state(model)
+    results["geometry"] = surface_geometry(setup.cpu_grid)
+    results["slice_times"] = setup.times
+    results["window_seconds"] = n_steps * Δt
+    results["average_seconds"] = average_steps * Δt
     stamp("Reactant model built in ", elapsed(t0), "; initial AMOC ",
           @sprintf("%.4f", objective_host(obj, model)), " Sv")
 end
@@ -154,13 +169,14 @@ if :gradient in stages
     checkpoints = get(P, "checkpoints", nothing)
     evaluate! = checkpoints === nothing ?
         build_gradient(model, state, obj; n_steps, Δt, compile_options = options, while_unroll_threshold, unroll_steps) :
-        build_checkpointed_gradient(model, state, obj; n_steps, Δt, checkpoints, compile_options = options, while_unroll_threshold)
+        build_checkpointed_gradient(model, state, obj; n_steps, Δt, checkpoints, average_steps, compile_options = options,
+                                    while_unroll_threshold)
     compile_seconds = time() - t0
     stamp(@sprintf("COMPILED %d-step gradient in %.1f min", n_steps, compile_seconds / 60))
 
     stamp("evaluating gradient 1...")
     t1 = time(); J, g, dmodel = evaluate!(); first_seconds = time() - t1
-    finite = all(isfinite, g.u) && all(isfinite, g.v)
+    finite = all(a -> all(isfinite, a), g)
     max_g = max(maximum(abs, g.u), maximum(abs, g.v))
     stamp(@sprintf("gradient 1 in %.1f s: AMOC %.4f Sv, max|g| %.3e %s, finite %s", first_seconds, J, max_g, gradient_units, finite))
     if haskey(results, "J_primal")
@@ -179,12 +195,15 @@ if :gradient in stages
     @test finite
     @test abs(J2 - J) <= 1e-10 * max(abs(J), 1)
 
-    results["J"] = J; results["gradient_u"] = g.u; results["gradient_v"] = g.v
+    results["J"] = J
+    for (name, value) in pairs(g)
+        results["gradient_$name"] = value
+    end
     results["compile_seconds"] = compile_seconds; results["first_seconds"] = first_seconds
     results["second_seconds"] = second_seconds; results["census"] = census
     save_results()
 
-    if finite
+    if finite && haskey(P, "taylor_h0")
         stamp("Taylor remainder check...")
         taylor = taylor_remainder_check(model, evaluate!; h0 = P["taylor_h0"], nh = P["taylor_nh"])
         results["taylor"] = taylor

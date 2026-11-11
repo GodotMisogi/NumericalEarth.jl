@@ -69,6 +69,9 @@ end
 
 component_clocks(model::PrescribedFluxOcean) = (ocean_model(model).clock,)
 wind_fields(model::PrescribedFluxOcean) = (u = model.stress.east, v = model.stress.north)
+forcing_gradient(dmodel::PrescribedFluxOcean) = (; wind_gradient(dmodel)...,
+                                                   heat_flux = interior_slices(dmodel.heat_flux),
+                                                   freshwater_flux = interior_slices(dmodel.freshwater_flux))
 forcing_shadows(dmodel::PrescribedFluxOcean) = (("stress.east", dmodel.stress.east), ("stress.north", dmodel.stress.north),
                                                  ("heat_flux", dmodel.heat_flux), ("freshwater_flux", dmodel.freshwater_flux))
 
