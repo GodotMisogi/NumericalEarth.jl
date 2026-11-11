@@ -3,8 +3,7 @@
 # Reduce gradient results files (test_omip_adjoint.jl output, hundreds of MB at long windows) to the small
 # summaries the plots and the writeup need. Runs on a cluster CPU node next to the results:
 #
-#   SCRIPT=adjoint/reduce_gradients.jl CONFIG=adjoint/configs/reduce_<name>.json \
-#     sbatch -p development -t 00:30:00 adjoint/omip_adjoint.slurm
+#   SCRIPT=adjoint/reduce_gradients.jl CONFIG=adjoint/configs/reduce_<name>.json sbatch adjoint/omip_cpu.slurm
 #
 # Config keys (paths relative to adjoint/):
 #   gradients  {label: results file}; each gives J, the uniform-wind sums, max|g|, ‖g‖ and the
