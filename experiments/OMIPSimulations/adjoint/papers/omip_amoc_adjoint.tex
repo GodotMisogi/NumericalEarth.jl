@@ -40,8 +40,10 @@ After that a 30-day gradient costs \SI{104}{s}. Finite differences confirm that 
 local derivative at every length. Past about one day, however, the objective is only piecewise smooth:
 it jumps by \SIrange{e-7}{e-3}{Sv} under perturbations of \SIrange{5e-7}{5e-4}{m/s}. That is why
 small-step Taylor tests fail there. At finite amplitude (\SIrange{0.25}{1}{m/s}) the gradient predicts
-the 30-day response to within \SIrange{0.05}{2}{\percent}. Frozen-mixing gradients at 84 and 360 steps are
-queued (Section~\ref{sec:next}).
+the 30-day response to within \SIrange{0.05}{2}{\percent}. Freezing CATKE's mixing coefficients in the
+adjoint (Section~\ref{sec:frozen}) changes the gradient's direction by little (cosine \num{0.994} at 30
+days), but it predicts the finite-amplitude response slightly worse than the full adjoint and saves no
+time. Its uniform-wind responses can still differ substantially.
 
 \section{Model configuration}
 
@@ -249,6 +251,65 @@ The adjoint measures the wind-driven response of $\psi$ at \SI{1000}{m} during t
 transport, inertial oscillations, barotropic and baroclinic adjustment), not the buoyancy-driven
 overturning. The maps should not be read as an equilibrium sensitivity.
 
+\section{Frozen mixing}
+\label{sec:frozen}
+
+Frozen-mixing gradients at 84 and 360 steps (jobs 3572831 and 3572832) use the same windows,
+checkpoints and forward model, so $J$ is identical. Table~\ref{tab:frozen} compares them with the full
+gradients. The secant slopes are averaged over $h = 1/32$ to \SI{1}{m/s}, where the jumps in $J$ are small
+next to $h\,\gvec^{\mathsf T}d$. Along the full gradient's direction, the slope is the central difference
+from the FD scans. Along the frozen gradient's direction, it is the forward difference from the frozen
+runs' Taylor checks, which carries an $O(h)$ curvature bias.
+
+\begin{table}[h]
+\centering\small
+\begin{tabular}{@{}lrr@{}}
+\toprule
+& 84 steps (1 week) & 360 steps (30 days) \\
+\midrule
+cosine(full, frozen) & \num{0.99964} & \num{0.99418} \\
+$\lVert\gvec_{\text{frozen}}\rVert / \lVert\gvec_{\text{full}}\rVert$ & \num{0.9963} & \num{0.9905} \\
+\addlinespace
+Along $d_{\text{full}}$: FD secant (central) & \num{0.6808} & \num{0.7360} \\
+\quad full $\gvec^{\mathsf T}d$ & \num{0.6766} ($-0.6\,\%$) & \num{0.7346} ($-0.2\,\%$) \\
+\quad frozen $\gvec^{\mathsf T}d$ & \num{0.6739} ($-1.0\,\%$) & \num{0.7234} ($-1.7\,\%$) \\
+\addlinespace
+Along $d_{\text{frozen}}$: FD secant (forward) & \num{0.6768} & \num{0.7375} \\
+\quad full $\gvec^{\mathsf T}d$ & \num{0.6764} ($-0.1\,\%$) & \num{0.7303} ($-1.0\,\%$) \\
+\quad frozen $\gvec^{\mathsf T}d$ & \num{0.6741} ($-0.4\,\%$) & \num{0.7276} ($-1.3\,\%$) \\
+\addlinespace
+uniform \SI{1}{m/s}: $\sum\partial J/\partial u_{10}$, full / frozen & $-1.583$ / $-1.429$ & $-0.247$ / $-0.234$ \\
+uniform \SI{1}{m/s}: $\sum\partial J/\partial v_{10}$, full / frozen & $+0.051$ / $+0.115$ & $+0.319$ / $+0.759$ \\
+\addlinespace
+gradient compile, first call, repeat call & \SI{29.0}{min}, \SI{2675}{s}, \SI{27}{s} & \SI{30.1}{min}, \SI{2475}{s}, \SI{114}{s} \\
+\bottomrule
+\end{tabular}
+\caption{Full against frozen-mixing gradients. Slopes are in Sv per m/s; the percentages are relative to
+the FD secant in the same direction.}
+\label{tab:frozen}
+\end{table}
+
+Freezing CATKE in the adjoint costs little in direction: the cosine is \num{0.9996} at one week and
+\num{0.994} at 30 days. In all four comparisons, however, the full adjoint is the closer predictor of the
+finite-amplitude response, and the frozen gradient underpredicts by \SIrange{0.4}{1.7}{\percent}. Freezing
+saves no time: compile and repeat call are within \SI{10}{\percent} of the full runs, and the first call
+is \SIrange{5}{19}{\percent} longer.
+The small change in direction still matters for large-scale patterns. At 30 days, the frozen gradient's
+response to a uniform meridional wind is \SI{+0.76}{Sv} per m/s against \SI{+0.32}{Sv} per m/s for the
+full gradient, because that sum cancels large values of both signs. The maps differ in the same way
+(Figure~\ref{fig:frozen}): the full gradient's largest boxes, in the Caribbean, are absent from the frozen
+map, and the frozen map's signal at the African coast is stronger. Which uniform-wind response is right is
+a direct finite-difference test along those directions; it has not been run yet.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth]{figures/frozen_vs_full_twodegree_nz20.png}\\[0.5em]
+\includegraphics[width=\textwidth]{figures/amoc_sensitivity_twodegree_nz20_360step_frozen.png}
+\caption{Top: FD secant slopes along the full gradient's direction, with the full and frozen predictions
+there. Bottom: the 30-day frozen-mixing sensitivity map; compare Figure~\ref{fig:maps}, bottom.}
+\label{fig:frozen}
+\end{figure}
+
 \section{Cost}
 
 \begin{center}\small
@@ -277,20 +338,20 @@ All settings come from JSON files in \path{adjoint/configs/}. The driver is
 \path{adjoint/test_omip_adjoint.jl}, and its stages (\texttt{cpu}, \texttt{primal},
 \texttt{gradient}, \texttt{fd\_scan}) are chosen by the \texttt{stages} key.
 
-\begin{center}\small
-\begin{tabular}{@{}lll@{}}
-\toprule
-Config & Job & Purpose \\
-\midrule
-\texttt{twodegree\_nz20\_84step\_frozen\_checkpointed} & 3572831 & frozen-mixing gradient, 1 week \\
-\texttt{twodegree\_nz20\_360step\_frozen\_checkpointed} & 3572832 & frozen-mixing gradient, 30 days \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-Each is compared with the full gradient (cosine and norm ratio), with the existing finite differences
-along the full gradient's direction, and with its own secants for $h = 1$ to $1/32$ \si{m/s}. Next:
+The results files grow to hundreds of MB at long windows. They are reduced on a Lonestar6 CPU node, and
+only the summary is copied back and plotted locally:
+\begin{verbatim}
+SCRIPT=adjoint/reduce_gradients.jl \
+  CONFIG=adjoint/configs/reduce_twodegree_nz20.json \
+  sbatch -J ReduceGrad adjoint/omip_cpu.slurm
+julia +1.12 --project=adjoint/plots adjoint/plot_amoc_sensitivity.jl \
+  adjoint/configs/plot_twodegree_nz20_360step_checkpointed.json
+\end{verbatim}
+Next:
 \begin{enumerate}
+\item Finite differences along the uniform zonal and meridional winds at 30 days. These decide between the
+      full and frozen uniform-wind responses (\SI{+0.32}{Sv} against \SI{+0.76}{Sv} per m/s for $v_{10}$),
+      and they test the gradient along a physically meaningful direction rather than its own.
 \item Merge upstream \texttt{ss/omip-prototype} again, including \texttt{c6eede8f} (a fold-halo patch
       and a \texttt{restore\_prognostic\_state!} override), and repeat the 2-step verification. An
       earlier merge without that commit broke the package and was reverted.
@@ -302,10 +363,10 @@ along the full gradient's direction, and with its own secants for $h = 1$ to $1/
 \item Nz = 70, and a spun-up initial state instead of rest.
 \end{enumerate}
 
-The submission command, from \path{experiments/OMIPSimulations} on Lonestar6, is:
+A gradient job is submitted from \path{experiments/OMIPSimulations} on Lonestar6 with:
 \begin{verbatim}
-CONFIG=adjoint/configs/twodegree_nz20_360step_frozen_checkpointed.json \
-  sbatch -J Frozen360 -p gpu-a100-dev -t 02:00:00 adjoint/omip_adjoint.slurm
+CONFIG=adjoint/configs/twodegree_nz20_360step_checkpointed.json \
+  sbatch -J Grad360Ckpt -p gpu-a100-dev -t 02:00:00 adjoint/omip_adjoint.slurm
 \end{verbatim}
 The gradient runs only on Lonestar6's x86\_64 A100 nodes. On Vista's aarch64 nodes, LLVM fails in the
 first call with ``fixup value out of range''.

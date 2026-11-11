@@ -120,6 +120,18 @@ Queued on LS6 (11-07; results 11-08):
   Freezing the mixing in the adjoint does not change f or its jumps; it changes what the gradient
   approximates, so its check is the large-h secant, not small-h Taylor.
   Files: `results/omip_adjoint_twodegree_nz20_{8,84,360}step_fd_scan.jld2`, logs `FDScan*.o357132{2,3,4}`.
+- **Frozen mixing at 84 and 360 steps** (11-10, Frozen84 3572831, Frozen360 3572832, `8604de03`): both ran
+  end to end; "FAILED" is the small-h Taylor verdict on the jumps (the Taylor rows were then not saved; fixed
+  by saving before the `@test`). Reduced on a CPU node (ReduceGrad 3573710, `reduce_gradients.jl` via
+  `omip_cpu.slurm`; 3573177 failed because `omip_adjoint.slurm`'s full precompile loads Reactant's CUDA
+  extension, which fails without a GPU). Cosine(full, frozen) 0.99964 (84) and 0.99418 (360), norm ratio
+  0.9963 and 0.9905. Against secants over h = 1/32 … 1: along d_full the full gᵀd is −0.6 % / −0.2 % and the
+  frozen −1.0 % / −1.7 %; along d_frozen full −0.1 % / −1.0 %, frozen −0.4 % / −1.3 %. So the full adjoint
+  predicts the finite response slightly better, and freezing saves no time (compile 29.0 / 30.1 min, first
+  call 2675 / 2475 s, repeat 27 / 114 s). Uniform-wind sums differ more than the cosine suggests: at 30 days
+  Σ∂J/∂v₁₀ is +0.32 (full) vs +0.76 (frozen) Sv per m/s, and the full map's Caribbean peak is absent from
+  the frozen one. Next check: FD along uniform u₁₀ and v₁₀ at 30 days. Writeup with figures:
+  `experiments/OMIPSimulations/adjoint/papers/omip_amoc_adjoint.tex`.
 - **ECCO2Ckpt 3566764 VERIFIED** (11-08, dev, `1da8855f`, 1:04:54; resubmitted from `gpu-a100` 3565218):
   build 292 s, CPU twin J −34.9752 Sv, primal vs CPU twin 2.9e-12, 2-step checkpointed gradient wrt the stress
   compile 27.4 min, first call 753 s, repeat 0.54 s exact, gradient vs primal J 9.8e-15, max|g| 1.56 Sv per

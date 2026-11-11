@@ -187,9 +187,9 @@ if :gradient in stages
     if finite
         stamp("Taylor remainder check...")
         taylor = taylor_remainder_check(model, evaluate!; h0 = P["taylor_h0"], nh = P["taylor_nh"])
-        @test taylor.verified
         results["taylor"] = taylor
         save_results()
+        @test taylor.verified
     end
 end
 

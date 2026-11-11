@@ -1,0 +1,7 @@
+{
+  "_comment": "Full (3570014/5) vs frozen-mixing (3572831/2) gradients against the FD scans along the full gradients (3571323/4).",
+  "reduced": "results/reduced_twodegree_nz20.jld2",
+  "panels": [["84step", "84step_frozen", "84 steps (1 week)"], ["360step", "360step_frozen", "360 steps (30 days)"]],
+  "h_min": 0.03,
+  "output": "papers/figures/frozen_vs_full_twodegree_nz20.png"
+}
