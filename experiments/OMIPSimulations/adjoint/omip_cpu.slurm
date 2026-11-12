@@ -15,7 +15,7 @@
 #SBATCH -N 1
 #SBATCH -n 1
 #SBATCH -t 00:30:00
-#SBATCH -A Transfer-of-ECCO-glo
+#SBATCH -A ADCIRC
 #SBATCH --mail-user=arjitseth@gmail.com
 #SBATCH --mail-type=ALL
 
