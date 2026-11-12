@@ -129,7 +129,7 @@ if any(in(stages), reactant_stages)
     obj = OverturningStrength(setup.cpu_grid)
     state = snapshot_state(model)
     results["geometry"] = surface_geometry(setup.cpu_grid)
-    results["slice_times"] = setup.times
+    results["slice_times"] = Array(setup.times)   # a device array under ReactantState
     results["window_seconds"] = n_steps * Δt
     results["average_seconds"] = average_steps * Δt
     stamp("Reactant model built in ", elapsed(t0), "; initial AMOC ",
