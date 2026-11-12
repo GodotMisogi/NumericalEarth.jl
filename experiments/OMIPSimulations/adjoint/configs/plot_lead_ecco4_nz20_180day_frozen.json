@@ -1,0 +1,10 @@
+{
+  "_comment": "Pillar-style lead-time maps of the 180-day ECCO4 window (frozen mixing): slices Jun, Apr, Jan 1993 (leads ~1, 3, 6 months).",
+  "results": "results/ecco4_adjoint_nz20_180day_frozen.jld2",
+  "output": "papers/figures/lead_sensitivity_ecco4_nz20_180day_frozen.png",
+  "slices": [
+    6,
+    4,
+    1
+  ]
+}
