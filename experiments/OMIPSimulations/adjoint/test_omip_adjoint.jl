@@ -28,6 +28,7 @@
 # Optional `checkpoints`: compile one step and its reverse pass instead of the whole window, and run them on
 # Revolve's binomial schedule with this many stored model copies (`build_checkpointed_gradient`);
 # `unroll_steps` then does not apply.
+# Optional `Nx`, `Ny` (default 180, 60): the tripolar grid size.
 # Optional `eddy_diffusivity` (default 800 m² s⁻¹): the GM/Redi skew and symmetric diffusivity; null turns
 # GM/Redi off.
 # Optional `advection` (default "weno"): "upwind3" replaces the WENO schemes with linear third-order upwind.
@@ -53,19 +54,20 @@ config_path = length(ARGS) >= 1 ? ARGS[1] : joinpath(@__DIR__, "configs", "twode
 P = JSON.parsefile(config_path)
 stages = Symbol.(strip.(split(P["stages"], ",")))
 Nz, n_steps, Δt, substeps = P["Nz"], P["steps"], Float64(P["dt"]), P["substeps"]
+Nx, Ny = get(P, "Nx", 180), get(P, "Ny", 60)   # 2° tripolar by default
 forcing = get(P, "forcing", "jra55")
 κ_eddy = get(P, "eddy_diffusivity", 800)   # GM/Redi skew and symmetric diffusivity (m² s⁻¹); null turns GM/Redi off
 advection = Symbol(get(P, "advection", "weno"))
 if forcing == "ecco4"
     n_months = P["n_months"]
     (n_months - 1) * 28 * 86400 > n_steps * Δt || error("$(n_months) monthly slices do not cover $(n_steps) steps of $(Δt) s")
-    model_setup = arch -> ecco_adjoint_setup(arch; Nz, Δt, substeps, n_months, κ_skew = κ_eddy, κ_symmetric = κ_eddy,
-                                             advection)
+    model_setup = arch -> ecco_adjoint_setup(arch; Nx, Ny, Nz, Δt, substeps, n_months,
+                                             κ_skew = κ_eddy, κ_symmetric = κ_eddy, advection)
     gradient_units = "Sv per N m⁻²"
 elseif forcing == "jra55"
     n_slices = P["n_atmosphere_slices"]
     n_slices * 3 * 3600 > n_steps * Δt || error("$(n_slices) three-hourly slices do not cover $(n_steps) steps of $(Δt) s")
-    model_setup = arch -> omip_adjoint_setup(arch; Nz, Δt, substeps, n_atmosphere_slices = n_slices,
+    model_setup = arch -> omip_adjoint_setup(arch; Nx, Ny, Nz, Δt, substeps, n_atmosphere_slices = n_slices,
                                              κ_skew = κ_eddy, κ_symmetric = κ_eddy, advection)
     gradient_units = "Sv per m/s"
 else

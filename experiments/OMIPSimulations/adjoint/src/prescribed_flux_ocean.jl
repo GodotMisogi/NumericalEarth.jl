@@ -114,13 +114,13 @@ freshwater flux from `start_date`, initialized from ECCO4's temperature and sali
 return `(; model, cpu_grid, Δt, times)` as [`omip_adjoint_setup`](@ref) does, with `model` a
 [`PrescribedFluxOcean`](@ref).
 """
-function ecco_adjoint_setup(arch; Nz = 20, depth = 5500, Δt = 7200.0, substeps = 50,
+function ecco_adjoint_setup(arch; Nx = 180, Ny = 60, Nz = 20, depth = 5500, Δt = 7200.0, substeps = 50,
                             vertical_closure = :catke, κ_skew = 800, κ_symmetric = 800,
                             biharmonic_timescale = 50days, advection = :weno,
                             start_date = DateTime(1993, 1, 1), n_months = 2)
 
     n_months >= 2 || throw(ArgumentError("time interpolation needs n_months ≥ 2, got $n_months"))
-    grid, cpu_grid = omip_adjoint_grid(arch; Nz, depth)
+    grid, cpu_grid = omip_adjoint_grid(arch; Nx, Ny, Nz, depth)
     ocean = omip_adjoint_ocean(grid, cpu_grid; Δt, substeps, vertical_closure, κ_skew, κ_symmetric,
                                biharmonic_timescale, advection, initial_date = start_date)
 

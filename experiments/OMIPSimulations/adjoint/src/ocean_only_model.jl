@@ -176,12 +176,12 @@ Build the ocean-only OMIP model on `arch` and return `(; model, cpu_grid, Δt, t
 times. `arch` is `CPU()` or `ReactantState()`; keyword arguments go to [`omip_adjoint_grid`](@ref),
 [`omip_adjoint_ocean`](@ref) and [`omip_adjoint_forcing`](@ref).
 """
-function omip_adjoint_setup(arch; Nz = 20, depth = 5500, Δt = 7200.0, substeps = 50,
+function omip_adjoint_setup(arch; Nx = 180, Ny = 60, Nz = 20, depth = 5500, Δt = 7200.0, substeps = 50,
                             vertical_closure = :catke, κ_skew = 800, κ_symmetric = 800,
                             biharmonic_timescale = 50days, advection = :weno,
                             start_date = DateTime(1990, 1, 1), n_atmosphere_slices = 16)
 
-    grid, cpu_grid = omip_adjoint_grid(arch; Nz, depth)
+    grid, cpu_grid = omip_adjoint_grid(arch; Nx, Ny, Nz, depth)
     ocean = omip_adjoint_ocean(grid, cpu_grid; Δt, substeps, vertical_closure, κ_skew, κ_symmetric,
                                biharmonic_timescale, advection)
     forcing  = omip_adjoint_forcing(arch; start_date, n_slices = n_atmosphere_slices)

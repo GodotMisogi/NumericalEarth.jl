@@ -1,0 +1,20 @@
+{
+  "_comment": "1° (360×180×20 tripolar) ECCO4 prescribed-flux ocean from 1993-01, Oceananigans 0.117.2, Δt = 2 h: 90 days (1080 steps), AMOC averaged over the last 30 days, frozen mixing; lead-time sensitivity and the 2° comparison (ecco4_nz20_90day_frozen).",
+  "forcing": "ecco4",
+  "n_months": 5,
+  "Nx": 360,
+  "Ny": 180,
+  "Nz": 20,
+  "steps": 1080,
+  "dt": 7200.0,
+  "substeps": 50,
+  "backend": "gpu",
+  "stages": "gradient",
+  "roll_barotropic_substeps": true,
+  "frozen_mixing": true,
+  "checkpoints": 30,
+  "average_days": 30,
+  "taylor_h0": 0.1,
+  "taylor_nh": 3,
+  "output": "results/ecco4_onedegree_nz20_90day_frozen.jld2"
+}
