@@ -1,0 +1,17 @@
+{
+  "_comment": "Diagnostic for the 1-year frozen-mixing NaN (3576176, WENO, GM/Redi on): the same window with linear third-order upwind advection, to test whether WENO's nonlinear weights drive the adjoint growth.",
+  "forcing": "ecco4",
+  "n_months": 15,
+  "Nz": 20,
+  "steps": 4380,
+  "dt": 7200.0,
+  "substeps": 50,
+  "backend": "gpu",
+  "stages": "gradient",
+  "roll_barotropic_substeps": true,
+  "frozen_mixing": true,
+  "advection": "upwind3",
+  "checkpoints": 60,
+  "average_days": 30,
+  "output": "results/ecco4_adjoint_nz20_1year_frozen_upwind3.jld2"
+}

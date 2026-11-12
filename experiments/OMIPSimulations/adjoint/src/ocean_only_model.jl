@@ -45,21 +45,33 @@ end
 $(TYPEDSIGNATURES)
 
 The OMIP ocean simulation on `grid`: `omip_closure` (CATKE by default, GM/Redi when `κ_skew` and
-`κ_symmetric` are given, biharmonic viscosity from `biharmonic_timescale`), split WENO advection (explicit
-in the vertical), enstrophy-conserving Coriolis, `substeps` split-explicit
+`κ_symmetric` are given, biharmonic viscosity from `biharmonic_timescale`), advection by `advection`
+(`:weno`, split WENO, or `:upwind3`, linear third-order upwind; both explicit in the vertical),
+enstrophy-conserving Coriolis, `substeps` split-explicit
 barotropic substeps and SplitRK3 time stepping. The initial state is the WOA annual climatology
 converted to TEOS-10 variables on `cpu_grid` and copied onto `grid`, or ECCO4's monthly mean for
 `initial_date` when one is given.
 """
 function omip_adjoint_ocean(grid, cpu_grid; Δt, substeps = 50, vertical_closure = :catke,
-                            κ_skew = 800, κ_symmetric = 800, biharmonic_timescale = 50days, initial_date = nothing)
+                            κ_skew = 800, κ_symmetric = 800, biharmonic_timescale = 50days, initial_date = nothing,
+                            advection = :weno)
 
     closure = omip_closure(vertical_closure; grid, κ_skew, κ_symmetric, biharmonic_timescale,
                            background_vertical_diffusivity = :henyey)
 
-    # Vertical advection is explicit: the adaptive implicit discretization keeps host state.
-    momentum_advection = split_momentum_advection(:weno, 5, ExplicitTimeDiscretization(), Val(:default))
-    tracer_scheme      = split_tracer_advection(7, ExplicitTimeDiscretization(), Val(:default))
+    # Vertical advection is explicit: the adaptive implicit discretization keeps host state. Third-order upwind
+    # is linear in the advected field, so its adjoint has none of the WENO weights' derivatives.
+    momentum_advection, tracer_scheme = if advection === :weno
+        (split_momentum_advection(:weno, 5, ExplicitTimeDiscretization(), Val(:default)),
+         split_tracer_advection(7, ExplicitTimeDiscretization(), Val(:default)))
+    elseif advection === :upwind3
+        upwind = UpwindBiased(order = 3)
+        (VectorInvariant(vorticity_scheme = upwind, vertical_advection_scheme = upwind,
+                         divergence_scheme = upwind, kinetic_energy_gradient_scheme = upwind),
+         upwind)
+    else
+        throw(ArgumentError("advection must be :weno or :upwind3, got $advection"))
+    end
 
     ocean = ocean_simulation(grid;
                              Δt,
@@ -166,12 +178,12 @@ times. `arch` is `CPU()` or `ReactantState()`; keyword arguments go to [`omip_ad
 """
 function omip_adjoint_setup(arch; Nz = 20, depth = 5500, Δt = 7200.0, substeps = 50,
                             vertical_closure = :catke, κ_skew = 800, κ_symmetric = 800,
-                            biharmonic_timescale = 50days,
+                            biharmonic_timescale = 50days, advection = :weno,
                             start_date = DateTime(1990, 1, 1), n_atmosphere_slices = 16)
 
     grid, cpu_grid = omip_adjoint_grid(arch; Nz, depth)
     ocean = omip_adjoint_ocean(grid, cpu_grid; Δt, substeps, vertical_closure, κ_skew, κ_symmetric,
-                               biharmonic_timescale)
+                               biharmonic_timescale, advection)
     forcing  = omip_adjoint_forcing(arch; start_date, n_slices = n_atmosphere_slices)
 
     # OMIP-2 Large & Yeager coefficients with a fixed iteration count, so the flux solver traces.
