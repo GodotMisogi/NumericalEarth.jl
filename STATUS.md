@@ -22,6 +22,22 @@ the winds before `evaluate!()`, so the finite difference includes the step-1 flu
 not. The 1-step zero gradient was the same defect. Everything about the unrolled 2-step machinery itself
 (memory, compile, finiteness, reproducibility) passed.
 
+## Oceananigans 0.117.2 (branch `ajs/omip-adjoint-oc117`, 11-12)
+
+Upstream `ss/omip-prototype` (`c5ad24b9`) dropped the `ss/for-omip` Oceananigans pin (0.113.5, branch since deleted)
+for registered 0.117.2, which includes CliMA/Oceananigans.jl#6396 (OMIPAdjoint's Zipper override removed). Of the
+feature branches merged into `ss/for-omip`, these reached 0.117.2: #5631 implicit boundary fluxes, #5604 adaptive
+implicit vertical advection, #5938 triad Redi/GM, #5828 immersed-cell masking, #5486 grids in JLD2 output, #5827
+ConservativeRegridding extension, #5450 enum bias, #5997 implicit-drag immersed mask. Not in 0.117.2: #5932 high-order
+WENO boundary reconstruction (open), #5976 `CutCellBottom` (open), #5536 FieldTimeSeries prefetch (open),
+`ss/fix-advective-gm` and `ss/consistent-area-coriolis` (no PR), and direct commits such as `RotatedFluxTapering`.
+Only the first affects the adjoint model: OMIPSimulations' advection helpers now bottom out at
+`minimum_buffer_upwind_order` (3 for tracers, 1 for momentum) instead of the ghost-cell `boundary_scheme`, so
+OMIPAdjoint calls them with the new signature (`split_tracer_advection(7, ExplicitTimeDiscretization(), 3)`).
+Upstream OMIPSimulations also patches two fold bugs that `ss/for-omip` had (buoyancy-gradient sign across the
+tripolar fold; T-pivot vertical halos). CPU twins, 2 steps: JRA55 −28.5134 Sv (0.113.5: −28.5631), ECCO4 −34.9162 Sv
+(−34.9752). Reactant 0.2.303 / Enzyme 0.13.216 / CUDA 6.2.2 unchanged.
+
 ## Running / waiting on
 
 Queued on LS6 (11-07; results 11-08):

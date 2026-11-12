@@ -62,8 +62,8 @@ function omip_adjoint_ocean(grid, cpu_grid; Δt, substeps = 50, vertical_closure
     # Vertical advection is explicit: the adaptive implicit discretization keeps host state. Third-order upwind
     # is linear in the advected field, so its adjoint has none of the WENO weights' derivatives.
     momentum_advection, tracer_scheme = if advection === :weno
-        (split_momentum_advection(:weno, 5, ExplicitTimeDiscretization(), Val(:default)),
-         split_tracer_advection(7, ExplicitTimeDiscretization(), Val(:default)))
+        (split_momentum_advection(:weno, 5, ExplicitTimeDiscretization()),
+         split_tracer_advection(7, ExplicitTimeDiscretization(), 3))   # OMIPSimulations' default buffer order
     elseif advection === :upwind3
         upwind = UpwindBiased(order = 3)
         (VectorInvariant(vorticity_scheme = upwind, vertical_advection_scheme = upwind,
