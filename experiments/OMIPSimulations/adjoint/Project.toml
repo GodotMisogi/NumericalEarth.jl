@@ -24,8 +24,7 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [sources]
 SeawaterPolynomials = {rev = "ss/conversion-functions", url = "https://github.com/CliMA/SeawaterPolynomials.jl.git"}
-Oceananigans = {rev = "ss/for-omip", url = "https://github.com/CliMA/Oceananigans.jl.git"}
-ClimaSeaIce = {rev = "ss/for-omip", url = "https://github.com/CliMA/ClimaSeaIce.jl.git"}
+ClimaSeaIce = {rev = "main", url = "https://github.com/CliMA/ClimaSeaIce.jl.git"}
 NumericalEarth = {path = "../../.."}
 OMIPSimulations = {path = ".."}
 
@@ -34,6 +33,7 @@ CUDA = "5.11.0, 6"
 Checkpointing = "0.13"
 Enzyme = "0.13.216"
 JSON = "0.21, 1"
+Oceananigans = "0.117.2"
 Reactant = "=0.2.303"
 julia = "1.10"
 

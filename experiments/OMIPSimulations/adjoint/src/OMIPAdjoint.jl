@@ -10,9 +10,8 @@ export omip_adjoint_setup, ecco_adjoint_setup, PrescribedFluxOcean,
 using Oceananigans
 using Oceananigans: prognostic_state, restore_prognostic_state!
 using Oceananigans.Units: days
-using Oceananigans.Architectures: AbstractArchitecture, CPU, ReactantState, architecture, on_architecture,
+using Oceananigans.Architectures: CPU, ReactantState, architecture, on_architecture,
                                   convert_to_device
-using Oceananigans.BoundaryConditions: BoundaryConditions, ZBC, NotFluxBC
 using Oceananigans.Grids: AbstractGrid, ExponentialDiscretization, LatitudeLongitudeGrid, inactive_node,
                           λnode, φnode, znode, Center, Face, Periodic, Bounded, Flat
 using Oceananigans.Operators: Δxᶜᶠᶜ, Δzᶜᶠᶜ, Δyᶠᶜᶜ, Δzᶠᶜᶜ, Azᶜᶜᶜ, ℑxᶠᵃᵃ, ℑyᵃᶠᵃ, intrinsic_vector
@@ -57,7 +56,6 @@ include("prescribed_flux_ocean.jl")
 include("overturning.jl")
 include("rolled_substeps.jl")
 include("frozen_mixing.jl")
-include("zipper_flux_bcs.jl")
 include("gradient.jl")
 include("checkpointed_gradient.jl")
 
