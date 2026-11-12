@@ -192,9 +192,6 @@ if :gradient in stages
     t2 = time(); J2, g2, _ = evaluate!(); second_seconds = time() - t2
     stamp(@sprintf("gradient 2 in %.2f s: repeat |ΔJ| %.2e, max|Δg| %.2e", second_seconds, abs(J2 - J),
                    max(maximum(abs, g2.u .- g.u), maximum(abs, g2.v .- g.v))))
-    @test finite
-    @test abs(J2 - J) <= 1e-10 * max(abs(J), 1)
-
     results["J"] = J
     for (name, value) in pairs(g)
         results["gradient_$name"] = value
@@ -202,6 +199,8 @@ if :gradient in stages
     results["compile_seconds"] = compile_seconds; results["first_seconds"] = first_seconds
     results["second_seconds"] = second_seconds; results["census"] = census
     save_results()
+    @test finite
+    @test abs(J2 - J) <= 1e-10 * max(abs(J), 1)
 
     if finite && haskey(P, "taylor_h0")
         stamp("Taylor remainder check...")

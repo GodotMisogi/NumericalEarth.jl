@@ -1,6 +1,0 @@
-{
-  "_comment": "Pillar-style lead-time maps of the 1-year ECCO4 window: slices Dec, Oct, Jul, Jan 1993 (leads ~1, 3, 6, 12 months).",
-  "results": "results/ecco4_adjoint_nz20_1year_full.jld2",
-  "output": "papers/figures/lead_sensitivity_ecco4_nz20_1year_full.png",
-  "slices": [12, 10, 7, 1]
-}
