@@ -14,7 +14,5 @@
   "frozen_mixing": true,
   "checkpoints": 30,
   "average_days": 30,
-  "taylor_h0": 0.1,
-  "taylor_nh": 3,
   "output": "results/ecco4_onedegree_nz20_90day_frozen.jld2"
 }
