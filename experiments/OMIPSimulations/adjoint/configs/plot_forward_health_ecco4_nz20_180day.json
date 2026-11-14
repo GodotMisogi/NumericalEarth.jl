@@ -1,0 +1,1 @@
+{"_comment": "Forward health of the 180-day ECCO4 window (Vista job 1143795).", "results": "results/forward_health_ecco4_nz20_180day.jld2", "output": "papers/figures/forward_health_ecco4_nz20_180day.png", "days": [30, 180]}
