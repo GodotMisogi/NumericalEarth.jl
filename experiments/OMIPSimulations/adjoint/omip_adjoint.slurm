@@ -23,7 +23,7 @@
 #SBATCH -n 1
 #SBATCH -t 08:00:00
 #SBATCH -A Transfer-of-ECCO-glo
-#SBATCH --mail-user=arjitseth@gmail.com
+#SBATCH --mail-user=ajseth@utexas.edu
 #SBATCH --mail-type=ALL
 
 cd "$SLURM_SUBMIT_DIR" || exit 1
