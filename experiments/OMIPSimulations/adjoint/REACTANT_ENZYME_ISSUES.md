@@ -18,6 +18,7 @@ Versions, unless stated otherwise: Julia 1.12.7, Reactant.jl 0.2.303, Reactant_j
 | 5 | Reactant `WHILE_UNROLL_THRESHOLD` / `enzyme_hlo_unroll` | Unrolls after differentiation, not before | One rewrite application ran > 4 h 47 min | No | Unroll at trace time instead |
 | 6 | Reactant on aarch64 (LLVM) | `fixup value out of range` on the first call of a large compiled thunk | Gradients cannot run on Vista GH200 | No | Run on x86_64 (LS6) |
 | 7 | Reactant thunk call path (suspected) | First call of compiled thunks costs 13–40 min of host time | Fixed overhead per job | No (unconfirmed) | None |
+| 8 | Reactant 0.2.303 XLA export under Julia 1.13 | `arith.uitofp` left in the module: "unsupported op for export to XLA" | Nothing compiles under Julia 1.13.3 (Vista; LS6 not yet tried) | No | Stay on Julia 1.12.7 |
 
 ## 1. Empty kernel becomes an undifferentiable `enzymexla.jit_call`
 
@@ -120,6 +121,23 @@ Versions, unless stated otherwise: Julia 1.12.7, Reactant.jl 0.2.303, Reactant_j
   nothing during the first call, and the GPU is idle.
 - Most likely Julia compiling the thunks' call wrappers for the very large argument types (the same glue as
   issue 6). Not yet confirmed with `Base.cumulative_compile_time_ns`; not reported.
+
+## 8. `arith.uitofp` reaches the XLA export under Julia 1.13
+
+- **Symptom.** On Vista (GH200), Julia 1.13.3, Reactant 0.2.303 / Reactant_jll 0.0.436, Oceananigans 0.117.2
+  (job 1142874, ECCO4 2-step config). The CPU twin runs and matches Julia 1.12.7 exactly (−34.9162 Sv). The
+  first Reactant compile (the primal window) then fails in `ClientCompileWithProto` with
+  `'arith.uitofp' op unsupported op for export to XLA`. The post-XLA module holds 82 `arith.uitofp` ops, all on
+  2-D surface tensors (`tensor<60x180xi64> to tensor<60x180xf64>`).
+- **Likely cause** (not yet confirmed). Julia 1.13's newer LLVM turns a signed integer-to-float conversion
+  (`sitofp`) of a provably non-negative value into `uitofp nneg`. The raise pipeline carries it through as
+  `arith.uitofp` on tensors, and the export to XLA has no lowering for it. Enzyme-JAX added raising for
+  `uitofp` in 2025 (#951, #952), so the gap is in the tensor-level op left for export. Nothing here is specific
+  to aarch64, so x86_64 is probably affected too. That will be checked when LS6's 1.13.3 image is built.
+- **Workaround.** Reactant runs stay on Julia 1.12.7. The adjoint environment carries both
+  `Manifest.toml` (1.12.7) and `Manifest-v1.13.toml` (1.13.3), so the switch is only the container.
+- **Report.** With the dumped module (`/tmp/reactant_pjSK1n/…post_xla_compile.mlir` on the compute node; the
+  module text is in `logs/Jl113Ecco2V.e1142874`) and the kernel that produces the conversion, once located.
 
 ## Not included: Oceananigans/NumericalEarth meeting Reactant
 
