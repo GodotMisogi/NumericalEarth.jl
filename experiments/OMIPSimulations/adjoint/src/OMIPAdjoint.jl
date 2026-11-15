@@ -20,7 +20,8 @@ using Oceananigans.OutputReaders: FieldTimeSeries, cpu_interpolating_time_indice
 using Oceananigans.ImmersedBoundaries: ImmersedBoundaryGrid, GridFittedBottom
 using Oceananigans.OrthogonalSphericalShellGrids: TripolarGrid
 using Oceananigans.Coriolis: HydrostaticSphericalCoriolis, EnstrophyConserving
-using Oceananigans.TurbulenceClosures: TurbulenceClosures, ExplicitTimeDiscretization, HorizontalScalarDiffusivity
+using Oceananigans.TurbulenceClosures: TurbulenceClosures, ExplicitTimeDiscretization, HorizontalScalarDiffusivity,
+                                     HorizontalScalarBiharmonicDiffusivity
 using Oceananigans.TurbulenceClosures.TKEBasedVerticalDiffusivities: FlavorOfCATKE
 using Oceananigans.Models.HydrostaticFreeSurfaceModels: HydrostaticFreeSurfaceModel
 using Oceananigans.TimeSteppers: TimeSteppers, Clock, time_step!, update_state!
@@ -39,7 +40,7 @@ using NumericalEarth.DataWrangling.JRA55: RepeatYearJRA55, JRA55PrescribedAtmosp
 using NumericalEarth.EarthSystemModels: default_sea_ice, reference_density, heat_capacity
 using NumericalEarth.EarthSystemModels.InterfaceComputations: ComponentInterfaces, net_fluxes
 
-using OMIPSimulations: omip_closure, split_momentum_advection, split_tracer_advection, exponential_scale,
+using OMIPSimulations: omip_closure, split_momentum_advection, split_tracer_advection, exponential_scale, νhb,
                        ncar_atmosphere_ocean_fluxes, woa_to_teos10!, approx_pressure_dbar
 
 using KernelAbstractions: @kernel, @index

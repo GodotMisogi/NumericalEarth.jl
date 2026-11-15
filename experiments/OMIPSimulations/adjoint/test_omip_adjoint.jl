@@ -32,7 +32,10 @@
 # Optional `eddy_diffusivity` (default 800 m² s⁻¹): the GM/Redi skew and symmetric diffusivity; null turns
 # GM/Redi off.
 # Optional `horizontal_diffusivity` (m² s⁻¹; default none): Laplacian horizontal diffusion of every tracer.
+# Optional `biharmonic_tracer_timescale` (days; default none): biharmonic tracer diffusion Az² / λ, the form of the
+# biharmonic viscosity.
 # Optional `advection` (default "weno"): "upwind3" replaces the WENO schemes with linear third-order upwind.
+# Optional `repeat_evaluation` (default true): evaluate the gradient a second time and require the same result.
 # Optional `average_days` (needs `checkpoints`): the objective is averaged over the window's last
 # `average_days` instead of taken at its end; the primal and fd_scan stages evaluate the end value, so they
 # do not apply.
@@ -60,19 +63,23 @@ forcing = get(P, "forcing", "jra55")
 κ_eddy = get(P, "eddy_diffusivity", 800)   # GM/Redi skew and symmetric diffusivity (m² s⁻¹); null turns GM/Redi off
 advection = Symbol(get(P, "advection", "weno"))
 κ_horizontal = get(P, "horizontal_diffusivity", nothing)   # Laplacian tracer diffusivity (m² s⁻¹)
+# Biharmonic tracer diffusion timescale, days → s
+λ_tracer = haskey(P, "biharmonic_tracer_timescale") ? P["biharmonic_tracer_timescale"] * 86400.0 : nothing
 if forcing == "ecco4"
     n_months = P["n_months"]
     (n_months - 1) * 28 * 86400 > n_steps * Δt || error("$(n_months) monthly slices do not cover $(n_steps) steps of $(Δt) s")
     model_setup = arch -> ecco_adjoint_setup(arch; Nx, Ny, Nz, Δt, substeps, n_months,
                                              κ_skew = κ_eddy, κ_symmetric = κ_eddy, advection,
-                                             horizontal_diffusivity = κ_horizontal)
+                                             horizontal_diffusivity = κ_horizontal,
+                                             biharmonic_tracer_timescale = λ_tracer)
     gradient_units = "Sv per N m⁻²"
 elseif forcing == "jra55"
     n_slices = P["n_atmosphere_slices"]
     n_slices * 3 * 3600 > n_steps * Δt || error("$(n_slices) three-hourly slices do not cover $(n_steps) steps of $(Δt) s")
     model_setup = arch -> omip_adjoint_setup(arch; Nx, Ny, Nz, Δt, substeps, n_atmosphere_slices = n_slices,
                                              κ_skew = κ_eddy, κ_symmetric = κ_eddy, advection,
-                                             horizontal_diffusivity = κ_horizontal)
+                                             horizontal_diffusivity = κ_horizontal,
+                                             biharmonic_tracer_timescale = λ_tracer)
     gradient_units = "Sv per m/s"
 else
     error("forcing must be \"jra55\" or \"ecco4\", got \"$forcing\"")
@@ -201,10 +208,14 @@ if :gradient in stages
     census = shadow_census(dmodel; cpu_grid = setup.cpu_grid)
     print_shadow_census(census); flush(stdout)
 
-    stamp("evaluating gradient 2...")
-    t2 = time(); J2, g2, _ = evaluate!(); second_seconds = time() - t2
-    stamp(@sprintf("gradient 2 in %.2f s: repeat |ΔJ| %.2e, max|Δg| %.2e", second_seconds, abs(J2 - J),
-                   max(maximum(abs, g2.u .- g.u), maximum(abs, g2.v .- g.v))))
+    repeat_evaluation = get(P, "repeat_evaluation", true)
+    J2, second_seconds = J, NaN
+    if repeat_evaluation
+        stamp("evaluating gradient 2...")
+        t2 = time(); J2, g2, _ = evaluate!(); second_seconds = time() - t2
+        stamp(@sprintf("gradient 2 in %.2f s: repeat |ΔJ| %.2e, max|Δg| %.2e", second_seconds, abs(J2 - J),
+                       max(maximum(abs, g2.u .- g.u), maximum(abs, g2.v .- g.v))))
+    end
     results["J"] = J
     for (name, value) in pairs(g)
         results["gradient_$name"] = value
