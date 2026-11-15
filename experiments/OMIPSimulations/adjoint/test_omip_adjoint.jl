@@ -31,6 +31,7 @@
 # Optional `Nx`, `Ny` (default 180, 60): the tripolar grid size.
 # Optional `eddy_diffusivity` (default 800 m² s⁻¹): the GM/Redi skew and symmetric diffusivity; null turns
 # GM/Redi off.
+# Optional `horizontal_diffusivity` (m² s⁻¹; default none): Laplacian horizontal diffusion of every tracer.
 # Optional `advection` (default "weno"): "upwind3" replaces the WENO schemes with linear third-order upwind.
 # Optional `average_days` (needs `checkpoints`): the objective is averaged over the window's last
 # `average_days` instead of taken at its end; the primal and fd_scan stages evaluate the end value, so they
@@ -58,17 +59,20 @@ Nx, Ny = get(P, "Nx", 180), get(P, "Ny", 60)   # 2° tripolar by default
 forcing = get(P, "forcing", "jra55")
 κ_eddy = get(P, "eddy_diffusivity", 800)   # GM/Redi skew and symmetric diffusivity (m² s⁻¹); null turns GM/Redi off
 advection = Symbol(get(P, "advection", "weno"))
+κ_horizontal = get(P, "horizontal_diffusivity", nothing)   # Laplacian tracer diffusivity (m² s⁻¹)
 if forcing == "ecco4"
     n_months = P["n_months"]
     (n_months - 1) * 28 * 86400 > n_steps * Δt || error("$(n_months) monthly slices do not cover $(n_steps) steps of $(Δt) s")
     model_setup = arch -> ecco_adjoint_setup(arch; Nx, Ny, Nz, Δt, substeps, n_months,
-                                             κ_skew = κ_eddy, κ_symmetric = κ_eddy, advection)
+                                             κ_skew = κ_eddy, κ_symmetric = κ_eddy, advection,
+                                             horizontal_diffusivity = κ_horizontal)
     gradient_units = "Sv per N m⁻²"
 elseif forcing == "jra55"
     n_slices = P["n_atmosphere_slices"]
     n_slices * 3 * 3600 > n_steps * Δt || error("$(n_slices) three-hourly slices do not cover $(n_steps) steps of $(Δt) s")
     model_setup = arch -> omip_adjoint_setup(arch; Nx, Ny, Nz, Δt, substeps, n_atmosphere_slices = n_slices,
-                                             κ_skew = κ_eddy, κ_symmetric = κ_eddy, advection)
+                                             κ_skew = κ_eddy, κ_symmetric = κ_eddy, advection,
+                                             horizontal_diffusivity = κ_horizontal)
     gradient_units = "Sv per m/s"
 else
     error("forcing must be \"jra55\" or \"ecco4\", got \"$forcing\"")

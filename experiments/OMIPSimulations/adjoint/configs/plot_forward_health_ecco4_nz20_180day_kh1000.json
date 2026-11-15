@@ -1,0 +1,9 @@
+{
+  "_comment": "Forward health of the 180-day ECCO4 window with κh = 1000 m²/s.",
+  "results": "results/forward_health_ecco4_nz20_180day_kh1000.jld2",
+  "output": "papers/figures/forward_health_ecco4_nz20_180day_kh1000.png",
+  "days": [
+    30,
+    180
+  ]
+}

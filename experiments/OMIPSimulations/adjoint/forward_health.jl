@@ -7,7 +7,8 @@
 #   SCRIPT=adjoint/forward_health.jl CONFIG=adjoint/configs/<config>.json sbatch adjoint/omip_adjoint.slurm
 #
 # Config keys: those of test_omip_adjoint.jl that set up the model (forcing, n_months or n_atmosphere_slices,
-# Nx, Ny, Nz, dt, substeps, eddy_diffusivity, advection, backend, roll_barotropic_substeps), plus
+# Nx, Ny, Nz, dt, substeps, eddy_diffusivity, horizontal_diffusivity, advection, backend,
+# roll_barotropic_substeps), plus
 #   architecture   optional "reactant" (default) or "cpu" (the plain CPU model, to check the diagnostics locally)
 #   steps          number of steps
 #   snapshot_days  interval between diagnostics
@@ -46,6 +47,7 @@ Nx, Ny, Nz = get(P, "Nx", 180), get(P, "Ny", 60), P["Nz"]
 n_steps, Δt, substeps = P["steps"], Float64(P["dt"]), P["substeps"]
 κ_eddy = get(P, "eddy_diffusivity", 800)
 advection = Symbol(get(P, "advection", "weno"))
+κ_horizontal = get(P, "horizontal_diffusivity", nothing)   # Laplacian tracer diffusivity (m² s⁻¹)
 forcing = get(P, "forcing", "jra55")
 start_date = DateTime(1993, 1, 1)
 
@@ -63,9 +65,10 @@ if on_reactant
 end
 setup = forcing == "ecco4" ?
     ecco_adjoint_setup(arch; Nx, Ny, Nz, Δt, substeps, n_months = P["n_months"],
-                       κ_skew = κ_eddy, κ_symmetric = κ_eddy, advection, start_date) :
+                       κ_skew = κ_eddy, κ_symmetric = κ_eddy, advection, start_date,
+                       horizontal_diffusivity = κ_horizontal) :
     omip_adjoint_setup(arch; Nx, Ny, Nz, Δt, substeps, n_atmosphere_slices = P["n_atmosphere_slices"],
-                       κ_skew = κ_eddy, κ_symmetric = κ_eddy, advection)
+                       κ_skew = κ_eddy, κ_symmetric = κ_eddy, advection, horizontal_diffusivity = κ_horizontal)
 model, cpu_grid = setup.model, setup.cpu_grid
 obj = OverturningStrength(cpu_grid)
 if on_reactant
