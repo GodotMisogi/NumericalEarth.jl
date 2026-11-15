@@ -19,7 +19,8 @@
 # mean of its four neighbors, over cells whose neighbors are all wet) and its worst cell; the count of statically
 # unstable interfaces and the most negative N² (TEOS-10 densities of both cells at the interface depth); the
 # largest CATKE tracer diffusivity; and, for ECCO4 forcing, the rms SST difference from ECCO4's monthly mean. Each
-# snapshot also stores 2-D maps (column maxima of the CFL numbers, surface noise, surface κ) for plotting.
+# snapshot also stores 2-D maps (column maxima of the CFL numbers, surface noise, surface κ, unstable interfaces per
+# column and the most negative N² per column) for plotting.
 # ==============================================================================
 
 using OMIPAdjoint
@@ -159,13 +160,19 @@ function snapshot(n)
 
     # Interfaces k | k+1 (k+1 above): stable when the lower cell is denser at the interface depth.
     unstable, N²min, N²at = 0, Inf, (1, 1, 1)
+    unstable_columns = zeros(Int16, Nx, Ny)     # statically unstable interfaces per column
+    N²min_columns = fill(NaN32, Nx, Ny)         # most negative N² per column
     for k in 1:Nz-1, j in 1:Ny, i in 1:Nx
         (wet[i, j, k] && wet[i, j, k+1]) || continue
         z = zᶠ[k+1]
         Δρ = ρ(T[i, j, k], S[i, j, k], z, eos) - ρ(T[i, j, k+1], S[i, j, k+1], z, eos)
         N² = 9.81 * Δρ / 1026 / Δzᶠ[k+1]
-        N² < 0 && (unstable += 1)
+        if N² < 0
+            unstable += 1
+            unstable_columns[i, j] += 1
+        end
         N² < N²min && ((N²min, N²at) = (N², (i, j, k)))
+        (isnan(N²min_columns[i, j]) || N² < N²min_columns[i, j]) && (N²min_columns[i, j] = N²)
     end
 
     surface = wet[:, :, Nz]
@@ -189,7 +196,7 @@ function snapshot(n)
     return (; day = n * Δt / 86400, J, cfl_w_max = cw, cfl_h_max = ch,
               noise_rms = Dict(k => rms(v) for (k, v) in noise), unstable, N²min, κc_max = κmax, sst_rms,
               cfl_w = Float32.(cfl_w), cfl_h = Float32.(cfl_h), noise_T = Float32.(noise["T"]),
-              noise_u = Float32.(noise["u"]), κc_surface = Float32.(κ[:, :, Nz]))
+              noise_u = Float32.(noise["u"]), κc_surface = Float32.(κ[:, :, Nz]), unstable_columns, N²min_columns)
 end
 
 # %%

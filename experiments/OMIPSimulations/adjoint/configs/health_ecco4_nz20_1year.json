@@ -1,0 +1,13 @@
+{
+  "_comment": "Forward health of the 1-year ECCO4 window, no tracer diffusion; the forward state of the 1-year frozen adjoints: where the statically unstable columns are in Nov-Dec, against where the adjoint blows up.",
+  "forcing": "ecco4",
+  "n_months": 15,
+  "Nz": 20,
+  "steps": 4380,
+  "dt": 7200.0,
+  "substeps": 50,
+  "backend": "gpu",
+  "roll_barotropic_substeps": true,
+  "snapshot_days": 5,
+  "output": "results/forward_health_ecco4_nz20_1year.jld2"
+}
