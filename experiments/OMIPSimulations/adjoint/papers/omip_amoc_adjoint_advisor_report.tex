@@ -49,9 +49,12 @@ as in Pillar et al.\ (2016), computed with the Enzyme reverse-mode adjoint of a 
         equatorial waveguides spreading with lead, as in Pillar's $-1$ and $-3$ month rows.
   \item \textbf{Windows of 180 days and longer blow up, even with frozen mixing.} The cause is in the forward
         trajectory: grid-scale noise grows in fronts and convective regions, and SST drifts \SI{3}{\celsius}
-        from ECCO4 under fixed fluxes. Turning off GM/Redi or WENO does not fix it. The time step does not seem to be
-        the cause. \emph{Decision needed:} SST/SSS feedback on the fluxes, explicit horizontal diffusion, or both
-        (Section~\ref{sec:next}).
+        from ECCO4 under fixed fluxes. Turning off GM/Redi or WENO does not fix it, and the time step is well inside
+        its limits. Laplacian tracer diffusion (\SI{1000}{m^2/s}) slows the growth $500\times$ at a one-month lead but
+        does not stop it. Scale-selective biharmonic tracer diffusion is now being tested (Section~\ref{sec:next}).
+  \item \textbf{The forward model departs from the OMIP base configuration} in resolution, time step, vertical
+        coordinate, vertical advection, sea ice, rivers, shortwave penetration and salinity restoring
+        (Section~\ref{sec:departures}).
 \end{enumerate}
 
 \section{Model and problem}
@@ -70,7 +73,7 @@ Forcing B & ECCO4 monthly wind stress, net heat flux and net freshwater flux, fr
 Objective & residual overturning $\psi$ at \SI{1000}{m} across a staircase of faces along \ang{26.5}N, \ang{80}W--\ang{14}W
             (RAPID line); at the window's end (A) or averaged over its last 30 days (B) \\
 Software & Float64; Oceananigans 0.117.2 (0.113.5 for the results of Sections~\ref{sec:verification}--\ref{sec:lead}),
-           Reactant 0.2.303, Enzyme 0.13.216, Julia 1.12.7; NVIDIA A100 and H100 (TACC Lonestar6) \\
+           Reactant 0.2.303, Enzyme 0.13.216, Julia 1.12.7; NVIDIA A100/H100 (Lonestar6) and GH200 (Vista) \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -83,6 +86,45 @@ J = -10^{-6} \sum_{k \le k_{\text{ref}}} \tilde T_k \;\;[\si{Sv}].
 \end{equation*}
 On the tripolar grid a single row drifts from \ang{28}N to \ang{34}N across the Atlantic, so the section follows
 the faces nearest \ang{26.5}N. $J$ is linear in the velocities.
+
+\subsection{Departures from the OMIP base configuration}
+\label{sec:departures}
+
+The forward model follows NumericalEarth's OMIP configuration (\texttt{omip\_simulation}, \texttt{:halfdegree})
+in most respects:
+\begin{itemize}
+  \item tripolar grid and bathymetry processing;
+  \item split Runge--Kutta 3 time stepping;
+  \item WENO advection: order 5 for momentum, order 7 for tracers, with a buffer of order 3;
+  \item enstrophy-conserving Coriolis and implicit bottom drag;
+  \item CATKE with the same constants, Henyey background diffusivity, and a 50-day biharmonic viscosity;
+  \item a WOA initial state at rest.
+\end{itemize}
+It departs from it as follows. Most departures are for cost or for differentiability.
+
+\begin{center}\small
+\begin{tabular}{@{}p{0.2\textwidth}p{0.28\textwidth}p{0.25\textwidth}p{0.19\textwidth}@{}}
+\toprule
+& OMIP base (\texttt{:halfdegree}) & Adjoint model & Reason \\
+\midrule
+Resolution & $720\times360$, $N_z = 100$ & $180\times60\times20$ (and $360\times180\times20$) & cost, memory \\
+Vertical coordinate & exponential, moving with the free surface ($z^\star$) & same spacing, fixed levels & not tested under Reactant \\
+$\Delta t$ / barotropic substeps & 30 min / 100 & 2 h / 50 & cost \\
+Vertical advection & implicit, adaptive & explicit & adaptive scheme keeps host-side state \\
+GM/Redi $\kappa$ & \SI{250}{m^2/s} & \SI{800}{m^2/s} (ORCA's value) & coarser grid \\
+Shortwave & penetrating, SeaWiFS chlorophyll & absorbed at the surface & simplification \\
+Surface salinity & restored to WOA, salt-conserving & not restored & keeps the controls pure \\
+Sea ice & ClimaSeaIce with dynamics & none (ocean only) & adjoint scope \\
+Rivers, icebergs & JRA55 runoff, river-mouth mixing & none & simplification \\
+Atmosphere (A) & multi-year JRA55, streamed from disk & repeat-year 1990, in device memory & must be device-resident \\
+Bathymetry & as regridded & Central American isthmus closed & leak through Panama at \ang{2} \\
+Forcing B & -- & ECCO4 prescribed fluxes and state & Pillar's controls \\
+\bottomrule
+\end{tabular}
+\end{center}
+The absence of salinity restoring and sea ice leaves the high-latitude surface free to drift. Explicit vertical
+advection and fixed levels are a different numerical path from the production model. Both may matter for the
+long-window behavior of Section~\ref{sec:long}.
 
 \section{Adjoint method}
 
@@ -136,7 +178,7 @@ B, 8 steps, Oceananigans 0.117.2 & $24.13$ & Taylor & \numrange{5e-6}{9e-6} at t
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.78\textwidth]{figures/fd_scans_twodegree_nz20.png}
+\includegraphics[width=0.7\textwidth]{figures/fd_scans_twodegree_nz20.png}
 \caption{Finite differences of $J$ along $d = \gvec/\lVert\gvec\rVert$ at 8, 84 and 360 steps (forcing A). Top:
 error of the central and forward differences relative to $\gvec^{\mathsf T}d$. Bottom: residual of the linear
 prediction on each side, with the signal $h\,\gvec^{\mathsf T}d$ dashed. A plateau as $h$ shrinks is a jump in $J$.}
@@ -175,7 +217,7 @@ from rest, so they sample the adjustment from rest, not an equilibrium sensitivi
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.74\textwidth]{figures/lead_sensitivity_ecco4_nz20_90day_frozen.png}
+\includegraphics[width=0.68\textwidth]{figures/lead_sensitivity_ecco4_nz20_90day_frozen.png}
 \caption{Sensitivity of the 30-day-mean AMOC (days 61--90, $J = \SI{16.71}{Sv}$) to each monthly flux slice, per unit
 area, by lead (rows) and forcing (columns), after Pillar et al.\ (2016, Fig.~1). Signs follow Pillar: upward heat flux
 and evaporation are positive. Colors are logarithmic over three decades.}
@@ -189,10 +231,11 @@ magnitudes, about \SI{e-10}{Sv} per N, match ReactOcean's 90-day maps. The heat-
 the cell-scale checkerboard ReactOcean also found, and should not be interpreted yet.
 
 \section{Longer windows: an instability of the linearized model}
+\label{sec:long}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.72\textwidth]{figures/lead_growth_ecco4_nz20.png}
+\includegraphics[width=0.64\textwidth]{figures/lead_growth_ecco4_nz20.png}
 \caption{Largest $|\partial J/\partial\tau_x|$ over cells for each monthly slice, against lead, for forcing B with
 frozen mixing. Points on the dashed line are NaN.}
 \label{fig:growth}
@@ -214,8 +257,9 @@ Fig.~\ref{fig:fd}.
 \textbf{Forward health check.} To see what changes in the forward run, the 180-day window was stepped with the same
 compiled step, recording diagnostics every 5 days (Fig.~\ref{fig:health}).
 \begin{itemize}
-  \item \textbf{CFL numbers stay small:} vertical $\le 0.03$ and horizontal $\le 0.07$ after spin-up. The time step
-        does not appear to be the cause; a $\Delta t = \SI{1}{h}$ run is queued to confirm.
+  \item \textbf{CFL numbers stay small:} vertical $\le 0.03$ and horizontal $\le 0.07$ after spin-up. In the smallest
+        wet cell (\SI{49.6}{km}), an internal wave at \SI{3}{m/s} has a CFL number of 0.44. The time step does not
+        appear to be the cause; a $\Delta t = \SI{1}{h}$ run is queued to confirm.
   \item \textbf{SST drifts} away from ECCO4 to \SI{3.1}{\celsius} rms by day 180. ECCO4's prescribed fluxes do not
         respond to SST, so nothing pulls the model back.
   \item \textbf{Grid-scale surface temperature noise} (the field minus its four-neighbor mean) grows steadily, from
@@ -228,7 +272,7 @@ compiled step, recording diagnostics every 5 days (Fig.~\ref{fig:health}).
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.95\textwidth]{figures/forward_health_ecco4_nz20_180day.png}
+\includegraphics[width=0.9\textwidth]{figures/forward_health_ecco4_nz20_180day.png}
 \caption{Forward health of the 180-day window (forcing B). Top: $J$, rms SST error against ECCO4, rms grid-scale
 surface temperature residual, and the number of statically unstable interfaces. Middle and bottom: the surface
 grid-scale temperature residual and CATKE's surface diffusivity at days 30 and 180.}
@@ -238,6 +282,19 @@ grid-scale temperature residual and CATKE's surface diffusivity at days 30 and 1
 A noisy, drifting forward state is the kind a linearized model can amplify enormously while the forward model
 limits itself. This points to the forward configuration (fixed fluxes, no explicit horizontal tracer diffusion)
 rather than the adjoint machinery.
+
+\textbf{Laplacian tracer diffusion} (\SI{1000}{m^2/s}, 0.3\,\% of its explicit stability limit).
+\begin{itemize}
+  \item \emph{Forward:} the grid-scale noise at day 180 falls from \SI{0.66}{K} to \SI{0.55}{K} rms, and the worst
+        cell from 11.3 to \SI{6.2}{K}. The SST drift is unchanged (\SI{3.05}{\celsius}).
+  \item \emph{Adjoint, 1 year:} the slice one month back drops from \num{1.2e4} to 22.6 Sv per N m$^{-2}$, but every
+        earlier slice is still NaN.
+\end{itemize}
+At \ang{2} a Laplacian of this size damps a two-cell oscillation in about two months, slower than the noise grows.
+
+\textbf{Biharmonic tracer diffusion}, $\kappa_4 = A_z^2/\lambda$ with $\lambda = 50$ days (the biharmonic viscosity's
+form), damps two-cell oscillations in 1--3 days and leaves large scales nearly untouched. Its forward check and
+1-year gradient are running on Vista.
 
 \section{Software and infrastructure}
 
@@ -260,7 +317,8 @@ been reported upstream (EnzymeAD/Reactant.jl\#3636). The others:
   \item two rewrite patterns (\texttt{while\_deadresult}, \texttt{cse\_reduce\_transposed}) that cost tens of
         minutes of compile time;
   \item \texttt{WHILE\_UNROLL\_THRESHOLD} acting after differentiation;
-  \item the aarch64 ``fixup value out of range'' failure that keeps gradients off Vista;
+  \item the aarch64 ``fixup value out of range'' failure, now resolved: with per-step compiles the gradient runs on
+        Vista (compile \SI{21}{min}, first call \SI{52}{min}, Taylor \num{2.2e-4});
   \item the 13--\SI{40}{min} first-call cost;
   \item the Julia 1.13 export failure.
 \end{itemize}
@@ -269,18 +327,16 @@ been reported upstream (EnzymeAD/Reactant.jl\#3636). The others:
 \label{sec:next}
 
 \begin{enumerate}
-  \item \textbf{Decision: stabilize the forward state for long windows.} The options are
-        \begin{enumerate}[label=(\alph*)]
-          \item SST/SSS feedback on the ECCO4 fluxes, $\lambda(\mathrm{SST}_{\mathrm{ECCO}} - \mathrm{SST})$ with
-                $\lambda \approx \SI{40}{W\,m^{-2}\,K^{-1}}$ (standard with prescribed fluxes; removes the drift, but
-                makes the heat-flux control less pure);
-          \item explicit horizontal tracer diffusion of \SIrange{500}{1000}{m^2/s} on top of WENO, as in ECCOv4, to
-                damp the grid-scale noise in both models;
-          \item both.
-        \end{enumerate}
-        Each is one configuration switch and one 1-year run.
-  \item \textbf{Queued:} \ang{1} windows of 90 days and 1 year on H100 (does resolution change the growth?), and
-        $\Delta t = \SI{1}{h}$ at \ang{2} (does the time step?).
+  \item \textbf{Stabilize the forward state for long windows.} Laplacian tracer diffusion slowed the growth but did
+        not stop it. Biharmonic tracer diffusion ($\lambda = 50$ days) is running on Vista. If it is not enough, the
+        next option is SST/SSS feedback on the ECCO4 fluxes, $\lambda(\mathrm{SST}_{\mathrm{ECCO}} - \mathrm{SST})$
+        with $\lambda \approx \SI{40}{W\,m^{-2}\,K^{-1}}$. That is standard with prescribed fluxes and removes the drift,
+        but makes the heat-flux control less pure.
+  \item \textbf{Closer to the OMIP base configuration} (Section~\ref{sec:departures}): salinity restoring, $z^\star$
+        coordinates and implicit vertical advection under Reactant, then sea ice.
+  \item \textbf{Queued on Lonestar6:} \ang{1} windows of 90 days and 1 year on H100 (does resolution change the
+        growth?), and $\Delta t = \SI{1}{h}$ at \ang{2} (does the time step?). Vista's GH200s (\SI{96}{GB}) can now
+        take these instead.
   \item Finite differences along uniform-wind directions, to settle the full- versus frozen-mixing large-scale
         sums.
   \item Then a spun-up initial state instead of rest, Nz = 70, and one-year lead-time maps after Pillar et al.
