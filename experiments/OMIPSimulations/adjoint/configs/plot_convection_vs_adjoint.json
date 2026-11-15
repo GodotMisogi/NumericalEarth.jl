@@ -1,0 +1,10 @@
+{
+  "_comment": "Adjoint heat-flux sensitivity one month before the end of the 1-year ECCO4 windows (slice 12, Dec 1993) against the statically unstable columns of the matching forward states in Nov-Dec. The no-diffusion adjoint (3576176) ran on Oceananigans 0.113.5, its health check on 0.117.2.",
+  "pairs": [["results/forward_health_ecco4_nz20_1year.jld2", "results/ecco4_adjoint_nz20_1year_frozen.jld2", "no tracer diffusion"],
+            ["results/forward_health_ecco4_nz20_1year_kh1000.jld2", "results/ecco4_adjoint_nz20_1year_frozen_kh1000.jld2", "Laplacian 1000 m²/s"],
+            ["results/forward_health_ecco4_nz20_1year_bh50.jld2", "results/ecco4_adjoint_nz20_1year_frozen_bh50.jld2", "biharmonic, λ = 50 days"]],
+  "slice": 12,
+  "days": [300, 365],
+  "top": 20,
+  "output": "papers/figures/convection_vs_adjoint_ecco4_nz20_1year.png"
+}

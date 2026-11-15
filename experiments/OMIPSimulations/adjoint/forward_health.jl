@@ -142,6 +142,20 @@ function ecco_sst(date)
     end
 end
 
+# The SST comparison is a diagnostic: a month ECCO4's server cannot deliver gives NaN instead of ending the run.
+const ecco_unavailable = Set{DateTime}()
+function ecco_sst_or_nothing(date)
+    first_day = DateTime(year(date), month(date), 1)
+    first_day in ecco_unavailable && return nothing
+    try
+        return ecco_sst(date)
+    catch err
+        push!(ecco_unavailable, first_day)
+        @warn "ECCO4 SST for $first_day unavailable; its SST error is NaN" exception = (err, catch_backtrace())
+        return nothing
+    end
+end
+
 # CATKE's tracer diffusivity among the model's closure fields (one entry per closure).
 catke_κc(om) = only(c.κc for c in om.closure_fields if hasproperty(c, :κc))
 
@@ -181,8 +195,8 @@ function snapshot(n)
     sst_rms = NaN
     if forcing == "ecco4"
         date = start_date + Second(round(Int, n * Δt))
-        d = T[:, :, Nz] .- ecco_sst(date)
-        sst_rms = rms(ifelse.(surface, d, NaN))
+        reference = ecco_sst_or_nothing(date)
+        isnothing(reference) || (sst_rms = rms(ifelse.(surface, T[:, :, Nz] .- reference, NaN)))
     end
 
     cw, Iw = argmax_finite(cfl_w); ch, Ih = argmax_finite(cfl_h); κmax, Iκ = argmax_finite(κ[:, :, Nz])
