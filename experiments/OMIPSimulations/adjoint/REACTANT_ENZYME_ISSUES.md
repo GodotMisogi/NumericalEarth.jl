@@ -16,7 +16,7 @@ Versions, unless stated otherwise: Julia 1.12.7, Reactant.jl 0.2.303, Reactant_j
 | 3 | Enzyme-JAX pattern `while_deadresult` | 25 of 26 min of one rewrite application, removing 250 of 430k ops | Gradient compile 122 → 34 min without it | No | Excluded by default |
 | 4 | Enzyme-JAX pattern `cse_reduce_transposed` (new in 0.2.303) | Quadratic candidate search; never fires on our modules | 2-step compile 53 → 100 min | No | Excluded by default |
 | 5 | Reactant `WHILE_UNROLL_THRESHOLD` / `enzyme_hlo_unroll` | Unrolls after differentiation, not before | One rewrite application ran > 4 h 47 min | No | Unroll at trace time instead |
-| 6 | Reactant on aarch64 (LLVM) | `fixup value out of range` on the first call of a large compiled thunk | Gradients cannot run on Vista GH200 | No | Run on x86_64 (LS6) |
+| 6 | Reactant on aarch64 (LLVM) | `fixup value out of range` on the first call of a large compiled thunk | Gradients could not run on Vista GH200; resolved with the checkpointed per-step thunks (Vista 1144920) | No | none needed now |
 | 7 | Reactant thunk call path (suspected) | First call of compiled thunks costs 13–40 min of host time | Fixed overhead per job | No (unconfirmed) | None |
 | 8 | Reactant 0.2.303 XLA export under Julia 1.13 | `arith.uitofp` left in the module: "unsupported op for export to XLA" | Nothing compiles under Julia 1.13.3 (Vista; LS6 not yet tried) | No | Stay on Julia 1.12.7 |
 
@@ -112,6 +112,9 @@ Versions, unless stated otherwise: Julia 1.12.7, Reactant.jl 0.2.303, Reactant_j
   (`../omip_adjoint_handoff/bulk_forcing_handoff.md`).
 - Workaround: gradients run on LS6 (x86_64) only. A smaller thunk (fewer untraced leaves; only controls and
   state as arguments) is the likely fix.
+- **Resolved (2026-11-15).** With the per-step checkpointed thunks, Reactant 0.2.303 and Oceananigans 0.117.2, the
+  ECCO4 2-step gradient runs on Vista (job 1144920, Julia 1.12): compile 21.1 min, first call 51.6 min (about 4× LS6's),
+  Taylor rel_err 2.2e-4. The slow first call suggests the oversized thunk glue is still there, but within range.
 
 ## 7. Suspected: first-call cost of compiled thunks (unconfirmed)
 
