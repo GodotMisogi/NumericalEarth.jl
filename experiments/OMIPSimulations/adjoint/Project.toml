@@ -25,6 +25,9 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 [sources]
 SeawaterPolynomials = {rev = "ss/conversion-functions", url = "https://github.com/CliMA/SeawaterPolynomials.jl.git"}
 ClimaSeaIce = {rev = "main", url = "https://github.com/CliMA/ClimaSeaIce.jl.git"}
+# Reactant main with Enzyme-JAX #3969-#3971 (uitofp raising, CSEReduceTransposed, while checkpointing); 0.2.309 is
+# not yet registered.
+Reactant = {rev = "2bb32e28", url = "https://github.com/EnzymeAD/Reactant.jl.git"}
 NumericalEarth = {path = "../../.."}
 OMIPSimulations = {path = ".."}
 
@@ -34,7 +37,7 @@ Checkpointing = "0.13"
 Enzyme = "0.13.216"
 JSON = "0.21, 1"
 Oceananigans = "0.117.2"
-Reactant = "=0.2.303"
+Reactant = "=0.2.309"
 julia = "1.10"
 
 [extras]
