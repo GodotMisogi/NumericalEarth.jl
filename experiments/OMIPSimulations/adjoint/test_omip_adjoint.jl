@@ -208,6 +208,15 @@ if :gradient in stages
     census = shadow_census(dmodel; cpu_grid = setup.cpu_grid)
     print_shadow_census(census); flush(stdout)
 
+    # Saved before the repeat evaluation, which can fail on its own (out of memory, time limit).
+    results["J"] = J
+    for (name, value) in pairs(g)
+        results["gradient_$name"] = value
+    end
+    results["compile_seconds"] = compile_seconds; results["first_seconds"] = first_seconds
+    results["census"] = census
+    save_results()
+
     repeat_evaluation = get(P, "repeat_evaluation", true)
     J2, second_seconds = J, NaN
     if repeat_evaluation
@@ -215,14 +224,9 @@ if :gradient in stages
         t2 = time(); J2, g2, _ = evaluate!(); second_seconds = time() - t2
         stamp(@sprintf("gradient 2 in %.2f s: repeat |ΔJ| %.2e, max|Δg| %.2e", second_seconds, abs(J2 - J),
                        max(maximum(abs, g2.u .- g.u), maximum(abs, g2.v .- g.v))))
+        results["second_seconds"] = second_seconds
+        save_results()
     end
-    results["J"] = J
-    for (name, value) in pairs(g)
-        results["gradient_$name"] = value
-    end
-    results["compile_seconds"] = compile_seconds; results["first_seconds"] = first_seconds
-    results["second_seconds"] = second_seconds; results["census"] = census
-    save_results()
     @test finite
     @test abs(J2 - J) <= 1e-10 * max(abs(J), 1)
 
