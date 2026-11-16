@@ -36,6 +36,7 @@
 # biharmonic viscosity.
 # Optional `advection` (default "weno"): "upwind3" replaces the WENO schemes with linear third-order upwind.
 # Optional `convective_adjustment` (m² s⁻¹; default none): implicit convective adjustment of tracers where N² < 0.
+# Optional `laplacian_viscosity` (m² s⁻¹; default none): Laplacian horizontal viscosity on top of the biharmonic one.
 # Optional `repeat_evaluation` (default true): evaluate the gradient a second time and require the same result.
 # Optional `average_days` (needs `checkpoints`): the objective is averaged over the window's last
 # `average_days` instead of taken at its end; the primal and fd_scan stages evaluate the end value, so they
@@ -67,6 +68,7 @@ advection = Symbol(get(P, "advection", "weno"))
 # Biharmonic tracer diffusion timescale, days → s
 λ_tracer = haskey(P, "biharmonic_tracer_timescale") ? P["biharmonic_tracer_timescale"] * 86400.0 : nothing
 κ_convective = get(P, "convective_adjustment", nothing)   # convective adjustment diffusivity (m² s⁻¹)
+ν_laplacian = get(P, "laplacian_viscosity", nothing)   # Laplacian horizontal viscosity (m² s⁻¹)
 if forcing == "ecco4"
     n_months = P["n_months"]
     (n_months - 1) * 28 * 86400 > n_steps * Δt || error("$(n_months) monthly slices do not cover $(n_steps) steps of $(Δt) s")
@@ -74,7 +76,7 @@ if forcing == "ecco4"
                                              κ_skew = κ_eddy, κ_symmetric = κ_eddy, advection,
                                              horizontal_diffusivity = κ_horizontal,
                                              biharmonic_tracer_timescale = λ_tracer,
-                                             convective_adjustment = κ_convective)
+                                             convective_adjustment = κ_convective, laplacian_viscosity = ν_laplacian)
     gradient_units = "Sv per N m⁻²"
 elseif forcing == "jra55"
     n_slices = P["n_atmosphere_slices"]
@@ -83,7 +85,7 @@ elseif forcing == "jra55"
                                              κ_skew = κ_eddy, κ_symmetric = κ_eddy, advection,
                                              horizontal_diffusivity = κ_horizontal,
                                              biharmonic_tracer_timescale = λ_tracer,
-                                             convective_adjustment = κ_convective)
+                                             convective_adjustment = κ_convective, laplacian_viscosity = ν_laplacian)
     gradient_units = "Sv per m/s"
 else
     error("forcing must be \"jra55\" or \"ecco4\", got \"$forcing\"")

@@ -52,6 +52,7 @@ advection = Symbol(get(P, "advection", "weno"))
 # Biharmonic tracer diffusion timescale, days → s
 λ_tracer = haskey(P, "biharmonic_tracer_timescale") ? P["biharmonic_tracer_timescale"] * 86400.0 : nothing
 κ_convective = get(P, "convective_adjustment", nothing)   # convective adjustment diffusivity (m² s⁻¹)
+ν_laplacian = get(P, "laplacian_viscosity", nothing)   # Laplacian horizontal viscosity (m² s⁻¹)
 forcing = get(P, "forcing", "jra55")
 start_date = DateTime(1993, 1, 1)
 
@@ -71,11 +72,11 @@ setup = forcing == "ecco4" ?
     ecco_adjoint_setup(arch; Nx, Ny, Nz, Δt, substeps, n_months = P["n_months"],
                        κ_skew = κ_eddy, κ_symmetric = κ_eddy, advection, start_date,
                        horizontal_diffusivity = κ_horizontal, biharmonic_tracer_timescale = λ_tracer,
-                       convective_adjustment = κ_convective) :
+                       convective_adjustment = κ_convective, laplacian_viscosity = ν_laplacian) :
     omip_adjoint_setup(arch; Nx, Ny, Nz, Δt, substeps, n_atmosphere_slices = P["n_atmosphere_slices"],
                        κ_skew = κ_eddy, κ_symmetric = κ_eddy, advection, horizontal_diffusivity = κ_horizontal,
                        biharmonic_tracer_timescale = λ_tracer,
-                       convective_adjustment = κ_convective)
+                       convective_adjustment = κ_convective, laplacian_viscosity = ν_laplacian)
 model, cpu_grid = setup.model, setup.cpu_grid
 obj = OverturningStrength(cpu_grid)
 if on_reactant
