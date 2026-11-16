@@ -1,0 +1,18 @@
+{
+  "_comment": "1-year ECCO4 window, frozen mixing, with implicit convective adjustment (10 m²/s where N² < 0): whether removing the statically unstable columns, where the 1-year adjoints blow up, keeps the adjoint bounded. One evaluation (fits gh-dev on Vista).",
+  "forcing": "ecco4",
+  "n_months": 15,
+  "Nz": 20,
+  "steps": 4380,
+  "dt": 7200.0,
+  "substeps": 50,
+  "backend": "gpu",
+  "stages": "gradient",
+  "roll_barotropic_substeps": true,
+  "frozen_mixing": true,
+  "convective_adjustment": 10,
+  "checkpoints": 60,
+  "average_days": 30,
+  "repeat_evaluation": false,
+  "output": "results/ecco4_adjoint_nz20_1year_frozen_ca10.jld2"
+}

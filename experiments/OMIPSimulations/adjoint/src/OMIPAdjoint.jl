@@ -21,7 +21,7 @@ using Oceananigans.ImmersedBoundaries: ImmersedBoundaryGrid, GridFittedBottom
 using Oceananigans.OrthogonalSphericalShellGrids: TripolarGrid
 using Oceananigans.Coriolis: HydrostaticSphericalCoriolis, EnstrophyConserving
 using Oceananigans.TurbulenceClosures: TurbulenceClosures, ExplicitTimeDiscretization, HorizontalScalarDiffusivity,
-                                     HorizontalScalarBiharmonicDiffusivity
+                                     HorizontalScalarBiharmonicDiffusivity, ConvectiveAdjustmentVerticalDiffusivity
 using Oceananigans.TurbulenceClosures.TKEBasedVerticalDiffusivities: FlavorOfCATKE
 using Oceananigans.Models.HydrostaticFreeSurfaceModels: HydrostaticFreeSurfaceModel
 using Oceananigans.TimeSteppers: TimeSteppers, Clock, time_step!, update_state!

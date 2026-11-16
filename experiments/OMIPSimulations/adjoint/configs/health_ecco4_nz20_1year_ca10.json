@@ -1,0 +1,14 @@
+{
+  "_comment": "Forward health of the 1-year ECCO4 window with implicit convective adjustment (10 m²/s where N² < 0, ECCOv4's value) on top of CATKE, against health_ecco4_nz20_1year (Vista 1145882).",
+  "forcing": "ecco4",
+  "n_months": 15,
+  "Nz": 20,
+  "steps": 4380,
+  "dt": 7200.0,
+  "substeps": 50,
+  "backend": "gpu",
+  "roll_barotropic_substeps": true,
+  "convective_adjustment": 10,
+  "snapshot_days": 5,
+  "output": "results/forward_health_ecco4_nz20_1year_ca10.jld2"
+}
