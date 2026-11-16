@@ -1,0 +1,16 @@
+{
+  "_comment": "Adjoint-only horizontal Laplacian damping, ν = κ = 10⁴ m²/s, on the 8-step ECCO4 window: size of the change against ecco4_nz20_8step_checkpointed.",
+  "forcing": "ecco4",
+  "n_months": 2,
+  "Nz": 20,
+  "steps": 8,
+  "dt": 7200.0,
+  "substeps": 50,
+  "backend": "gpu",
+  "stages": "gradient",
+  "roll_barotropic_substeps": true,
+  "checkpoints": 3,
+  "adjoint_viscosity": 10000,
+  "adjoint_diffusivity": 10000,
+  "output": "results/ecco4_adjoint_nz20_8step_damp1e4.jld2"
+}

@@ -1,0 +1,19 @@
+{
+  "_comment": "90-day ECCO4 window, frozen mixing, AMOC averaged over the last 30 days, adjoint-only damping with zero coefficients (the undamped baseline on the current code): the bias the damping adds where the exact adjoint is bounded.",
+  "forcing": "ecco4",
+  "n_months": 5,
+  "Nz": 20,
+  "steps": 1080,
+  "dt": 7200.0,
+  "substeps": 50,
+  "backend": "gpu",
+  "stages": "gradient",
+  "roll_barotropic_substeps": true,
+  "frozen_mixing": true,
+  "checkpoints": 40,
+  "average_days": 30,
+  "repeat_evaluation": false,
+  "adjoint_viscosity": 0,
+  "adjoint_diffusivity": 0,
+  "output": "results/ecco4_adjoint_nz20_90day_frozen_damp0.jld2"
+}
