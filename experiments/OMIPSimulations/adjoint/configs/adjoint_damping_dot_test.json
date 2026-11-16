@@ -1,0 +1,12 @@
+{
+  "_comment": "Checks of the adjoint-only damping: forward operator on CPU, and dot-product test of the compiled adjoint (⟨D x, y⟩ = ⟨x, Dᵀ y⟩) at ν = κ = 10⁴ m²/s, Δt = 2 h.",
+  "n_months": 2,
+  "Nz": 20,
+  "dt": 7200.0,
+  "substeps": 50,
+  "adjoint_viscosity": 10000,
+  "adjoint_diffusivity": 10000,
+  "stages": "cpu,reactant",
+  "backend": "gpu",
+  "seed": 1
+}

@@ -4,6 +4,7 @@ export omip_adjoint_setup, ecco_adjoint_setup, PrescribedFluxOcean,
        OverturningStrength, objective_host,
        roll_barotropic_substeps!, freeze_mixing!,
        adjoint_compile_options, snapshot_state, build_primal, build_gradient, build_checkpointed_gradient,
+       AdjointDamping,
        wind_gradient, forcing_gradient, surface_geometry, shadow_census, print_shadow_census,
        taylor_remainder_check, finite_difference_scan
 
@@ -12,16 +13,19 @@ using Oceananigans: prognostic_state, restore_prognostic_state!
 using Oceananigans.Units: days
 using Oceananigans.Architectures: CPU, ReactantState, architecture, on_architecture,
                                   convert_to_device
-using Oceananigans.Grids: AbstractGrid, ExponentialDiscretization, LatitudeLongitudeGrid, inactive_node,
+using Oceananigans.Grids: AbstractGrid, ExponentialDiscretization, LatitudeLongitudeGrid, inactive_node, peripheral_node,
                           λnode, φnode, znode, Center, Face, Periodic, Bounded, Flat
-using Oceananigans.Operators: Δxᶜᶠᶜ, Δzᶜᶠᶜ, Δyᶠᶜᶜ, Δzᶠᶜᶜ, Azᶜᶜᶜ, ℑxᶠᵃᵃ, ℑyᵃᶠᵃ, intrinsic_vector
-using Oceananigans.Fields: Field, CenterField, interior, interpolate!
+using Oceananigans.Operators: Δxᶜᶠᶜ, Δzᶜᶠᶜ, Δyᶠᶜᶜ, Δzᶠᶜᶜ, Azᶜᶜᶜ, ℑxᶠᵃᵃ, ℑyᵃᶠᵃ, intrinsic_vector,
+                              Δxᶜᶜᶜ, Δyᶜᶜᶜ, Δxᶠᶜᶜ, Δyᶜᶠᶜ
+using Oceananigans.BoundaryConditions: fill_halo_regions!
+using Oceananigans.Fields: Field, CenterField, interior, interpolate!, instantiated_location
 using Oceananigans.OutputReaders: FieldTimeSeries, cpu_interpolating_time_indices
 using Oceananigans.ImmersedBoundaries: ImmersedBoundaryGrid, GridFittedBottom
 using Oceananigans.OrthogonalSphericalShellGrids: TripolarGrid
 using Oceananigans.Coriolis: HydrostaticSphericalCoriolis, EnstrophyConserving
 using Oceananigans.TurbulenceClosures: TurbulenceClosures, ExplicitTimeDiscretization, HorizontalScalarDiffusivity,
-                                     HorizontalScalarBiharmonicDiffusivity, ConvectiveAdjustmentVerticalDiffusivity
+                                     HorizontalScalarBiharmonicDiffusivity, ConvectiveAdjustmentVerticalDiffusivity,
+                                     ∂ⱼ_τ₁ⱼ, ∂ⱼ_τ₂ⱼ, ∇_dot_qᶜ, with_tracers
 using Oceananigans.TurbulenceClosures.TKEBasedVerticalDiffusivities: FlavorOfCATKE
 using Oceananigans.Models.HydrostaticFreeSurfaceModels: HydrostaticFreeSurfaceModel
 using Oceananigans.TimeSteppers: TimeSteppers, Clock, time_step!, update_state!
@@ -58,6 +62,7 @@ include("overturning.jl")
 include("rolled_substeps.jl")
 include("frozen_mixing.jl")
 include("gradient.jl")
+include("adjoint_damping.jl")
 include("checkpointed_gradient.jl")
 
 end # module OMIPAdjoint

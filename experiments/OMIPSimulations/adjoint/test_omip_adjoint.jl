@@ -37,6 +37,9 @@
 # Optional `advection` (default "weno"): "upwind3" replaces the WENO schemes with linear third-order upwind.
 # Optional `convective_adjustment` (m² s⁻¹; default none): implicit convective adjustment of tracers where N² < 0.
 # Optional `laplacian_viscosity` (m² s⁻¹; default none): Laplacian horizontal viscosity on top of the biharmonic one.
+# Optional `adjoint_viscosity` and `adjoint_diffusivity` (m² s⁻¹; need `checkpoints`): adjoint-only horizontal Laplacian
+# damping of the adjoint velocities and tracers after each reverse step (`AdjointDamping`); the gradient is then
+# approximate, so the Taylor check is refused.
 # Optional `repeat_evaluation` (default true): evaluate the gradient a second time and require the same result.
 # Optional `average_days` (needs `checkpoints`): the objective is averaged over the window's last
 # `average_days` instead of taken at its end; the primal and fd_scan stages evaluate the end value, so they
@@ -90,6 +93,10 @@ elseif forcing == "jra55"
 else
     error("forcing must be \"jra55\" or \"ecco4\", got \"$forcing\"")
 end
+
+damped = haskey(P, "adjoint_viscosity") || haskey(P, "adjoint_diffusivity")
+damped && !haskey(P, "checkpoints") && error("adjoint damping needs the checkpointed gradient (config `checkpoints`)")
+damped && haskey(P, "taylor_h0") && error("the damped adjoint is not the exact gradient; drop taylor_h0")
 
 average_steps = haskey(P, "average_days") ? round(Int, P["average_days"] * 86400 / Δt) : 1
 if average_steps > 1
@@ -153,6 +160,8 @@ if any(in(stages), reactant_stages)
     setup = model_setup(ReactantState())
     model = setup.model
     obj = OverturningStrength(setup.cpu_grid)
+    adjoint_damping = damped ? AdjointDamping(setup.cpu_grid; viscosity = get(P, "adjoint_viscosity", 0),
+                                              diffusivity = get(P, "adjoint_diffusivity", 0), Δt) : nothing
     state = snapshot_state(model)
     results["geometry"] = surface_geometry(setup.cpu_grid)
     results["slice_times"] = Array(setup.times)   # a device array under ReactantState
@@ -195,8 +204,8 @@ if :gradient in stages
     checkpoints = get(P, "checkpoints", nothing)
     evaluate! = checkpoints === nothing ?
         build_gradient(model, state, obj; n_steps, Δt, compile_options = options, while_unroll_threshold, unroll_steps) :
-        build_checkpointed_gradient(model, state, obj; n_steps, Δt, checkpoints, average_steps, compile_options = options,
-                                    while_unroll_threshold)
+        build_checkpointed_gradient(model, state, obj; n_steps, Δt, checkpoints, average_steps, adjoint_damping,
+                                    compile_options = options, while_unroll_threshold)
     compile_seconds = time() - t0
     stamp(@sprintf("COMPILED %d-step gradient in %.1f min", n_steps, compile_seconds / 60))
 

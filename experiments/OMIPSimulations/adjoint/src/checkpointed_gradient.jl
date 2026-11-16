@@ -65,14 +65,16 @@ reverse_step!(model, dmodel, Δt) =
 reverse_objective!(model, dmodel, obj) =
     autodiff(set_strong_zero(ReverseWithPrimal), objective_value, Active, Duplicated(model, dmodel), Const(obj))
 
-# Reverse the step the model holds the input of (step m, input xₘ₋₁), then seed the adjoint of xₘ₋₁ when it is
-# averaged. The seed must come after the step's reverse pass, which turns the adjoint of xₘ into that of xₘ₋₁.
-# By then the model no longer holds xₘ₋₁, but the objective is linear in the velocities, so its gradient (the
-# seed) does not depend on the state; its value is taken from xₘ₋₁ before the reverse pass. Returns ψ(xₘ₋₁)
-# when averaged, else 0.
+# Reverse the step the model holds the input of (step m, input xₘ₋₁), apply the adjoint damping, if any (the
+# adjoint of a damping step between steps m - 1 and m), then seed the adjoint of xₘ₋₁ when it is averaged. The
+# seed must come after the step's reverse pass, which turns the adjoint of xₘ into that of xₘ₋₁. By then the
+# model no longer holds xₘ₋₁, but the objective is linear in the velocities, so its gradient (the seed) does not
+# depend on the state; its value is taken from xₘ₋₁ before the reverse pass. Returns ψ(xₘ₋₁) when averaged,
+# else 0.
 function reverse_step_with_average!(model, dmodel, thunks, obj, Δt, averaged)
     ψ = averaged ? host_number(thunks.objective(model, obj)) : 0.0
     thunks.reverse_step(model, dmodel, Δt)
+    thunks.damp(dmodel)
     averaged && thunks.reverse_objective(model, dmodel, obj)
     return ψ
 end
@@ -126,10 +128,12 @@ default, is the final state alone); averaging needs `obj` linear in the model st
 forcing gradient from [`forcing_gradient`](@ref), averaged likewise, and `dmodel` the unscaled sum. The forward
 and reverse steps run on Revolve's binomial schedule with at most `checkpoints` stored copies of the model's
 device arrays (host memory), so the compile cost does not depend on `n_steps` and the recomputation grows only
-logarithmically with it.
+logarithmically with it. With `adjoint_damping`, an [`AdjointDamping`](@ref), the adjoint is damped after each
+step's reverse pass, so the result approximates the gradient; the forward trajectory is unchanged.
 """
 function build_checkpointed_gradient(model, state, obj; n_steps, Δt, checkpoints, average_steps = 1,
-                                     compile_options = adjoint_compile_options(), while_unroll_threshold = 0)
+                                     adjoint_damping = nothing, compile_options = adjoint_compile_options(),
+                                     while_unroll_threshold = 0)
     n_steps >= 1 || throw(ArgumentError("n_steps must be at least 1, got $n_steps"))
     checkpoints >= 1 || throw(ArgumentError("checkpoints must be at least 1, got $checkpoints"))
     1 <= average_steps <= n_steps ||
@@ -141,7 +145,8 @@ function build_checkpointed_gradient(model, state, obj; n_steps, Δt, checkpoint
          reverse_refresh = @compile(compile_options = compile_options, reverse_refresh!(model, dmodel)),
          reverse_step = @compile(compile_options = compile_options, reverse_step!(model, dmodel, Δt)),
          reverse_objective = @compile(compile_options = compile_options, reverse_objective!(model, dmodel, obj)),
-         objective = @compile(compile_options = compile_options, objective_value(model, obj)))
+         objective = @compile(compile_options = compile_options, objective_value(model, obj)),
+         damp = compile_adjoint_damping(model, dmodel, adjoint_damping, compile_options))
     end
     arrays = device_arrays(model)
 
