@@ -4,6 +4,13 @@ Problems found in Reactant.jl, Reactant_jll and Enzyme-JAX while differentiating
 (`OMIPAdjoint`, this directory). Only problems in those tools are listed. Problems that come from how
 Oceananigans or NumericalEarth meet Reactant are listed at the end and kept out of the main list.
 
+**Upstream status (2026-11-16).** Issues 2, 4 and 8 were reported on 2026-11-15 (from the ReactOcean work, as
+GodotMisogi) and fixed in Enzyme-JAX within a day: #3969 (`uitofp` raising), #3970 (`CSEReduceTransposed`), #3971
+(while checkpointing without zero local-gradient carries). Reactant main pins Enzyme-JAX `7ce1dac` (#3969, #3970), but
+its release v0.2.308 and its Reactant_jll 0.0.444 predate the fixes, so they need a new Reactant/Reactant_jll release
+(or a local libReactantExtra build). When one appears: Julia 1.13 becomes usable, and the `cse_reduce_transposed`
+exclusion can go.
+
 Versions, unless stated otherwise: Julia 1.12.7, Reactant.jl 0.2.303, Reactant_jll 0.0.436, Enzyme_jll
 0.0.303+1, Oceananigans `ss/for-omip` (0.113.5). Hardware: TACC Lonestar6 A100 (x86_64) and Vista GH200
 (aarch64). Job numbers are Slurm jobs; the detailed record is `PROGRESS.md` and the repository-root
@@ -12,13 +19,13 @@ Versions, unless stated otherwise: Julia 1.12.7, Reactant.jl 0.2.303, Reactant_j
 | # | Component | Issue | Effect | Reported | Workaround here |
 |---|---|---|---|---|---|
 | 1 | Reactant_jll raise + Enzyme-JAX | Empty kernel raised to an operand-free `enzymexla.jit_call` that Enzyme cannot differentiate | Gradient fails to compile | Yes: EnzymeAD/Reactant.jl#3636 | `cd417288` (Oceananigans fix #6396 is in v0.117.1+) |
-| 2 | Enzyme-JAX (Enzyme-MLIR) | Zero-in/zero-out loop-carried shadows in reverse `while` loops | 72.9 GiB of loop state; rolled time loop does not fit on a GPU | No (draft in `PROGRESS.md`) | Steps unrolled at trace time, then Revolve checkpointing |
+| 2 | Enzyme-JAX (Enzyme-MLIR) | Zero-in/zero-out loop-carried shadows in reverse `while` loops | 72.9 GiB of loop state; rolled time loop does not fit on a GPU | Yes: Enzyme-JAX #3967, fixed by #3971 (not yet in a Reactant release) | Revolve checkpointing |
 | 3 | Enzyme-JAX pattern `while_deadresult` | 25 of 26 min of one rewrite application, removing 250 of 430k ops | Gradient compile 122 → 34 min without it | No | Excluded by default |
-| 4 | Enzyme-JAX pattern `cse_reduce_transposed` (new in 0.2.303) | Quadratic candidate search; never fires on our modules | 2-step compile 53 → 100 min | No | Excluded by default |
+| 4 | Enzyme-JAX pattern `cse_reduce_transposed` (new in 0.2.303) | Quadratic candidate search; never fires on our modules | 2-step compile 53 → 100 min | Yes: Enzyme-JAX #3966, fixed by #3970 (in Reactant main, no release yet) | Excluded by default |
 | 5 | Reactant `WHILE_UNROLL_THRESHOLD` / `enzyme_hlo_unroll` | Unrolls after differentiation, not before | One rewrite application ran > 4 h 47 min | No | Unroll at trace time instead |
-| 6 | Reactant on aarch64 (LLVM) | `fixup value out of range` on the first call of a large compiled thunk | Gradients could not run on Vista GH200; resolved with the checkpointed per-step thunks (Vista 1144920) | No | none needed now |
+| 6 | Reactant on aarch64 (LLVM) | `fixup value out of range` on the first call of a large compiled thunk | Gradients could not run on Vista GH200; resolved with the checkpointed per-step thunks (Vista 1144920) | Comment on Reactant.jl #3511 | none needed now |
 | 7 | Reactant thunk call path (suspected) | First call of compiled thunks costs 13–40 min of host time | Fixed overhead per job | No (unconfirmed) | None |
-| 8 | Reactant 0.2.303 XLA export under Julia 1.13 | `arith.uitofp` left in the module: "unsupported op for export to XLA" | Nothing compiles under Julia 1.13.3 (Vista; LS6 not yet tried) | No | Stay on Julia 1.12.7 |
+| 8 | Reactant 0.2.303 XLA export under Julia 1.13 | `arith.uitofp` left in the module: "unsupported op for export to XLA" | Nothing compiles under Julia 1.13.3 (Vista; LS6 not yet tried) | Yes: Reactant.jl #3803, fixed by Enzyme-JAX #3969 (in Reactant main, no release yet) | Stay on Julia 1.12.7 |
 
 ## 1. Empty kernel becomes an undifferentiable `enzymexla.jit_call`
 
