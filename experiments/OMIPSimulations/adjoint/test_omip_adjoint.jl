@@ -37,6 +37,7 @@
 # Optional `advection` (default "weno"): "upwind3" replaces the WENO schemes with linear third-order upwind.
 # Optional `convective_adjustment` (m² s⁻¹; default none): implicit convective adjustment of tracers where N² < 0.
 # Optional `laplacian_viscosity` (m² s⁻¹; default none): Laplacian horizontal viscosity on top of the biharmonic one.
+# Optional `start_date` (ISO date, e.g. "1993-11-01"): the window's first day, for the initial state and the forcing.
 # Optional `adjoint_viscosity` and `adjoint_diffusivity` (m² s⁻¹; need `checkpoints`): adjoint-only horizontal Laplacian
 # damping of the adjoint velocities and tracers after each reverse step (`AdjointDamping`); the gradient is then
 # approximate, so the Taylor check is refused.
@@ -55,7 +56,7 @@ using JSON
 using JLD2
 using Printf
 using Test
-using Dates: now, format
+using Dates: now, format, DateTime
 
 ENV["DATADEPS_ALWAYS_ACCEPT"] = "true"   # the WOA download goes through DataDeps, which otherwise prompts
 
@@ -72,6 +73,7 @@ advection = Symbol(get(P, "advection", "weno"))
 λ_tracer = haskey(P, "biharmonic_tracer_timescale") ? P["biharmonic_tracer_timescale"] * 86400.0 : nothing
 κ_convective = get(P, "convective_adjustment", nothing)   # convective adjustment diffusivity (m² s⁻¹)
 ν_laplacian = get(P, "laplacian_viscosity", nothing)   # Laplacian horizontal viscosity (m² s⁻¹)
+date_kwargs = haskey(P, "start_date") ? (; start_date = DateTime(P["start_date"])) : (;)
 if forcing == "ecco4"
     n_months = P["n_months"]
     (n_months - 1) * 28 * 86400 > n_steps * Δt || error("$(n_months) monthly slices do not cover $(n_steps) steps of $(Δt) s")
@@ -79,7 +81,8 @@ if forcing == "ecco4"
                                              κ_skew = κ_eddy, κ_symmetric = κ_eddy, advection,
                                              horizontal_diffusivity = κ_horizontal,
                                              biharmonic_tracer_timescale = λ_tracer,
-                                             convective_adjustment = κ_convective, laplacian_viscosity = ν_laplacian)
+                                             convective_adjustment = κ_convective, laplacian_viscosity = ν_laplacian,
+                                             date_kwargs...)
     gradient_units = "Sv per N m⁻²"
 elseif forcing == "jra55"
     n_slices = P["n_atmosphere_slices"]
@@ -88,7 +91,8 @@ elseif forcing == "jra55"
                                              κ_skew = κ_eddy, κ_symmetric = κ_eddy, advection,
                                              horizontal_diffusivity = κ_horizontal,
                                              biharmonic_tracer_timescale = λ_tracer,
-                                             convective_adjustment = κ_convective, laplacian_viscosity = ν_laplacian)
+                                             convective_adjustment = κ_convective, laplacian_viscosity = ν_laplacian,
+                                             date_kwargs...)
     gradient_units = "Sv per m/s"
 else
     error("forcing must be \"jra55\" or \"ecco4\", got \"$forcing\"")
