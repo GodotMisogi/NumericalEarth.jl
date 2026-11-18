@@ -52,6 +52,7 @@ using JSON
 using JLD2
 using Printf
 using Test
+using Profile   # SIGUSR1 prints a profile of where the run spends its time (diagnosing compile stalls)
 using Dates: now, format
 
 ENV["DATADEPS_ALWAYS_ACCEPT"] = "true"   # the WOA download goes through DataDeps, which otherwise prompts
