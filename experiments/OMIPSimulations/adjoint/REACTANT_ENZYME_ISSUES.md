@@ -4,12 +4,13 @@ Problems found in Reactant.jl, Reactant_jll and Enzyme-JAX while differentiating
 (`OMIPAdjoint`, this directory). Only problems in those tools are listed. Problems that come from how
 Oceananigans or NumericalEarth meet Reactant are listed at the end and kept out of the main list.
 
-**Upstream status (2026-11-16).** Issues 2, 4 and 8 were reported on 2026-11-15 (from the ReactOcean work, as
+**Upstream status (2026-11-18).** Issues 2, 4 and 8 were reported on 2026-11-15 (from the ReactOcean work, as
 GodotMisogi) and fixed in Enzyme-JAX within a day: #3969 (`uitofp` raising), #3970 (`CSEReduceTransposed`), #3971
-(while checkpointing without zero local-gradient carries). Reactant main pins Enzyme-JAX `7ce1dac` (#3969, #3970), but
-its release v0.2.308 and its Reactant_jll 0.0.444 predate the fixes, so they need a new Reactant/Reactant_jll release
-(or a local libReactantExtra build). When one appears: Julia 1.13 becomes usable, and the `cse_reduce_transposed`
-exclusion can go.
+(while checkpointing without zero local-gradient carries). All three are in Reactant_jll 0.0.445 (registered
+2026-11-16) and Reactant main 0.2.309 (git `2bb32e28`, not registered as of 2026-11-18), tested on branch
+`ajs/omip-adjoint-r309`. Under Julia 1.12.7 the 2-step gradient verifies and the first-call cost (issue 7) is gone
+(Vista 1150765). Under Julia 1.13.3 the first compile stalls for > 3 h 49 min (Vista 1147598), so Julia 1.13 is
+still not usable. `ajs/omip-adjoint-oc117` is still on 0.2.303, with the `cse_reduce_transposed` exclusion.
 
 Versions, unless stated otherwise: Julia 1.12.7, Reactant.jl 0.2.303, Reactant_jll 0.0.436, Enzyme_jll
 0.0.303+1, Oceananigans `ss/for-omip` (0.113.5). Hardware: TACC Lonestar6 A100 (x86_64) and Vista GH200
@@ -19,13 +20,13 @@ Versions, unless stated otherwise: Julia 1.12.7, Reactant.jl 0.2.303, Reactant_j
 | # | Component | Issue | Effect | Reported | Workaround here |
 |---|---|---|---|---|---|
 | 1 | Reactant_jll raise + Enzyme-JAX | Empty kernel raised to an operand-free `enzymexla.jit_call` that Enzyme cannot differentiate | Gradient fails to compile | Yes: EnzymeAD/Reactant.jl#3636 | `cd417288` (Oceananigans fix #6396 is in v0.117.1+) |
-| 2 | Enzyme-JAX (Enzyme-MLIR) | Zero-in/zero-out loop-carried shadows in reverse `while` loops | 72.9 GiB of loop state; rolled time loop does not fit on a GPU | Yes: Enzyme-JAX #3967, fixed by #3971 (not yet in a Reactant release) | Revolve checkpointing |
+| 2 | Enzyme-JAX (Enzyme-MLIR) | Zero-in/zero-out loop-carried shadows in reverse `while` loops | 72.9 GiB of loop state; rolled time loop does not fit on a GPU | Yes: Enzyme-JAX #3967, fixed by #3971 (in Reactant 0.2.309, unregistered) | Revolve checkpointing |
 | 3 | Enzyme-JAX pattern `while_deadresult` | 25 of 26 min of one rewrite application, removing 250 of 430k ops | Gradient compile 122 → 34 min without it | No | Excluded by default |
-| 4 | Enzyme-JAX pattern `cse_reduce_transposed` (new in 0.2.303) | Quadratic candidate search; never fires on our modules | 2-step compile 53 → 100 min | Yes: Enzyme-JAX #3966, fixed by #3970 (in Reactant main, no release yet) | Excluded by default |
+| 4 | Enzyme-JAX pattern `cse_reduce_transposed` (new in 0.2.303) | Quadratic candidate search; never fires on our modules | 2-step compile 53 → 100 min | Yes: Enzyme-JAX #3966, fixed by #3970 (in Reactant 0.2.309, unregistered) | Excluded by default |
 | 5 | Reactant `WHILE_UNROLL_THRESHOLD` / `enzyme_hlo_unroll` | Unrolls after differentiation, not before | One rewrite application ran > 4 h 47 min | No | Unroll at trace time instead |
 | 6 | Reactant on aarch64 (LLVM) | `fixup value out of range` on the first call of a large compiled thunk | Gradients could not run on Vista GH200; resolved with the checkpointed per-step thunks (Vista 1144920) | Comment on Reactant.jl #3511 | none needed now |
-| 7 | Reactant thunk call path (suspected) | First call of compiled thunks costs 13–40 min of host time | Fixed overhead per job | No (unconfirmed) | None |
-| 8 | Reactant 0.2.303 XLA export under Julia 1.13 | `arith.uitofp` left in the module: "unsupported op for export to XLA" | Nothing compiles under Julia 1.13.3 (Vista; LS6 not yet tried) | Yes: Reactant.jl #3803, fixed by Enzyme-JAX #3969 (in Reactant main, no release yet) | Stay on Julia 1.12.7 |
+| 7 | Reactant thunk call path | First call of compiled thunks costs 13–40 min of host time | Fixed overhead per job; gone with 0.2.309 (Vista 1150765: 3095 s → 19.1 s) | No | Reactant 0.2.309 (not yet on `oc117`) |
+| 8 | Reactant 0.2.303 XLA export under Julia 1.13 | `arith.uitofp` left in the module: "unsupported op for export to XLA" | Nothing compiles under Julia 1.13.3 (Vista; LS6 not yet tried) | Yes: Reactant.jl #3803, fixed by Enzyme-JAX #3969 (in Reactant 0.2.309, unregistered) | Stay on Julia 1.12.7 |
 
 ## 1. Empty kernel becomes an undifferentiable `enzymexla.jit_call`
 
@@ -123,7 +124,11 @@ Versions, unless stated otherwise: Julia 1.12.7, Reactant.jl 0.2.303, Reactant_j
   ECCO4 2-step gradient runs on Vista (job 1144920, Julia 1.12): compile 21.1 min, first call 51.6 min (about 4× LS6's),
   Taylor rel_err 2.2e-4. The slow first call suggests the oversized thunk glue is still there, but within range.
 
-## 7. Suspected: first-call cost of compiled thunks (unconfirmed)
+## 7. First-call cost of compiled thunks (gone with Reactant 0.2.309)
+
+- **Status (2026-11-18).** Reactant 0.2.309 under Julia 1.12.7 cuts the 2-step test's first calls from 68.8 s to
+  4.3 s (primal) and from 3095 s to 19.1 s (gradient), with compile times unchanged (Vista 1150765). The cause
+  was not confirmed before the fix.
 
 - With the checkpointed gradient, five compiled thunks take the model (and its shadow) as arguments. Their
   first calls cost 2241–2368 s on the JRA55-forced model, independent of window length (2 to 360 steps), and
@@ -144,6 +149,9 @@ Versions, unless stated otherwise: Julia 1.12.7, Reactant.jl 0.2.303, Reactant_j
   `arith.uitofp` on tensors, and the export to XLA has no lowering for it. Enzyme-JAX added raising for
   `uitofp` in 2025 (#951, #952), so the gap is in the tensor-level op left for export. Nothing here is specific
   to aarch64, so x86_64 is probably affected too. That will be checked when LS6's 1.13.3 image is built.
+- **Status (2026-11-18).** Fixed by Enzyme-JAX #3969, in Reactant 0.2.309. With 0.2.309 under Julia 1.13.3 the
+  first compile stalls for > 3 h 49 min at 0 % GPU (Vista 1147598), so it is not yet known whether the fix
+  suffices.
 - **Workaround.** Reactant runs stay on Julia 1.12.7. The adjoint environment carries both
   `Manifest.toml` (1.12.7) and `Manifest-v1.13.toml` (1.13.3), so the switch is only the container.
 - **Report.** With the dumped module (`/tmp/reactant_pjSK1n/…post_xla_compile.mlir` on the compute node; the

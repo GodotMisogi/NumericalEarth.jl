@@ -1,4 +1,8 @@
-# Differentiable OMIP test: progress (2026-10-13, updated after the LS6 port)
+# Differentiable OMIP test: detailed record to 2026-11-06
+
+The current state is in the repository-root `STATUS.md`; decisions, findings and jobs after 2026-11-06 are in
+`LOGBOOK.md`. The sections below are kept as written at the time. Where a later result overturned them, a
+note says so.
 
 Goal: a verified reverse-mode gradient of the AMOC at 26.5°N with respect to the JRA55 10-m winds, for the 2°
 ocean-only OMIP model, differentiated with Reactant + Enzyme through NumericalEarth's own coupling
@@ -8,7 +12,12 @@ ocean-only OMIP model, differentiated with Reactant + Enzyme through NumericalEa
 Scope chosen by the user: ocean-only with real OMIP data (tripolar 2° grid, ETOPO bathymetry, WOA initial
 state, JRA55 repeat-year forcing), no sea ice.
 
-## Status
+## Status as of 2026-10-30 (superseded)
+
+Superseded by: the zero 1-step gradient and the 2-step Taylor mismatch came from `reset!` computing the first
+step's fluxes outside the differentiated window, fixed in `4cc69c3e` (first verified gradient, job 3560476);
+Revolve checkpointing (`444a432d`) replaced the unrolled steps; the Vista failure is gone with the per-step
+checkpointed thunks (Vista 1144920).
 
 | Stage | State |
 |---|---|
@@ -38,7 +47,8 @@ The GPU memory in `logs/gpu.<jobid>.csv` is XLA's up-front 75% reservation, not 
 
 ## Branch and environments
 
-- Branch `ajs/omip-adjoint` on the fork `git@github.com:GodotMisogi/NumericalEarth.jl.git`, tip `09a77f33`.
+- Branch `ajs/omip-adjoint` on the fork `git@github.com:GodotMisogi/NumericalEarth.jl.git` (Oceananigans 0.113.5).
+  The work continues on `ajs/omip-adjoint-oc117` (Oceananigans 0.117.2); see `STATUS.md`.
 - Vista worktree: `$WORK/.julia/dev/NumericalEarth-adjoint` (remote `fork`). The main checkout
   `$WORK/.julia/dev/NumericalEarth.jl` is untouched. LS6 runs the same worktree through `/work`
   (`/work/09603/ajseth/vista/.julia/dev/NumericalEarth-adjoint`); its depot `/work2/09603/ajseth/ls6/.julia` is
@@ -49,8 +59,9 @@ The GPU memory in `logs/gpu.<jobid>.csv` is XLA's up-front 75% reservation, not 
 
 ## What was built (`experiments/OMIPSimulations/adjoint/`, package `OMIPAdjoint`)
 
-- `Project.toml`: own environment. Reactant pinned to `=0.2.290`. Oceananigans and ClimaSeaIce from
-  `ss/for-omip`, SeawaterPolynomials from `ss/conversion-functions`, OMIPSimulations and NumericalEarth by path.
+- `Project.toml`: own environment. Reactant pinned to `=0.2.303` (`=0.2.290` before `017f6230`). Oceananigans
+  0.117.2 and ClimaSeaIce `main` (both `ss/for-omip` on `ajs/omip-adjoint`), SeawaterPolynomials from
+  `ss/conversion-functions`, OMIPSimulations and NumericalEarth by path.
 - `src/ocean_only_model.jl`
   - `omip_adjoint_grid`: 180×60×Nz tripolar grid, ETOPO bathymetry regridded on a CPU twin and copied to the
     device. `close_central_american_isthmus!` lands λ ∈ [276, 284], φ ∈ [7, 12], because the 2° bathymetry
@@ -72,9 +83,10 @@ The GPU memory in `logs/gpu.<jobid>.csv` is XLA's up-front 75% reservation, not 
 - `test_omip_adjoint.jl`: stages `cpu`, `primal`, `gradient`, driven by a JSON config in `configs/`.
 - `prepare_data.jl`: login-node download of ETOPO, WOA and the JRA55 window.
 - `omip_adjoint.slurm` (was `omip_adjoint_vista.slurm`): one script for Vista and LS6. Container
-  `$WORK/containers/julia_1.12_$TACC_SYSTEM.sif`, `Transfer-of-ECCO-glo` (valid on both), default partition `gh`
-  (pass `-p gpu-a100`/`gpu-h100` on LS6), GPU 0 only, the CUDA 12.9 `Reactant_jll` preference (loads on LS6's
-  570 driver too), `nvidia-smi` sampling, MLIR dumps copied to `logs/` on failure, e-mail on every state change.
+  `$WORK/containers/julia_1.12_$TACC_SYSTEM.sif`, `Transfer-of-ECCO-glo` by default (LS6 jobs pass `-A ADCIRC`),
+  default partition `gh` (pass `-p gpu-a100`/`gpu-h100` on LS6), GPU 0 only, the CUDA 12.9 `Reactant_jll`
+  preference (loads on LS6's 570 driver too), `nvidia-smi` sampling, MLIR dumps copied to `logs/` on failure,
+  e-mail on every state change.
 
 ## Fixes outside `adjoint/`
 
@@ -431,7 +443,7 @@ fails there, as the fix for the vacuous pass intends. The exclusion is the defau
 `adjoint_compile_options` from this point; a config's `excluded_passes` replaces it (`[]` runs every pattern).
 Shared helpers (pass timer, census, stage table) live in `mlir_diagnostics.jl`.
 
-## Known issues left open
+## Known issues left open (as of 2026-11-06)
 
 - **Gradient first call on aarch64 (Vista).** Job 1068827 passed the primal again with the new container
   (−1.3433 Sv, 3.47e-9), compiled the 1-step gradient in 96.2 min, then spent 88 min in the first call at 0% GPU
@@ -443,26 +455,31 @@ Shared helpers (pass timer, census, stage table) live in `mlir_diagnostics.jl`.
   in ~15 min (job 3509300). Shrinking the thunk (fewer
   untraced leaves in the arguments, or passing only the controls and state) is the lever for Vista, and it would
   also cut the first-call cost on both clusters.
+  **Resolved:** gradients run on Vista since the per-step checkpointed thunks (Vista 1144920, `c89407c7`).
 
 - `atlantic_ocean_basin` does not cut this tripolar grid. The grid's longitudes run 73°–433°, so the Cape
   Agulhas barrier at 20° never lands. The objective sidesteps it by defining the section by longitude span. The
   basin mask should be fixed in NumericalEarth.
+  **Avoided:** the objective now uses a staircase section along 26.5°N (`b0660e21`); the mask is still unfixed.
 
-## Next steps
+## Next steps (as of 2026-11-06; the current list is in `STATUS.md`)
 
-1. Differentiate the flux computation: `refresh_diagnostics!` into the window, `reset!` restores state only.
-   Rerun the 1-step rung on the dev queue (expected ≈ 19 min build + 34 min compile + the `update_state!`
-   share + 15 min first call) for the first meaningful Taylor check, then the 2-step unrolled rung.
-2. Report `while_deadresult`'s cost upstream (Enzyme-JAX: 25 min on a 14-loop, 430k-op differentiated
-   module for 250 ops). Compile time is now 34 min for the 1-step coupled gradient: XLA 19 min (never
-   attributed; `--xla_dump_to`), Enzyme 5 min, tracing + Julia compile 5 min, model build 19 min (Julia
+1. **Done** (`4cc69c3e`, job 3560476). Differentiate the flux computation: `refresh_diagnostics!` into the window,
+   `reset!` restores state only. Rerun the 1-step rung on the dev queue (expected ≈ 19 min build + 34 min compile +
+   the `update_state!` share + 15 min first call) for the first meaningful Taylor check, then the 2-step unrolled
+   rung.
+2. **Still open** (not reported). Report `while_deadresult`'s cost upstream (Enzyme-JAX: 25 min on a 14-loop,
+   430k-op differentiated module for 250 ops). Compile time is now 34 min for the 1-step coupled gradient: XLA 19
+   min (never attributed; `--xla_dump_to`), Enzyme 5 min, tracing + Julia compile 5 min, model build 19 min (Julia
    compile of ComponentInterfaces + OceanOnlyModel; a sysimage or PrecompileTools workload would remove it).
-3. Rolled time-step loops need the Enzyme-JAX fix for the zero-in/zero-out shadow state (see "The 2-step
-   gradient"); until then every rung runs with the steps unrolled at trace time (`unroll_steps`), whose
-   compile time grows with the step count (34 min at 1 step, 53 at 2). Report upstream together with
+3. **Reported and fixed** (Enzyme-JAX #3971, in Reactant 0.2.309); meanwhile Revolve checkpointing (`444a432d`)
+   replaced `unroll_steps`. Rolled time-step loops need the Enzyme-JAX fix for the zero-in/zero-out shadow state
+   (see "The 2-step gradient"); until then every rung runs with the steps unrolled at trace time (`unroll_steps`),
+   whose compile time grows with the step count (34 min at 1 step, 53 at 2). Report upstream together with
    `while_deadresult`'s cost.
-4. Then Nz = 70, then 8 steps, recording compile and evaluation times at each rung. Pass criteria: finite
-   shadow census and "GRADIENT VERIFIED" from the Taylor check.
+4. **Superseded** by the checkpointed 8-, 84- and 360-step gradients at Nz = 20. Then Nz = 70, then 8 steps,
+   recording compile and evaluation times at each rung. Pass criteria: finite shadow census and "GRADIENT VERIFIED"
+   from the Taylor check.
 
 ## Reactant 0.2.303 (jobs 3543579, 3543330/1, 3544007/8)
 
