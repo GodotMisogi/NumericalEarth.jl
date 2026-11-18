@@ -1,7 +1,7 @@
 # OMIP adjoint logbook
 
 Reverse-mode gradient (Reactant + Enzyme) of the AMOC at 26.5°N with respect to the JRA55 10-m winds, for the
-2° ocean-only OMIP model, package `OMIPAdjoint` in `experiments/OMIPSimulations/adjoint/` (all paths below are relative to it), branch `ajs/omip-adjoint`. `PROGRESS.md`
+2° ocean-only OMIP model, package `OMIPAdjoint` in `experiments/OMIPSimulations/adjoint/` (all paths below are relative to it), branch `ajs/omip-adjoint` (Oceananigans 0.113.5), since 11-12 `ajs/omip-adjoint-oc117` (0.117.2). `PROGRESS.md`
 holds the detailed record and tables; this logbook lists the decisions, the parameter values, what was tried
 and dropped, and what is open. Dates are 2026.
 
@@ -25,7 +25,20 @@ and dropped, and what is open. Dates are 2026.
 | 10-17 | Run the 2-step rung with the time-step loop unrolled before differentiation (`while_unroll_threshold = 2`) | Rolled, Enzyme's reverse step loop carries 72.9 GiB of zero-in/zero-out shadow state (see findings); unrolled, those are locals, as at 1 step |
 | 10-27 | Unroll the window at trace time (`unroll_steps`, a plain Julia loop) instead of through Reactant's threshold | The threshold never unrolled the forward loop and blew up the post-Enzyme rewrite (dead ends); a trace-time unroll makes both the forward and the reverse code straight-line by construction |
 | 10-30 | Update to Reactant 0.2.303 (Reactant_jll 0.0.436, EnzymeCore 0.8.26, Enzyme_jll 0.0.303+1; Enzyme already the newest, 0.13.216) and re-time the compile (`017f6230`) | User's request. Only the Reactant/Enzyme packages move (`Pkg.update(...; preserve = PRESERVE_ALL)`): the Oceananigans `ss/for-omip` branch is now at 0.117.0 and a fresh resolve fails on OMIPSimulations' compat. The 12.9 CUDA build and `while_deadresult` (526 patterns, 525 excluded) are still there |
-| standing | `PROGRESS.md`, `LOGBOOK.md`, `../Manifest.toml` and `../omip_adjoint_handoff/` stay uncommitted | Local records and a local manifest |
+| 11-07 | Move `refresh_diagnostics!` into the differentiated window (`4cc69c3e`) | Finding 4; first verified gradient 3560476 |
+| 11-07 | AMOC section as a staircase of faces along 26.5°N, rows 38–40 (`b0660e21`) | Row 41 curves from 28°N to 34°N across the Atlantic on the tripolar grid |
+| 11-08 | Device clocks for the coupled model and the prescribed components (`afcb086f`); Float64 forcing in memory (`1da8855f`) | Host clocks were baked into the compiled functions (entry 11-07 to 11-10) |
+| 11-08 | Checkpointed gradient: one compiled step and its reverse pass, run on Revolve's schedule (Checkpointing.jl) | Compile time flat in the window length; unrolled windows grow with the step count |
+| 11-08 | ECCO4 prescribed-flux ocean (`PrescribedFluxOcean`) with monthly stress, net heat and net freshwater flux as controls | Pillar et al. (2016)'s controls; each monthly slice is one lead |
+| 11-10 | `frozen_mixing`: CATKE's diffusivities enter the adjoint through `ignore_derivatives` | The full CATKE adjoint is NaN at 90 days; FD scans show a piecewise-smooth objective (CATKE's switches) |
+| 11-11 | Objective averaged over the window's last 30 days; Pillar-style lead maps | Pillar et al. (2016) |
+| 11-11 | LS6 jobs charge `ADCIRC` (user) | Transfer-of-ECCO-glo nearly spent |
+| 11-12 | Merge upstream `ss/omip-prototype` (`f9d52dcb`): Oceananigans 0.117.2, branch `ajs/omip-adjoint-oc117` | `ss/for-omip` deleted upstream; same Oceananigans as ReactOcean |
+| 11-14 | Every Slurm job mails ajseth@utexas.edu (user) | |
+| 11-14 | Stay on Julia 1.12.7 | Reactant 0.2.303 leaves `arith.uitofp` at the XLA export under Julia 1.13.3 |
+| 11-16 | Adjoint-only damping is the intended long-window remedy; forward-viscosity runs only as diagnostics (user) | Standard practice (Hoteit et al. 2005) |
+| 11-17 | Test Reactant main (0.2.309, git `2bb32e28`, Reactant_jll 0.0.445) on its own branch and worktree `ajs/omip-adjoint-r309` | Leaves the jobs queued in the shared worktree on 0.2.303 |
+| standing | Manifests and `../omip_adjoint_handoff/` stay uncommitted | Local manifests |
 | standing | Scripts take a JSON config, never environment variables | Project convention |
 
 ## Parameter values
@@ -95,6 +108,19 @@ Reference numbers (LS6 A100, Nz = 20):
   (90 s with threshold 0). Jobs 3516665, 3520928, 3520929, 3530023 all timed out there.
 - Jobs cancelled as redundant: `gpu-a100` twins of dev runs (3515268, 3515590, 3515917, 3516059, 3516090,
   3516092) and the 1-step per-pass run 3515042 once its question was answered.
+- **Static instability as the cause of the long-window blow-up (11-15/16).** All 20 largest heat-flux
+  sensitivities of the 1-year adjoints lay in statically unstable columns (100 % against 14–17 % of wet columns,
+  1145882–4), but convective adjustment at 10 m²/s (1146808) moved the blow-up to the Agulhas region (2e20)
+  instead of removing it.
+- **Grid-scale noise and horizontal dissipation.** Laplacian (1000 m²/s) and biharmonic (λ = 50 days) tracer
+  diffusion cut the forward grid-scale noise but not the adjoint growth; forward Laplacian viscosity 10⁴ and
+  5×10⁴ m²/s (1147584, 1147586) leave its rate unchanged (3e13 and 2e17, moving to the Southern Ocean);
+  adjoint-only damping at 10⁴ and 5×10⁴ m²/s is NaN at 1 year (3588713/4) and only ~17× smaller at 90 days.
+- **Time step, GM/Redi, WENO (on 0.113.5).** Δt = 1 h (3576780), no GM/Redi (3576463) and linear third-order
+  upwind advection for momentum and tracers (3576772, 1.5e161) all blow up at 1 year.
+- **Forward drift.** 60 days from ECCO's own 1993-11 state (1149976) blows up within a month.
+- **"The 90-day window is healthy."** True only on 0.113.5 (3574422); on 0.117.2 it is 1e23 (3588711). The
+  seasonal reading (January bounded, November not) compared runs on different Oceananigans versions.
 
 ## Findings
 
@@ -131,6 +157,29 @@ Reference numbers (LS6 A100, Nz = 20):
    drift 0; the NaN census is unchanged (40 `u`, 116 `S`), with the NaN columns at i ∈ {1, 90, 91, 180},
    j ∈ {59, 60, 61} (the seam columns), and they do not reach the wind gradient.
 
+5. **The adjoint is the exact local derivative (11-10 FD scans, 8/84/360 steps).** The objective is
+   piecewise smooth: jumps of 1e-7 to 1e-3 Sv appear as h grows (none at 8 steps), from discrete switches in
+   the forward model; small-h Taylor checks fail on the jumps, not on the gradient. Large-h secants match
+   gᵀd to 0.05–2 % at 30 days.
+6. **Long windows: the adjoint grows by about one e-fold per 17 h** and reaches 1e13–1e23 or NaN within one
+   to three months of the window's start, near coasts and fronts (NE Atlantic, Grand Banks, Agulhas, the
+   Antarctic margin), whatever the dissipation, Δt or advection scheme (dead ends above).
+7. **The forward model does not have that growth (11-18, `perturbation_growth.jl`).** Twin runs of the
+   compiled step with 1e-6 K noise in T: rms ΔT grows ×60 (from 1993-11, 1150762) and ×110 (from 1993-01,
+   1150763) in 60 days, an e-fold of 12–15 days; 1e-3 K saturates (×4–9); the ε = 0 twins are bitwise
+   identical. Single cells jump 100× within 3 days: the forward map has steep switches. So the adjoint
+   explosion is an artifact of differentiating something steep, not physical sensitivity, and damping can
+   only mask it.
+8. **The Oceananigans 0.117.2 migration made it worse.** Same 90-day January window: J 16.71 → 17.91 Sv and
+   max|∂J/∂τx| 3.9 → 1.2e23, hot spot at 50°W 42–48°N next to the coast. The migration changed WENO's
+   near-land treatment (`boundary_scheme` → `minimum_buffer_upwind_order`, 3 for tracers, 1 for momentum),
+   the Zipper (#6396) and the fold halos. The near-boundary advection is the prime suspect; the late-year
+   blow-up predates the migration.
+9. **Reactant 0.2.309 removes the first-call cost (1150765, Julia 1.12).** 2-step test: primal first call
+   68.8 → 4.3 s, gradient first call 3095 s → 19.1 s; compiles unchanged (6.2 and 20.2 min); Taylor verified
+   (2.2e-4). Under Julia 1.13 the same Reactant stalls in the first compile for > 3 h 49 min at 0 % GPU
+   (1147598), so the stall is Julia 1.13's.
+
 ## Tooling added
 
 | File | Purpose |
@@ -140,6 +189,13 @@ Reference numbers (LS6 A100, Nz = 20):
 | `test_omip_adjoint.jl` | Stages `cpu`, `primal`, `gradient`; config keys `excluded_passes`, `while_unroll_threshold` |
 | `omip_adjoint.slurm` | One script for Vista and LS6; `SCRIPT=` and `CONFIG=` select the run |
 | Session scratch (not in the repo) | `hlo_census.py`, `while_state.py`, `while_sample.py`: computation output bytes, while-state histograms and body classification on an XLA HLO text dump |
+| `src/checkpointed_gradient.jl` | Revolve sweep of the compiled step and reverse-step thunks; objective averaged over the last `average_steps`; optional adjoint damping |
+| `src/prescribed_flux_ocean.jl` | ECCO4 prescribed-flux ocean, `ecco_adjoint_setup` (`start_date`, `n_months`, closure and advection options) |
+| `src/adjoint_damping.jl`, `test_adjoint_damping.jl` | `AdjointDamping`: forward damping step D on scratch fields, its transpose by Enzyme after each reverse step; forward check and dot-product test |
+| `forward_health.jl`, `plot_forward_health.jl`, `plot_convection_vs_adjoint.jl` | Forward diagnostics of an adjoint window (CFL, grid-scale noise, unstable columns, κ, SST against ECCO4) and their maps |
+| `perturbation_growth.jl` | Twin forward runs: growth of ε × noise added to T |
+| `reduce_gradients.jl`, `omip_cpu.slurm`, `plots/` | Reduction on LS6 CPU nodes; plots locally (`plot_lead_sensitivity.jl`, Pillar maps) |
+| `test_omip_adjoint.jl` keys since 11-07 | `checkpoints`, `average_days`, `frozen_mixing`, `eddy_diffusivity`, `advection`, `Nx`/`Ny`, `horizontal_diffusivity`, `biharmonic_tracer_timescale`, `convective_adjustment`, `laplacian_viscosity`, `adjoint_viscosity`/`adjoint_diffusivity`, `start_date`, `repeat_evaluation` |
 
 ## Jobs (LS6 unless noted)
 
@@ -177,23 +233,43 @@ Reference numbers (LS6 A100, Nz = 20):
 | 3558732 / 3558733 | `pass_bisect` on those (`pass_bisect_coupled_2step_unrolled_{290,303}.json`, `1ec855b9`) | COMPLETED 11-06, 40 / 88 min. `post_op_transpose_reshape` own module 150.6 / 1188.9 s, other version's module 154.1 / 1503.4 s; pre-Enzyme 280.3 / 297.8 s; Enzyme 532.2 / 247.5 s; post-Enzyme `opt_passes2` 107.6 / 821.4 s, again 52.0 / 401.5 s |
 | local (Mac CPU, 11-06) | single main-list applications on the dumped modules, 0.2.290 and 0.2.303 envs | **`cse_reduce_transposed`** is the regression: excluding it alone 24.1 s vs 161.8 s full (0.2.290 7.9 s), identical output; whole `post_op_transpose_reshape` 68.6 s without vs 574.9 s with; post-Enzyme `opt_passes2` 43.6 vs 313.4 s |
 
+### Jobs since 11-11 (2°, ECCO4 forcing, frozen mixing, AMOC averaged over the last 30 days unless noted)
+
+| Job | What | Outcome |
+|---|---|---|
+| 3574422 / 3574421 | 90 days from 1993-01, frozen / full CATKE (0.113.5) | frozen bounded (max 3.9, J 16.7094 Sv); full NaN |
+| 3576176, 3576763 | 1 year, 180 days (0.113.5) | NaN (J 20.13, 15.70 Sv) |
+| 3576463, 3576772, 3576780 | 1 year without GM/Redi, with upwind3 advection, at Δt = 1 h (0.113.5) | NaN, 1.5e161, NaN (then out of memory in the repeat) |
+| 3577970 | 8-step checkpointed gradient on 0.117.2 | verified; the reference for the damping checks |
+| Vista 1144920 | 2-step gradient on Vista (aarch64) | verified; first call 52 min |
+| Vista 1145882–4 | 1-year forward health (no / Laplacian 1000 / biharmonic λ = 50 tracer diffusion) | forward bounded; adjoint hot spots all in unstable columns |
+| Vista 1146807 / 1146808 | convective adjustment 10 m²/s: health / 1-year gradient | worst N² 34× weaker; adjoint 2e20 at the Agulhas |
+| Vista 1147583–6 | forward Laplacian viscosity 10⁴ / 5×10⁴: health and 1-year gradients | forward bounded; adjoint 3e13 / 2e17 |
+| Vista 1147598 | Reactant 0.2.309, Julia 1.13.3, 2-step test | primal compile stalled > 3 h 49 min (TIMEOUT) |
+| LS6 3587706, Vista 1147994 | damping dot-product test | 2.6e-15, 3.9e-14 |
+| Vista 1148278 / 1148279 | 8-step gradient, damping 0 / 10⁴ m²/s | 2e-12 / 0.6–2.4 % from 3577970 |
+| LS6 3588711 / 3588712 | 90 days from 1993-01, damping 0 / 10⁴ (0.117.2) | 1.2e23 / 7e21 (J 17.9094 Sv) |
+| LS6 3588713 / 3588714 | 1 year, damping 10⁴ / 5×10⁴ | NaN |
+| Vista 1149976 | 60 days from 1993-11 (`start_date`) | 8.9e18 at 60°W 43°N |
+| Vista 1150762 / 1150763 | twin forward runs from 1993-11 / 1993-01 | e-fold 15 / 12 days (finding 7) |
+| Vista 1150765 | Reactant 0.2.309, Julia 1.12.7, 2-step test | verified; gradient first call 19.1 s |
+| LS6 3578000, 3580072 | 1° 1 year and 90 days (H100) | node c318-002 could not create a CUDA context |
+| LS6 3591885 | 1° 90 days (H100, c318-001) | forward NaN at Δt = 2 h, 50 substeps |
+
 ## Open
 
-- The differentiated window misses the first step's fluxes (finding 4): the reset computes them from the
-  controls outside the window, so the gradient is wrong by construction (zero at 1 step, two thirds of the
-  finite-difference slope at 2 steps). Next: move `refresh_diagnostics!` (the coupled `update_state!`) into
-  the window so every step's fluxes are differentiated, and rerun the 1-step rung (cheapest: 34 min compile
-  plus one `update_state!`) for the first meaningful Taylor check. The alternative, perturbing the winds
-  after the reset in the check, would only verify the window's adjoint, not the gradient wanted.
-- Optional confirmation of pattern 257 with a segment-6 sub-bisect (main list except 257, and 257 alone,
-  on `logs/bisect_coupled_2step_unroll2_all/05_post_enzyme_inline.mlir`).
-- Report upstream (Enzyme-JAX): `while_deadresult`'s cost; zero-in/zero-out loop-carried shadows;
-  `cse_reduce_transposed`'s quadratic candidate search (the 0.2.303 2-step regression, 11-06).
-- Exclude `cse_reduce_transposed` in `adjoint_compile_options` and confirm the 2-step compile returns to ~54 min.
-- Attribute XLA's 19 min; cut the 19-min model build (sysimage or PrecompileTools); shrink the gradient thunk
-  (first call ~15 min; Vista failure).
-- Fix `atlantic_ocean_basin` for this tripolar grid in NumericalEarth.
-- Then Nz = 70 and 8 steps, with compile and evaluation times at each rung.
+- Name the term whose derivative explodes (findings 7, 8): the 90-day 1993-01 window on 0.117.2 with
+  `advection = upwind3`; instrument the reverse sweep (norm and location of each adjoint field every few
+  steps) on the 60-day November or 90-day January window.
+- Move `ajs/omip-adjoint-oc117` to Reactant 0.2.309 (git pin until registered).
+- 1°: forward health at Δt = 2 h with 100 substeps and at Δt = 1 h, then the 1° gradient.
+- Julia 1.13 compile stall with 0.2.309: rerun with the SIGUSR1 profile for an upstream report.
+- Upstream reports still open: Enzyme-JAX #3965 (batch fission); Oceananigans #6529, #6530, PR #6531 (posted
+  from ReactOcean); `while_deadresult`'s cost.
+- Resolved since 11-06: finding 4 (`4cc69c3e`); `cse_reduce_transposed` excluded (`fb295782`) and fixed upstream
+  (Enzyme-JAX #3970); zero shadow carries (#3971) and `uitofp` (#3969) fixed upstream, in Reactant 0.2.309;
+  the Vista first-call failure (gone with per-step thunks); `atlantic_ocean_basin` avoided by the staircase
+  section.
 
 ## Entries
 
@@ -383,3 +459,217 @@ Reference numbers (LS6 A100, Nz = 20):
   (439k ops), so it is specific to the unrolled 2-step reverse module, not to op count. Next: dump the
   post-Enzyme module on 0.2.303 and bisect the pattern list on it (`pass_bisect.jl`) to name the pattern(s),
   then report upstream with the module.
+
+### 2026-11-07 to 11-10 (moved from STATUS.md on 11-18)
+
+Queued on LS6 (11-07; results 11-08):
+
+- **Grad1Section 3566763 VERIFIED** (11-08, dev, `1da8855f`, 1:25:52; resubmitted from `gpu-a100` 3561032,
+  `twodegree_nz20_1step.json`): CPU twin J −14.3509 Sv, traced primal vs CPU twin 7.5e-13, rolled 1-step
+  gradient compile 31.9 min, first call 847 s, repeat 0.47 s exact; gradient vs primal J 3.7e-16; Taylor
+  rel_err 6.1e-5, second-order remainder. File `results/omip_adjoint_twodegree_nz20_1step.jld2`.
+- **Grad1Frozen 3564718 done** (11-08, 57.7 min, 1 step unrolled, `frozen_mixing`, `b0418df6`, staircase
+  section): build 916 s, compile 22.7 min (22.2 unfrozen, 3560476), first call 768 s, second 0.37 s, J −14.3509 Sv,
+  max|g| 1.09e-2 Sv per m/s, repeat drift 0. Against the full model's finite difference: gᵀd 4.49911511e-2,
+  FD slope 4.49959212e-2, rel_err 1.06e-4, **GRADIENT VERIFIED**, remainder second order (rate 4.0 → 3.7 until
+  roundoff below h = 1/16). Freezing CATKE's κ costs 1e-4 at 1 step and saves no compile time here. Against
+  the full-mixing gradient 3566763 (Float64 forcing; J differs 2.9e-7 from the forcing precision alone):
+  cosine 0.99999968, norm ratio 0.99984, max|Δg| / max|g| 1.2e-3; the forcing precision accounts for ≲ 3e-5
+  (from the 2-step pair), so this is the frozen-mixing error.
+- **Grad2Ckpt 3565170 failed its J check** (11-08, 1:36:45, Revolve, 1 checkpoint): build 916 s, primal
+  compile 484 s, primal J −28.563087893063496 (repeat exact), **gradient compile 27.1 min** (47.8 for the
+  unrolled 2-step window), first call 2230 s, max|g| 1.11e-2, finite. Its J differs from the primal's by
+  7.5e-8 (relative), the fused unrolled gradient (3561033) by 3.6e-12; my `@test rel < 1e-8` aborted the job
+  before the census, repeat and Taylor check, so no gradient was saved. The check now warns and records
+  instead (`211728c9`). The old file is `..._2step_checkpointed_3565170.jld2`. Rerun 3565514 failed at model
+  build on `afcb086f` (below).
+- **Grad2Ckpt 3565554 VERIFIED** (11-08, `1da8855f`, 1:39:02): primal J −28.563087573790 (repeat exact),
+  gradient compile 27.1 min, first call 2368 s (the five Revolve thunks each pay a first-call cost), repeat
+  0.82 s with max|Δg| 6e-36; gradient vs primal J 1.6e-15; Taylor rel_err 2.0e-7, second-order remainder down
+  to h = 0.125. Against the unrolled 2-step gradient 3561033 (Float32 forcing): J 1.1e-8, cosine 0.9999999996,
+  norm ratio 0.999996, max|Δg| / max|g| 2.9e-5, i.e. the forcing precision. NaN shadows on the same seam
+  columns as before (82 u, 160 v, 8 S). File `results/omip_adjoint_twodegree_nz20_2step_checkpointed.jld2`.
+- **Host clocks baked into compiled functions** (StepConsist 3565513, `step_consistency.jl`, log kept as
+  `StepConsist.o3565513.before_clock_fix`): under ReactantState the `EarthSystemModel`, `PrescribedAtmosphere`
+  and `PrescribedRadiation` clocks were host `Clock{Float64}` (NumericalEarthReactantExt's `same_time_type`
+  accepts them beside the ocean's `ConcreteRNumber` clock). The atmospheric and radiative interpolation reads
+  `coupled_model.clock.time`, so each compiled function used the forcing time it was traced at, and tracing
+  ticked the host clocks (0 → 14400 s after compiling the 1- and 2-step windows). Separately compiled step vs
+  window: 5.2e-3 at 1 step, 6.5e-4 at 2; atmosphere state, CATKE and fluxes differ O(1). A rolled window gives
+  every iteration the forcing of its trace time. Earlier verified results stand: 1-step windows and the
+  unrolled 2-step window were traced from a fresh clock (unrolling advances the host clock step by step), and
+  the rolled 2-step primal's stale value only enters the fluxes after the last step, which J does not see.
+  Fixed in OMIPAdjoint (`afcb086f`, `Clock(grid)` for all three). With the time traced, Oceananigans'
+  `ifelse(n₁ == n₂, ψ₁, ψ̃)` returned `Union{Float32, Float64}` for the Float32 JRA55 slices and Reactant could
+  not raise the atmospheric interpolation kernel (3565514, `reconcile_state!`); the in-memory forcing is now
+  Float64 (`1da8855f`; CPU 2-step J −28.5630876 vs −28.5630879 with Float32). **Verified** by StepConsist
+  3565553 (`1da8855f`; 3565543 cancelled, it had started on `afcb086f`): no host number changes during any
+  compile; separately compiled refresh + step vs window, J relative difference 2.2e-15 at 1 step and 1.1e-15
+  at 2 (window J −28.563087573790813, matching the CPU twin); every device array agrees to ≤ 6e-11 relative
+  (CATKE κ, the implicit solver's scratch). Upstream TODO: convert ψ₁ in Oceananigans'
+  `interpolate`/`time_interpolated_getindex`.
+  Upstream: NumericalEarth's `default_earth_system_clock` and the prescribed components' default
+  `Clock{Float64}` should be device clocks on ReactantState.
+- Longer rollouts on `gpu-a100-dev` (11-09, `3c70bde4`; 3565171 cancelled after a day in `gpu-a100` Priority):
+  Grad8Ckpt 3570013 (8 steps, 3 checkpoints), Grad84Ckpt 3570014 (1 week, 12 checkpoints, 60 slices) and
+  Grad360Ckpt 3570015 (30 days, 30 checkpoints, 248 slices, gradient stage only to fit 2 h). All three ran
+  end to end and saved their gradients (8: 52 MB local; 84: 197 MB and 360: 813 MB on LS6 only); all three
+  failed the old Taylor verdict.
+
+  | steps | build | gradient compile | first call | repeat | J (Sv) | grad vs primal J | small-h Taylor |
+  |---|---|---|---|---|---|---|---|
+  | 8 | 931 s | 28.4 min | 2350 s | 3.5 s | −11.28 | 3.6e-14 | second order; Richardson 2.6e-6 |
+  | 84 | 1022 s | 27.3 min | 2241 s | 28 s | −15.97 | 2.1e-11 | noise ±2e-4 in Δf; agrees to ~3e-3 |
+  | 360 | 1423 s | 29.1 min | 2367 s | 104 s | +16.63 | (no primal) | Δf ≈ 8e-4 + h gᵀd; 1e-2 |
+
+  Compile and first call are flat in the step count; a full 30-day gradient costs 104 s once compiled.
+  The first call's ~39 min is host-side: XLA logs nothing between "COMPILED" and the end of the first call
+  (it does log every compile), so it is most likely Julia compiling the five thunks' call wrappers for the model
+  type (ECCO4's smaller model: 753 s). The old verdict's six-point fit was dominated by h = 1 (8 steps: rel_err
+  1.08e-3 though the remainder is O(h²) down to 6.5e-7); it now fits the three smallest h (`c1dcb8b1`;
+  earlier runs: 2-step 1.9e-6, 1-step 2.7e-6, ECCO4 8.1e-6). For 84 and 360 steps the finite difference is
+  not smooth: the remainder stops falling with h (84) or Δf keeps a ~8e-4 Sv jump as h → 0 (360), as if
+  discrete switches (CATKE's convective/stable branches, `ifelse` limiters) flip under any perturbation.
+  The adjoint differentiates the branch taken, so FD with h ≥ 1/32 m/s cannot check it there.
+  FD scans (11-10): the first submission (3571246–8) failed to precompile OMIPSimulations, because the 11-09
+  merge of upstream `ss/omip-prototype` (`ba7f0eeb`) brought `a44003cf`, which includes
+  `src/extended_halo_checkpoint_patch.jl` that upstream committed only in `c6eede8f` (with a fold-halo patch
+  and a `restore_prognostic_state!` override). At the user's choice the merge is reverted (`9f9c1f90`; the tree
+  outside `adjoint/` and STATUS equals `6c0d6357`, the code of the saved gradients); merge upstream again after
+  the scans and re-verify. Resubmitted as FDScan8 3571322, FDScan84 3571323, FDScan360 3571324 on dev, stages
+  `primal,fd_scan`: forward and central differences of the compiled primal along each saved gradient for
+  h = 1 … 6e-8 m/s (25 octaves, ~1–6 s per evaluation), 8 steps as the smooth control. The user expects the
+  adjoint will in practice have to freeze the turbulence (`frozen_mixing`).
+  **Results (11-10, all three completed; f0 equals the saved J to 4e-14, 2e-11, 4e-12):** the adjoint is the
+  exact local derivative at every length; the objective is piecewise smooth with small jumps.
+
+  | steps | gᵀd (Sv per m/s) | smooth neighborhood along ±d | FD vs gᵀd there | jumps in f | central diff. at h = 0.25–1 |
+  |---|---|---|---|---|---|
+  | 8 | 0.1842 | all h ≤ 1 | central 4e-9 – 2e-8 (h = 2e-3 – 2e-2), forward O(h) | none | 4e-4 |
+  | 84 | 0.6766 | h ≤ 2.4e-4 | central 4e-9 (h = 1.2e-4), forward 2e-6 | 1e-6 – 3e-4 Sv for h ≥ 4.9e-4 | 5e-3 – 7e-3 |
+  | 360 | 0.7346 | +d: h ≤ 1.2e-4; −d: h ≤ 4.8e-7 | forward 1e-6 – 2e-5 (h = 2e-6 – 3e-5) | 2.6e-7 Sv at h ∈ (4.8e-7, 9.5e-7) along −d; up to ~1e-3 Sv for h ≥ 6e-5 | 2e-3 (h = 0.5), 5e-4 (h = 0.25) |
+
+  The jumps are discontinuities of f itself (constant offset over a range of h, e.g. −2.6e-7 Sv along −d at
+  360 steps from h = 9.5e-7 to 3e-5), not kinks: discrete switches in the forward model (CATKE's convective
+  and stable branches are the likely source). Their size grows with the window (none at 8 steps, ≤ 3e-4 Sv at
+  84, ~1e-3 Sv at 360), so the old Taylor checks (same direction, h ≤ 1e-2) failed on the jumps, not on the
+  gradient. At finite amplitude the jumps are negligible: over h = 0.25–1 m/s the secant slope matches gᵀd to
+  0.05–2 % at 30 days. Along d = g/|g| the signal is largest; along other directions the same jumps weigh more.
+  Freezing the mixing in the adjoint does not change f or its jumps; it changes what the gradient
+  approximates, so its check is the large-h secant, not small-h Taylor.
+  Files: `results/omip_adjoint_twodegree_nz20_{8,84,360}step_fd_scan.jld2`, logs `FDScan*.o357132{2,3,4}`.
+- **Frozen mixing at 84 and 360 steps** (11-10, Frozen84 3572831, Frozen360 3572832, `8604de03`): both ran
+  end to end; "FAILED" is the small-h Taylor verdict on the jumps (the Taylor rows were then not saved; fixed
+  by saving before the `@test`). Reduced on a CPU node (ReduceGrad 3573710, `reduce_gradients.jl` via
+  `omip_cpu.slurm`; 3573177 failed because `omip_adjoint.slurm`'s full precompile loads Reactant's CUDA
+  extension, which fails without a GPU). Cosine(full, frozen) 0.99964 (84) and 0.99418 (360), norm ratio
+  0.9963 and 0.9905. Against secants over h = 1/32 … 1: along d_full the full gᵀd is −0.6 % / −0.2 % and the
+  frozen −1.0 % / −1.7 %; along d_frozen full −0.1 % / −1.0 %, frozen −0.4 % / −1.3 %. So the full adjoint
+  predicts the finite response slightly better, and freezing saves no time (compile 29.0 / 30.1 min, first
+  call 2675 / 2475 s, repeat 27 / 114 s). Uniform-wind sums differ more than the cosine suggests: at 30 days
+  Σ∂J/∂v₁₀ is +0.32 (full) vs +0.76 (frozen) Sv per m/s, and the full map's Caribbean peak is absent from
+  the frozen one. Next check: FD along uniform u₁₀ and v₁₀ at 30 days. Writeup with figures:
+  `experiments/OMIPSimulations/adjoint/papers/omip_amoc_adjoint.tex`.
+- **ECCO2Ckpt 3566764 VERIFIED** (11-08, dev, `1da8855f`, 1:04:54; resubmitted from `gpu-a100` 3565218):
+  build 292 s, CPU twin J −34.9752 Sv, primal vs CPU twin 2.9e-12, 2-step checkpointed gradient wrt the stress
+  compile 27.4 min, first call 753 s, repeat 0.54 s exact, gradient vs primal J 9.8e-15, max|g| 1.56 Sv per
+  N m⁻² (the log's "Sv per m/s" label is JRA55's). Taylor (h0 = 0.1) rel_err 7.1e-4 from the averaged slope,
+  which the h = 0.1 point dominates (remainder 6.5e-4, then 8e-6 at h = 0.05); at h = 3.1e-3 the remainder is
+  2.3e-6 of h gᵀd. Same seam NaN shadows. File `results/ecco4_adjoint_nz20_2step_checkpointed.jld2`.
+  Setup: `PrescribedFluxOcean`,
+  ECCO4 1993-01 initial state and monthly stress, net heat and net freshwater fluxes, CPU twin, primal,
+  2-step checkpointed gradient wrt the stress. Local CPU build checked (2 steps: J 0 → −35.0 Sv from rest,
+  stress ≤ 0.4 N m⁻², heat flux −530…+230 W m⁻², freshwater −37…+200 mm/day). The Earthdata credentials
+  (`ECCO_USERNAME`, `ECCO_WEBDAV_PASSWORD`) are now exported in LS6's `~/.bashrc` (copied from Vista);
+  oceFWflx for all of 1993 is cached (job 3565274).
+
+Checkpointing v0.13.0 was added to LS6's adjoint Manifest by a `development` job (3565146, `PRESERVE_ALL`)
+before pulling, so pending jobs kept a consistent environment.
+
+**Grad2Section 3561033** (11-07, 1:22:49, 2 unrolled steps on the staircase section, quadratic-fit verdict):
+build 920 s, compile 47.8 min, first call 761 s, J −28.5631 Sv, max|g| 1.18e-2 Sv per m/s, **GRADIENT
+VERIFIED** (rel_err 9.18e-7). Sensitivity sits on 26.5°N with peaks at the staircase steps (63°W, 28°W);
+uniform 1 m/s: −0.257 Sv (u), +0.658 Sv (v). J of −28.6 Sv 4 h from rest is likely the spin-up transient
+(row 41 gave −5.3); the CPU twins of 3566763 (1 step) and StepConsist 3565553 (2 steps) match the traced
+objective, and ECCO4's initial state gives −35.0 Sv after 2 steps, so it is the spin-up from rest.
+
+**Grad2Window 3560703** (11-07, 81 min, 2 unrolled steps, gradient only, `4cc69c3e`; 3559769's
+result kept as `..._2step_unrolled_gradient_3559769.jld2`): build 923 s, compile 47.3 min, first call 734 s,
+second 0.43 s, J −5.3233 Sv, max|g| 8.19e-3, same seam NaN census as at 1 step. Taylor reports MISMATCH
+(rel_err 3.0e-3) but the gradient is right: |Δf − h gᵀd| falls 4.0× per halving (second order) and
+(Δf − h gᵀd)/h² is constant (2.07–2.14e-4) over h = 1 … 1/32, so the check's averaged successive-difference
+slope carries the curvature c(hᵢ + hᵢ₊₁), which predicts the whole 3.0e-3; a quadratic fit Δf = a + g h + q h²
+gives rel 9.3e-5 (2.3e-4 at 1 step). The verdict needs that fit (or a remainder-order test).
+
+**The objective is not at 26.5°N in the Atlantic.** On the 2° `TripolarGrid` (180 × 60) the rows already curve
+at 26°N: `nearest_row` probes i = Nx ÷ 2 (111°W, Pacific) and picks row 41 (26.4°N there), which across the
+RAPID span (280–346°E) runs from 28.4°N at Florida to 33.8°N. The wind sensitivity map (2-step, local plot)
+follows that row: Ekman-signed ∂J/∂u < 0, ∂J/∂v > 0 along it; a uniform 1 m/s gives −0.35 Sv (u), +0.42 Sv (v);
+> 99.999 % of Σ|g| in the North Atlantic. Fixed in `b0660e21`: a staircase of v- and u-faces along 26.5°N
+(rows 38–40, within ±1.4° of the line); every AMOC value before it is row 41's.
+
+**First verified gradient: Grad1Window 3560476** (11-07, 56 min, 1 unrolled step, gradient only,
+`twodegree_nz20_1step_unrolled_gradient.json`, on `4cc69c3e`, which moves `refresh_diagnostics!` into the
+differentiated window; `reset!` only restores the snapshot, `build_reset` removed): build 925 s, gradient
+compile 22.2 min, first call 680 s, second 0.31 s, J −1.3433 Sv, max|g| 7.22e-3 Sv per m/s, finite, repeat
+drift 0. Taylor: gᵀd 2.66807157e-2, FD slope 2.66993605e-2, rel_err 7.0e-4, **GRADIENT VERIFIED**; the
+remainder |Δf − h gᵀd| falls 4.5× per halving of h (second order). Census: NaN in 82 `u`, 160 `v`, 8 `S`
+state shadows, all on the fold seam (j = 60–61, i ∈ {0, 1, 2, 90, 91, 92, 180}), not reaching the winds.
+
+Grad2NoCSE 3559769 (done 11-06, `fb295782`, `cse_reduce_transposed` excluded): gradient compile **47.3 min**
+(99.6 with the pattern, 3543332; 53.2 on 0.2.290), build 939 s, first call 1073 s, second 0.43 s; J, gᵀd
+1.91137470e-2 and FD slope 2.87207311e-2 identical to 3543332, Taylor MISMATCH as before (finding 4).
+**The 0.2.303 2-step regression is `cse_reduce_transposed`** (new Enzyme-JAX pattern): LS6
+bisect 3558732/3 (pattern code, not module: 0.2.303 patterns 1189–1503 s on either module, 0.2.290 151–154 s),
+then local CPU bisects on the dumped modules: excluding that one pattern restores 0.2.290's times with identical
+output (it never fires; quadratic candidate search over reduces sharing one init). Excluded by default
+(`fb295782`), confirmed by 3559769; upstream report pending.
+2-step regression attributed (3555512 vs 3555525): post-Enzyme pattern application 297 → 2549 s
+(the `InterpreterPass`es after `DifferentiatePass` in `all` and in `post_op_transpose_reshape`); Enzyme 666 → 266 s
+and XLA 1692 → 1538 s got faster. 0.2.290 worktree kept at
+`/scratch/09603/ajseth/NumericalEarth-0290` for the comparison. Reactant 0.2.303 / Reactant_jll 0.0.436 on LS6 since 10-30, with the OMIPAdjoint `Zipper`
+override (`cd417288`; EnzymeAD/Reactant.jl#3636, CliMA/Oceananigans.jl#6396). Compile times against 0.2.290:
+
+| | 1 step (3544007/8 vs 3516163/3516091) | 2 steps unrolled (3543332 vs 3536598) |
+|---|---|---|
+| model build | 842 s (≈ 19 min) | 929 s (1246 s) |
+| primal compile | 466 s (≈ 8–9 min) | 824 s (925 s) |
+| gradient compile | 29.9 min (33.8) | **99.6 min (53.2)**; 81.7 min gradient-only (3548971) |
+| first gradient call | 778 s (903) | 818 s (965) |
+
+All numbers (primal, gradient, census, Taylor values) are identical. The 2-step gradient-compile regression is
+not attributed yet. Container: `$WORK/containers/julia_1.12_ls6.sif` links to a `/scratch` copy (mounting from
+`/work` timed out on 11-03).
+
+### 2026-11-11 to 11-13
+
+- Time-averaged objective and flux gradients (`b413a808`), Pillar-style lead maps (`1b807e70`). 90 days frozen
+  bounded (3574422), full CATKE NaN (3574421); 1 year and 180 days frozen NaN (3576176, 3576763). Variants
+  without GM, with upwind3, at Δt = 1 h all blow up (3576463, 3576772, 3576780).
+- 11-12: merged upstream `ss/omip-prototype` (`f9d52dcb`), Oceananigans 0.117.2; advection helpers called with
+  the new signature (`e00134e3`). Re-verified: JRA55 2-step Taylor 1.6e-4, ECCO4 8-step (3577970).
+- Writeup `papers/omip_amoc_adjoint.tex`, three-page and seven-page reports for the advisor.
+
+### 2026-11-14 to 11-16
+
+- Forward health checks (`forward_health.jl`): CFL small (internal-wave 0.44 in the smallest wet cell), SST
+  drifts 3 °C over a year, grid-scale noise grows at fronts and convective regions. Tracer diffusion
+  (Laplacian, biharmonic) and the departures from Simone's `omip_simulation(:halfdegree)` recorded in the
+  advisor report (`2359d646`).
+- Vista gradients work (1144920). `REACTANT_ENZYME_ISSUES.md` lists eight issues; 11-16 Enzyme-JAX fixed #3969
+  (`uitofp`), #3970 (`cse_reduce_transposed`) and #3971 (zero shadow carries), reported from ReactOcean.
+- Convection check: 1-year adjoint hot spots all in unstable columns; convective adjustment and forward
+  viscosity did not remove the growth (dead ends).
+
+### 2026-11-16 to 11-18
+
+- Adjoint-only damping implemented (`939d9986`): the forward damping step on scratch fields between halo fills,
+  transposed by Enzyme so the adjoint's pending halo contributions and the fold signs come out right. Dot
+  product 2.6e-15; 8-step zero damping 2e-12 from the undamped gradient; 10⁴ m²/s changes it 1–2 %. It does not
+  bound the 90-day or 1-year adjoints.
+- `start_date` (`7e70e544`): 60 days from 1993-11 explode, so the forward drift is not the cause. Twin forward
+  runs (`c5b51c48`): forward perturbations grow at 12–15 days per e-fold in both seasons (finding 7).
+- The 90-day January window explodes on 0.117.2 (finding 8); the earlier healthy result was 0.113.5's.
+- Reactant 0.2.309 under Julia 1.12 removes the first-call cost (finding 9); under Julia 1.13 the first compile
+  stalls.
+- 1°: the first H100 attempts hit a bad node (c318-002); on c318-001 the forward model goes NaN at Δt = 2 h.
