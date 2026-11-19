@@ -1,6 +1,6 @@
-# OMIP adjoint: status as of 2026-11-18
+# OMIP adjoint: status as of 2026-11-19
 
-Branch `ajs/omip-adjoint-oc117` (fork GodotMisogi, Oceananigans 0.117.2), tip `c5b51c48`, shared by Vista and LS6
+Branch `ajs/omip-adjoint-oc117` (fork GodotMisogi, Oceananigans 0.117.2, Reactant 0.2.309), shared by Vista and LS6
 through `/work/09603/ajseth/vista/.julia/dev/NumericalEarth-oc117`. Reactant 0.2.309 test branch
 `ajs/omip-adjoint-r309` (worktree `NumericalEarth-r309`). The pre-0.117.2 code (Oceananigans 0.113.5,
 `ss/for-omip`) is `ajs/omip-adjoint`, worktree `NumericalEarth-adjoint` on TACC. Records: `LOGBOOK.md`
@@ -16,7 +16,7 @@ through `/work/09603/ajseth/vista/.julia/dev/NumericalEarth-oc117`. Reactant 0.2
 | Vista (aarch64) gradients | work since the per-step thunks (1144920); the `fixup` failure is gone |
 | Long windows on 0.117.2 | **adjoint explodes** (see below), forward model healthy |
 | Adjoint-only damping (`AdjointDamping`, `939d9986`) | implemented and verified (dot product 2.6e-15 LS6, 3.9e-14 Vista; zero damping reproduces the 8-step gradient to 2e-12); does **not** contain the growth |
-| Reactant 0.2.309 (git `2bb32e28`, Reactant_jll 0.0.445) | under Julia 1.12: 2-step test verified, **first gradient call 19 s instead of 52 min** (1150765); under Julia 1.13 the first compile stalls > 3 h 49 min (1147598) |
+| Reactant 0.2.309 (git `2bb32e28`, Reactant_jll 0.0.445) | **on `oc117` since 11-19** (`8cfba671`): 2-step Taylor verified (1153869); 8-step gradient matches 3577970 to 1.7e-12 (stress) and 5e-10 (fluxes), compile 21.6 min, **first call 27 s instead of 14 min** (1153870); under Julia 1.13 the first compile stalls > 3 h 49 min (1147598) |
 | 1° (360 × 180) | forward model NaN within 90 days at Δt = 2 h, 50 substeps (3591885) |
 
 ## The long-window adjoint growth
@@ -49,7 +49,7 @@ before the end of the window, near coasts and fronts. What is known:
 
 ## Waiting on the user
 
-1. Move `ajs/omip-adjoint-oc117` to Reactant 0.2.309 (git pin until registered); nothing is queued.
+1. Done 11-19: `ajs/omip-adjoint-oc117` is on Reactant 0.2.309 (git pin until registered).
 2. 90-day 1993-01 frozen window on 0.117.2 with `advection = upwind3` (no WENO anywhere): bounded means the
    0.117.2 WENO boundary change is the cause.
 3. Instrument the reverse sweep (norm and location of each adjoint field every few steps) on the 60-day

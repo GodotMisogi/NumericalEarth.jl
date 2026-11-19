@@ -10,7 +10,8 @@ GodotMisogi) and fixed in Enzyme-JAX within a day: #3969 (`uitofp` raising), #39
 2026-11-16) and Reactant main 0.2.309 (git `2bb32e28`, not registered as of 2026-11-18), tested on branch
 `ajs/omip-adjoint-r309`. Under Julia 1.12.7 the 2-step gradient verifies and the first-call cost (issue 7) is gone
 (Vista 1150765). Under Julia 1.13.3 the first compile stalls for > 3 h 49 min (Vista 1147598), so Julia 1.13 is
-still not usable. `ajs/omip-adjoint-oc117` is still on 0.2.303, with the `cse_reduce_transposed` exclusion.
+still not usable. `ajs/omip-adjoint-oc117` moved to 0.2.309 on 2026-11-19 (`8cfba671`; Vista 1153869/1153870
+reproduce the 0.2.303 results), still with the `cse_reduce_transposed` exclusion.
 
 Versions, unless stated otherwise: Julia 1.12.7, Reactant.jl 0.2.303, Reactant_jll 0.0.436, Enzyme_jll
 0.0.303+1, Oceananigans `ss/for-omip` (0.113.5). Hardware: TACC Lonestar6 A100 (x86_64) and Vista GH200
@@ -25,7 +26,7 @@ Versions, unless stated otherwise: Julia 1.12.7, Reactant.jl 0.2.303, Reactant_j
 | 4 | Enzyme-JAX pattern `cse_reduce_transposed` (new in 0.2.303) | Quadratic candidate search; never fires on our modules | 2-step compile 53 → 100 min | Yes: Enzyme-JAX #3966, fixed by #3970 (in Reactant 0.2.309, unregistered) | Excluded by default |
 | 5 | Reactant `WHILE_UNROLL_THRESHOLD` / `enzyme_hlo_unroll` | Unrolls after differentiation, not before | One rewrite application ran > 4 h 47 min | No | Unroll at trace time instead |
 | 6 | Reactant on aarch64 (LLVM) | `fixup value out of range` on the first call of a large compiled thunk | Gradients could not run on Vista GH200; resolved with the checkpointed per-step thunks (Vista 1144920) | Comment on Reactant.jl #3511 | none needed now |
-| 7 | Reactant thunk call path | First call of compiled thunks costs 13–40 min of host time | Fixed overhead per job; gone with 0.2.309 (Vista 1150765: 3095 s → 19.1 s) | No | Reactant 0.2.309 (not yet on `oc117`) |
+| 7 | Reactant thunk call path | First call of compiled thunks costs 13–40 min of host time | Fixed overhead per job; gone with 0.2.309 (Vista 1150765: 3095 s → 19.1 s) | No | Reactant 0.2.309 |
 | 8 | Reactant 0.2.303 XLA export under Julia 1.13 | `arith.uitofp` left in the module: "unsupported op for export to XLA" | Nothing compiles under Julia 1.13.3 (Vista; LS6 not yet tried) | Yes: Reactant.jl #3803, fixed by Enzyme-JAX #3969 (in Reactant 0.2.309, unregistered) | Stay on Julia 1.12.7 |
 
 ## 1. Empty kernel becomes an undifferentiable `enzymexla.jit_call`

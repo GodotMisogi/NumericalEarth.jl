@@ -38,6 +38,7 @@ and dropped, and what is open. Dates are 2026.
 | 11-14 | Stay on Julia 1.12.7 | Reactant 0.2.303 leaves `arith.uitofp` at the XLA export under Julia 1.13.3 |
 | 11-16 | Adjoint-only damping is the intended long-window remedy; forward-viscosity runs only as diagnostics (user) | Standard practice (Hoteit et al. 2005) |
 | 11-17 | Test Reactant main (0.2.309, git `2bb32e28`, Reactant_jll 0.0.445) on its own branch and worktree `ajs/omip-adjoint-r309` | Leaves the jobs queued in the shared worktree on 0.2.303 |
+| 11-19 | Move `ajs/omip-adjoint-oc117` to Reactant 0.2.309 (`8cfba671`); keep the `cse_reduce_transposed` exclusion | 0.2.309 reproduces 0.2.303's gradients and removes the first-call cost; dropping the exclusion needs its own compile-time check |
 | standing | Manifests and `../omip_adjoint_handoff/` stay uncommitted | Local manifests |
 | standing | Scripts take a JSON config, never environment variables | Project convention |
 
@@ -253,6 +254,8 @@ Reference numbers (LS6 A100, Nz = 20):
 | Vista 1149976 | 60 days from 1993-11 (`start_date`) | 8.9e18 at 60°W 43°N |
 | Vista 1150762 / 1150763 | twin forward runs from 1993-11 / 1993-01 | e-fold 15 / 12 days (finding 7) |
 | Vista 1150765 | Reactant 0.2.309, Julia 1.12.7, 2-step test | verified; gradient first call 19.1 s |
+| Vista 1153869 | Reactant 0.2.309 on `oc117`, 2-step ECCO4 test | primal 8.1e-13 from the CPU twin; Taylor verified; first gradient call 19.5 s |
+| Vista 1153870 | Reactant 0.2.309 on `oc117`, 8-step gradient with `adjoint_trace_every = 4` | J 4.6e-14, stress gradients 1.7e-12, flux gradients 5e-10 from 3577970; same Taylor rows; first call 27.1 s |
 | LS6 3578000, 3580072 | 1° 1 year and 90 days (H100) | node c318-002 could not create a CUDA context |
 | LS6 3591885 | 1° 90 days (H100, c318-001) | forward NaN at Δt = 2 h, 50 substeps |
 
@@ -261,7 +264,6 @@ Reference numbers (LS6 A100, Nz = 20):
 - Name the term whose derivative explodes (findings 7, 8): the 90-day 1993-01 window on 0.117.2 with
   `advection = upwind3`; instrument the reverse sweep (norm and location of each adjoint field every few
   steps) on the 60-day November or 90-day January window.
-- Move `ajs/omip-adjoint-oc117` to Reactant 0.2.309 (git pin until registered).
 - 1°: forward health at Δt = 2 h with 100 substeps and at Δt = 1 h, then the 1° gradient.
 - Julia 1.13 compile stall with 0.2.309: rerun with the SIGUSR1 profile for an upstream report.
 - Upstream reports still open: Enzyme-JAX #3965 (batch fission); Oceananigans #6529, #6530, PR #6531 (posted
@@ -269,7 +271,7 @@ Reference numbers (LS6 A100, Nz = 20):
 - Resolved since 11-06: finding 4 (`4cc69c3e`); `cse_reduce_transposed` excluded (`fb295782`) and fixed upstream
   (Enzyme-JAX #3970); zero shadow carries (#3971) and `uitofp` (#3969) fixed upstream, in Reactant 0.2.309;
   the Vista first-call failure (gone with per-step thunks); `atlantic_ocean_basin` avoided by the staircase
-  section.
+  section; `oc117` on Reactant 0.2.309 (11-19).
 
 ## Entries
 

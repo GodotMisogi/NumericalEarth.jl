@@ -59,7 +59,8 @@ The GPU memory in `logs/gpu.<jobid>.csv` is XLA's up-front 75% reservation, not 
 
 ## What was built (`experiments/OMIPSimulations/adjoint/`, package `OMIPAdjoint`)
 
-- `Project.toml`: own environment. Reactant pinned to `=0.2.303` (`=0.2.290` before `017f6230`). Oceananigans
+- `Project.toml`: own environment. Reactant 0.2.309 from git `2bb32e28` (`8cfba671`; `=0.2.303` from `017f6230`,
+  `=0.2.290` before). Oceananigans
   0.117.2 and ClimaSeaIce `main` (both `ss/for-omip` on `ajs/omip-adjoint`), SeawaterPolynomials from
   `ss/conversion-functions`, OMIPSimulations and NumericalEarth by path.
 - `src/ocean_only_model.jl`
