@@ -42,18 +42,20 @@ before the end of the window, near coasts and fronts. What is known:
   the forward map has steep switches. So the explosion is an artifact of the linearization: a steep but
   continuous term whose derivative, chained over many steps, explodes.
 - **The 0.117.2 migration made it worse**: same window, J moved 1.2 Sv and the January adjoint went from 3.9 to
-  1e23. The migration replaced WENO's ghost-cell `boundary_scheme` with `minimum_buffer_upwind_order` (3 for
-  tracers, 1 for momentum) near land, and brought the Zipper fix (#6396) and the fold fixes. The hot spot sits
-  next to the Nova Scotia / Grand Banks coast. Prime suspect: the new near-boundary advection.
+  1e23. **Not because of the near-boundary WENO change**: with linear third-order upwind (no WENO) the same
+  window still explodes, to 2.3e101 (1154000).
+- **Where and how it grows (11-19, `AdjointTrace`, LOGBOOK finding 10).** In both runs the adjoint stays near
+  2e4, then jumps several decades per day in short bursts: first at the Kuroshio separation (145–160°E,
+  39–43°N), then at the Grand Banks (310°E, 43°N), both in the top levels, led by S and the momentum
+  tendencies. WENO bursts at days 83–79 and 56–51 of the window, upwind3 at days 69–66 and 64–60.
 - Adjoint damping at 10⁴ m²/s lowers the 90-day explosion only ~17×, and costs 1–2 % of the 8-step gradient.
 
 ## Waiting on the user
 
 1. Done 11-19: `ajs/omip-adjoint-oc117` is on Reactant 0.2.309 (git pin until registered).
-2. 90-day 1993-01 frozen window on 0.117.2 with `advection = upwind3` (no WENO anywhere): bounded means the
-   0.117.2 WENO boundary change is the cause.
-3. Instrument the reverse sweep (norm and location of each adjoint field every few steps) on the 60-day
-   November or 90-day January window, to name the operator that grows.
+2. Done 11-19: the upwind3 90-day window also explodes (1154000), so WENO's boundary change is not the cause.
+3. Done 11-19: reverse sweep traced (`AdjointTrace`; 1153999, 1154000). Next, to name the operator: the same
+   window with GM/Redi off (`eddy_diffusivity = null`), and a one-step Jacobian at the first burst.
 4. 1° forward health check (Δt = 2 h with 100 substeps, and Δt = 1 h) to choose a stable step.
 5. Optional: Julia 1.13 + 0.2.309 rerun with the SIGUSR1 profile, for an upstream report.
 

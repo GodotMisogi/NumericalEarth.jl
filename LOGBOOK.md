@@ -175,11 +175,22 @@ Reference numbers (LS6 A100, Nz = 20):
    max|∂J/∂τx| 3.9 → 1.2e23, hot spot at 50°W 42–48°N next to the coast. The migration changed WENO's
    near-land treatment (`boundary_scheme` → `minimum_buffer_upwind_order`, 3 for tracers, 1 for momentum),
    the Zipper (#6396) and the fold halos. The near-boundary advection is the prime suspect; the late-year
-   blow-up predates the migration.
+   blow-up predates the migration. **Refuted 11-19 (finding 10):** without WENO the window still explodes.
 9. **Reactant 0.2.309 removes the first-call cost (1150765, Julia 1.12).** 2-step test: primal first call
    68.8 → 4.3 s, gradient first call 3095 s → 19.1 s; compiles unchanged (6.2 and 20.2 min); Taylor verified
    (2.2e-4). Under Julia 1.13 the same Reactant stalls in the first compile for > 3 h 49 min at 0 % GPU
    (1147598), so the stall is Julia 1.13's.
+10. **The 90-day adjoint grows in bursts at two places, whatever the advection (11-19, `AdjointTrace`).** Same
+   1993-01 window on 0.117.2 and Reactant 0.2.309, ocean shadows summarized daily in the reverse sweep. WENO
+   (1153999; J 17.9094 Sv as 3588711): baseline about 2e4 until day 85 of the window, then 2e4 → 5e19 in about
+   four days at the Kuroshio separation (145.7°E 39.2°N, top two levels; S and the v tendency lead), a plateau
+   near 1e14 over days 77–57, and a second burst at the Grand Banks (310.7°E 43.4°N, near the surface) to 4e26
+   by day 51. Linear third-order upwind (1154000; J 15.0931 Sv): bounded until day 69, then the same two
+   places in the same order (Kuroshio Extension 160°E 42.5°N days 69–66, Grand Banks from day 64), ending at
+   2.3e101. So the near-boundary WENO change is not needed for the 0.117.2 explosion; the hot spots are the
+   wintertime western-boundary-current separations near the surface, with growth of several decades per
+   day in short bursts rather than a steady e-fold. Both branches build GM/Redi with `FluxTapering(1e-2)`
+   through `omip_closure`, so the 0.113.5 → 0.117.2 change is not in OMIPSimulations' closure setup.
 
 ## Tooling added
 
@@ -195,6 +206,7 @@ Reference numbers (LS6 A100, Nz = 20):
 | `src/adjoint_damping.jl`, `test_adjoint_damping.jl` | `AdjointDamping`: forward damping step D on scratch fields, its transpose by Enzyme after each reverse step; forward check and dot-product test |
 | `forward_health.jl`, `plot_forward_health.jl`, `plot_convection_vs_adjoint.jl` | Forward diagnostics of an adjoint window (CFL, grid-scale noise, unstable columns, κ, SST against ECCO4) and their maps |
 | `perturbation_growth.jl` | Twin forward runs: growth of ε × noise added to T |
+| `AdjointTrace` (`src/adjoint_trace.jl`, config `adjoint_trace_every`) | Per-field summaries of the ocean adjoint (largest finite entry and its indices, root sum of squares, non-finite count) every N reversed steps, saved as `adjoint_trace` |
 | `reduce_gradients.jl`, `omip_cpu.slurm`, `plots/` | Reduction on LS6 CPU nodes; plots locally (`plot_lead_sensitivity.jl`, Pillar maps) |
 | `test_omip_adjoint.jl` keys since 11-07 | `checkpoints`, `average_days`, `frozen_mixing`, `eddy_diffusivity`, `advection`, `Nx`/`Ny`, `horizontal_diffusivity`, `biharmonic_tracer_timescale`, `convective_adjustment`, `laplacian_viscosity`, `adjoint_viscosity`/`adjoint_diffusivity`, `start_date`, `repeat_evaluation` |
 
@@ -256,14 +268,16 @@ Reference numbers (LS6 A100, Nz = 20):
 | Vista 1150765 | Reactant 0.2.309, Julia 1.12.7, 2-step test | verified; gradient first call 19.1 s |
 | Vista 1153869 | Reactant 0.2.309 on `oc117`, 2-step ECCO4 test | primal 8.1e-13 from the CPU twin; Taylor verified; first gradient call 19.5 s |
 | Vista 1153870 | Reactant 0.2.309 on `oc117`, 8-step gradient with `adjoint_trace_every = 4` | J 4.6e-14, stress gradients 1.7e-12, flux gradients 5e-10 from 3577970; same Taylor rows; first call 27.1 s |
+| Vista 1153999 / 1154000 | 90 days from 1993-01, frozen, traced daily: WENO / upwind3 (0.117.2, 0.2.309) | 1.3e22 (J 17.9094 Sv) / 2.3e101 (J 15.0931 Sv); finding 10 |
 | LS6 3578000, 3580072 | 1° 1 year and 90 days (H100) | node c318-002 could not create a CUDA context |
 | LS6 3591885 | 1° 90 days (H100, c318-001) | forward NaN at Δt = 2 h, 50 substeps |
 
 ## Open
 
-- Name the term whose derivative explodes (findings 7, 8): the 90-day 1993-01 window on 0.117.2 with
-  `advection = upwind3`; instrument the reverse sweep (norm and location of each adjoint field every few
-  steps) on the 60-day November or 90-day January window.
+- Name the term whose derivative explodes (findings 7, 8, 10). The trace names the fields (S and the
+  momentum tendencies) and the places (Kuroshio and Grand Banks, top levels) but not the operator inside
+  the step. Candidates: GM/Redi on 0.117.2 (90-day window with `eddy_diffusivity = null`), and a one-step
+  Jacobian at the first burst (checkpoint at the burst, seed the hot cell, compare the closure terms).
 - 1°: forward health at Δt = 2 h with 100 substeps and at Δt = 1 h, then the 1° gradient.
 - Julia 1.13 compile stall with 0.2.309: rerun with the SIGUSR1 profile for an upstream report.
 - Upstream reports still open: Enzyme-JAX #3965 (batch fission); Oceananigans #6529, #6530, PR #6531 (posted
@@ -675,3 +689,13 @@ not attributed yet. Container: `$WORK/containers/julia_1.12_ls6.sif` links to a 
 - Reactant 0.2.309 under Julia 1.12 removes the first-call cost (finding 9); under Julia 1.13 the first compile
   stalls.
 - 1°: the first H100 attempts hit a bad node (c318-002); on c318-001 the forward model goes NaN at Δt = 2 h.
+
+### 2026-11-19
+
+- `oc117` on Reactant 0.2.309 (`8cfba671`): 2-step test verified (1153869); the 8-step gradient matches 3577970 to
+  round-off with a 27 s first call (1153870). The `cse_reduce_transposed` exclusion stays.
+- `AdjointTrace` (`4d86b63a`). The 90-day January window traced with WENO and with upwind3 (1153999, 1154000):
+  both explode in bursts at the Kuroshio separation, then the Grand Banks (finding 10), so the near-boundary
+  WENO change is not the cause.
+- Job 3577970's own Taylor verdict is MISMATCH (relative error 4.3e-3): R1 is non-monotonic above h = 0.0125
+  and flat below it, the jumps in J; the smallest-h secant matches gᵀd to 1e-5.
