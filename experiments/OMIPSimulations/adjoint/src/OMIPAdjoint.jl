@@ -4,7 +4,7 @@ export omip_adjoint_setup, ecco_adjoint_setup, PrescribedFluxOcean,
        OverturningStrength, objective_host,
        roll_barotropic_substeps!, freeze_mixing!,
        adjoint_compile_options, snapshot_state, build_primal, build_gradient, build_checkpointed_gradient,
-       AdjointDamping,
+       AdjointDamping, AdjointTrace,
        wind_gradient, forcing_gradient, surface_geometry, shadow_census, print_shadow_census,
        taylor_remainder_check, finite_difference_scan
 
@@ -63,6 +63,7 @@ include("rolled_substeps.jl")
 include("frozen_mixing.jl")
 include("gradient.jl")
 include("adjoint_damping.jl")
+include("adjoint_trace.jl")
 include("checkpointed_gradient.jl")
 
 end # module OMIPAdjoint

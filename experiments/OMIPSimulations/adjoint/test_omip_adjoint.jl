@@ -41,6 +41,8 @@
 # Optional `adjoint_viscosity` and `adjoint_diffusivity` (m² s⁻¹; need `checkpoints`): adjoint-only horizontal Laplacian
 # damping of the adjoint velocities and tracers after each reverse step (`AdjointDamping`); the gradient is then
 # approximate, so the Taylor check is refused.
+# Optional `adjoint_trace_every` (steps; needs `checkpoints`): record per-field summaries of the ocean adjoint every
+# this many steps of the reverse sweep (`AdjointTrace`), saved as `adjoint_trace`.
 # Optional `repeat_evaluation` (default true): evaluate the gradient a second time and require the same result.
 # Optional `average_days` (needs `checkpoints`): the objective is averaged over the window's last
 # `average_days` instead of taken at its end; the primal and fd_scan stages evaluate the end value, so they
@@ -101,6 +103,9 @@ end
 damped = haskey(P, "adjoint_viscosity") || haskey(P, "adjoint_diffusivity")
 damped && !haskey(P, "checkpoints") && error("adjoint damping needs the checkpointed gradient (config `checkpoints`)")
 damped && haskey(P, "taylor_h0") && error("the damped adjoint is not the exact gradient; drop taylor_h0")
+haskey(P, "adjoint_trace_every") && !haskey(P, "checkpoints") &&
+    error("adjoint_trace_every needs the checkpointed gradient (config `checkpoints`)")
+adjoint_trace = haskey(P, "adjoint_trace_every") ? AdjointTrace(P["adjoint_trace_every"]) : nothing
 
 average_steps = haskey(P, "average_days") ? round(Int, P["average_days"] * 86400 / Δt) : 1
 if average_steps > 1
@@ -209,7 +214,7 @@ if :gradient in stages
     evaluate! = checkpoints === nothing ?
         build_gradient(model, state, obj; n_steps, Δt, compile_options = options, while_unroll_threshold, unroll_steps) :
         build_checkpointed_gradient(model, state, obj; n_steps, Δt, checkpoints, average_steps, adjoint_damping,
-                                    compile_options = options, while_unroll_threshold)
+                                    adjoint_trace, compile_options = options, while_unroll_threshold)
     compile_seconds = time() - t0
     stamp(@sprintf("COMPILED %d-step gradient in %.1f min", n_steps, compile_seconds / 60))
 
@@ -234,6 +239,7 @@ if :gradient in stages
     end
     results["compile_seconds"] = compile_seconds; results["first_seconds"] = first_seconds
     results["census"] = census
+    adjoint_trace === nothing || (results["adjoint_trace"] = copy(adjoint_trace.records))
     save_results()
 
     repeat_evaluation = get(P, "repeat_evaluation", true)

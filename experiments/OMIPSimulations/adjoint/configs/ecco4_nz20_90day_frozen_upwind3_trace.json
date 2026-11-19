@@ -1,0 +1,19 @@
+{
+  "_comment": "ecco4_nz20_90day_frozen_trace with linear third-order upwind advection (no WENO): bounded means the 0.117.2 near-boundary WENO change causes the 90-day growth.",
+  "forcing": "ecco4",
+  "n_months": 5,
+  "Nz": 20,
+  "steps": 1080,
+  "dt": 7200.0,
+  "substeps": 50,
+  "backend": "gpu",
+  "stages": "gradient",
+  "roll_barotropic_substeps": true,
+  "frozen_mixing": true,
+  "checkpoints": 40,
+  "advection": "upwind3",
+  "adjoint_trace_every": 12,
+  "average_days": 30,
+  "repeat_evaluation": false,
+  "output": "results/ecco4_adjoint_nz20_90day_frozen_upwind3_trace.jld2"
+}

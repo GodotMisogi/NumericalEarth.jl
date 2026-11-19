@@ -82,7 +82,7 @@ end
 # Run the steps forward on the Revolve schedule, then back through their reverse passes. The model starts
 # at the window's first step input; `dmodel` ends as the adjoint of that input, seeded with a unit weight for
 # each of the last `average_steps` states. Returns the sum of the objective over those states.
-function revolve_sweep!(model, dmodel, arrays, thunks, obj, n_steps, Δt, checkpoints, slots, average_steps)
+function revolve_sweep!(model, dmodel, arrays, thunks, obj, n_steps, Δt, checkpoints, slots, average_steps, trace)
     schedule = Revolve{Nothing}(n_steps, min(checkpoints, n_steps))
     first_averaged = n_steps - average_steps + 1    # states xₙ with n ≥ first_averaged enter the average
     m = n_steps                                     # the step reversed next
@@ -105,9 +105,11 @@ function revolve_sweep!(model, dmodel, arrays, thunks, obj, n_steps, Δt, checkp
             J = host_number(thunks.reverse_objective(model, dmodel, obj)[2])
             restore_memory!(model, arrays, input)
             J += reverse_step_with_average!(model, dmodel, thunks, obj, Δt, m - 1 >= first_averaged)
+            record_adjoint!(trace, dmodel, m, n_steps)
             m -= 1
         elseif flag == Checkpointing.uturn
             J += reverse_step_with_average!(model, dmodel, thunks, obj, Δt, m - 1 >= first_averaged)
+            record_adjoint!(trace, dmodel, m, n_steps)
             m -= 1
         elseif flag == Checkpointing.done
             m == 0 || error("Revolve reversed $(n_steps - m) of $n_steps steps")
@@ -129,10 +131,13 @@ forcing gradient from [`forcing_gradient`](@ref), averaged likewise, and `dmodel
 and reverse steps run on Revolve's binomial schedule with at most `checkpoints` stored copies of the model's
 device arrays (host memory), so the compile cost does not depend on `n_steps` and the recomputation grows only
 logarithmically with it. With `adjoint_damping`, an [`AdjointDamping`](@ref), the adjoint is damped after each
-step's reverse pass, so the result approximates the gradient; the forward trajectory is unchanged.
+step's reverse pass, so the result approximates the gradient; the forward trajectory is unchanged. With
+`adjoint_trace`, an [`AdjointTrace`](@ref), each evaluation records per-field summaries of the adjoint during
+the reverse sweep.
 """
 function build_checkpointed_gradient(model, state, obj; n_steps, Δt, checkpoints, average_steps = 1,
-                                     adjoint_damping = nothing, compile_options = adjoint_compile_options(),
+                                     adjoint_damping = nothing, adjoint_trace = nothing,
+                                     compile_options = adjoint_compile_options(),
                                      while_unroll_threshold = 0)
     n_steps >= 1 || throw(ArgumentError("n_steps must be at least 1, got $n_steps"))
     checkpoints >= 1 || throw(ArgumentError("checkpoints must be at least 1, got $checkpoints"))
@@ -155,8 +160,10 @@ function build_checkpointed_gradient(model, state, obj; n_steps, Δt, checkpoint
         restore_state!(model, state)
         start = memory_snapshot(model, arrays)     # the refresh's reverse pass runs from here
         slots = Dict{Int, typeof(start)}()
+        adjoint_trace === nothing || empty!(adjoint_trace.records)
         thunks.refresh(model)
-        J = revolve_sweep!(model, dmodel, arrays, thunks, obj, n_steps, Δt, checkpoints, slots, average_steps)
+        J = revolve_sweep!(model, dmodel, arrays, thunks, obj, n_steps, Δt, checkpoints, slots, average_steps,
+                           adjoint_trace)
         restore_memory!(model, arrays, start)
         thunks.reverse_refresh(model, dmodel)
         gradient = map(g -> g ./ average_steps, forcing_gradient(dmodel))
