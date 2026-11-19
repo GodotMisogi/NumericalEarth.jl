@@ -16,6 +16,8 @@
 #             gives `taylor_h0` and `taylor_nh`)
 #   fd_scan   finite differences of the primal window along a saved gradient (`fd_gradient`, a results file
 #             of the same configuration) for `fd_nh` step sizes halving from `fd_h0`; needs `primal`
+#   step_jacobian  leading growth of one step's adjoint at the states `jacobian_steps` (step indices) by
+#             `jacobian_iterations` of power iteration (`step_adjoint_growth`)
 # Optional `excluded_passes`: pattern names left out of Reactant's rewrite lists, replacing
 # adjoint_compile_options' default (["while_deadresult", "cse_reduce_transposed"]); [] runs every pattern.
 # Optional `while_unroll_threshold` (default 0, every loop rolled): Reactant's unroll pattern acts on
@@ -153,7 +155,7 @@ end
 # %%
 ##### Reactant model
 
-reactant_stages = (:primal, :gradient)
+reactant_stages = (:primal, :gradient, :step_jacobian)
 if any(in(stages), reactant_stages)
     :NVPTX in Reactant.LLVM.backends() ||
         error("Reactant lowers Oceananigans kernels through NVPTX; this Julia's LLVM lacks it (macOS). Run on the GPU cluster.")
@@ -262,6 +264,20 @@ if :gradient in stages
         save_results()
         @test taylor.verified
     end
+end
+
+if :step_jacobian in stages
+    t0 = time()
+    jacobian = step_adjoint_growth(model, state; steps = P["jacobian_steps"], iterations = P["jacobian_iterations"], Δt,
+                                   compile_options = options, while_unroll_threshold)
+    for r in jacobian
+        n = length(r.growth)
+        stamp(@sprintf("step %d: growth per step %.4g after %d iterations (previous %.4g)", r.step, r.growth[n], n,
+                       r.growth[max(n - 1, 1)]))
+    end
+    stamp("step Jacobian stage in ", elapsed(t0))
+    results["step_jacobian"] = jacobian
+    save_results()
 end
 
 stamp("saved ", output_path)
