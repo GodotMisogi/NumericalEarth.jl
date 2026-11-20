@@ -56,3 +56,20 @@ function BuoyancyFormulations.compute_buoyancy_gradients!(buoyancy::BuoyancyForc
     end
     return nothing
 end
+
+# CATKE's TKE equation is stepped after each stage's tracer update and before `update_state!` refreshes stored
+# gradients, so it would read the stage's starting N² where inline gradients give the updated one. Recomputing them
+# first keeps the forward model of stored gradients the same as that of inline ones, to rounding.
+# TODO: Oceananigans' `step_closure_prognostics!` for `HydrostaticFreeSurfaceModel` should refresh materialized
+# buoyancy gradients itself; `materialize_gradients = true` otherwise changes the CATKE forward model.
+const StoredBuoyancyGradientsModel =
+    HydrostaticFreeSurfaceModel{<:Any, <:Any, <:AbstractArchitecture, <:Any, <:Any, <:Any, <:Any,
+                                <:BuoyancyForce{<:Any, <:Any, <:NamedTuple}}
+
+function TurbulenceClosures.step_closure_prognostics!(model::StoredBuoyancyGradientsModel, Δt::Number)
+    grid = model.grid
+    BuoyancyFormulations.compute_buoyancy_gradients!(model.buoyancy, grid, model.tracers;
+                                                     parameters = volume_kernel_parameters(grid))
+    TurbulenceClosures.step_closure_prognostics!(model.closure_fields, model.closure, model, Δt)
+    return nothing
+end

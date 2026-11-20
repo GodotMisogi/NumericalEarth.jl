@@ -12,9 +12,9 @@ using Oceananigans
 using Oceananigans: prognostic_state, restore_prognostic_state!
 using Oceananigans.Units: days
 using Oceananigans.Architectures: CPU, ReactantState, architecture, on_architecture,
-                                  convert_to_device
+                                  convert_to_device, AbstractArchitecture
 using Oceananigans.Grids: AbstractGrid, ExponentialDiscretization, LatitudeLongitudeGrid, inactive_node, peripheral_node,
-                          λnode, φnode, znode, Center, Face, Periodic, Bounded, Flat
+                          λnode, φnode, znode, Center, Face, Periodic, Bounded, Flat, volume_kernel_parameters
 using Oceananigans.Operators: Δxᶜᶠᶜ, Δzᶜᶠᶜ, Δyᶠᶜᶜ, Δzᶠᶜᶜ, Azᶜᶜᶜ, ℑxᶠᵃᵃ, ℑyᵃᶠᵃ, intrinsic_vector,
                               Δxᶜᶜᶜ, Δyᶜᶜᶜ, Δxᶠᶜᶜ, Δyᶜᶠᶜ
 using Oceananigans.BoundaryConditions: fill_halo_regions!

@@ -1,0 +1,9 @@
+{
+  "_comment": "Stored vs inline buoyancy gradients on the CPU ECCO4 ocean from 1993-01 (WENO, GM/Redi 800 m² s⁻¹): the gradients at the initial state and after 24 steps, and the two forward models side by side for 24 steps of 2 h.",
+  "n_months": 2,
+  "Nz": 20,
+  "steps": 24,
+  "dt": 7200.0,
+  "substeps": 50,
+  "output": "results/buoyancy_gradient_check_jan1993.jld2"
+}
