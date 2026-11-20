@@ -205,6 +205,20 @@ Reference numbers (LS6 A100, Nz = 20):
    stratified winter cells. Caveats: the fixed-state growth is not the sweep's (the sweep grows only where
    its adjoint already is, on a moving state), and the 1-year blow-up on 0.113.5 is NaN without GM/Redi too
    (3576463), so it has another cause as well.
+12. **Holding the buoyancy gradients constant in derivatives bounds the 90-day adjoint (11-20).** Config key
+   `frozen_buoyancy_gradients` (`7f69e3bd`) stores ∂xᵣb, ∂yᵣb, ∂zb in the `BuoyancyForce` and stop-gradients
+   them after each `compute_buoyancy_gradients!`, so the triad slopes, tapers, stratification masks and N²
+   are constant in the adjoint; the GM/Redi fluxes are still differentiated in the tracer they carry.
+   One-step growth: x₉₇₈ 16.2 → 1.00 per step, x₁₀₄₄ 3.99 → 0.99 (1156065); with GM/Redi off instead,
+   1.21 and 1.30 (1156053), u and v modes at level 17 near the equator at 319–321°E. The
+   90-day traced window (1156066) stays bounded: prognostic adjoint ≤ 4.9e3 (GM/Redi off 1.25e5, on 8.8e27),
+   max|g| 3.9; the u tendency shadow peaks at 3.2e7 for one sample (state 996, 50.6°E 13.8°S, level 18). Its
+   gradients differ from the GM/Redi-off run's by 30–98 % of max, as expected for different physics; the
+   frozen gradient is an approximation (it drops the sensitivity through the slopes), like frozen mixing.
+   Caveat: J is 17.9075 Sv, not 17.9094 Sv (relative 1.1e-4), although stored and inline gradients agree
+   bitwise on a CPU rectilinear grid; not isolated between the tripolar fold patch for stored gradients
+   and XLA rounding grown over 1080 steps. The final shadow S now also holds 4 NaN in the top halo at the
+   fold (j = 61), next to the u, v fold-halo NaN already there with GM/Redi off; the gradient is finite.
 
 ## Tooling added
 
@@ -221,6 +235,7 @@ Reference numbers (LS6 A100, Nz = 20):
 | `forward_health.jl`, `plot_forward_health.jl`, `plot_convection_vs_adjoint.jl` | Forward diagnostics of an adjoint window (CFL, grid-scale noise, unstable columns, κ, SST against ECCO4) and their maps |
 | `perturbation_growth.jl` | Twin forward runs: growth of ε × noise added to T |
 | `step_jacobian` stage (`src/step_jacobian.jl`, configs `jacobian_steps`, `jacobian_iterations`) | Power iteration of one step's reverse pass at fixed states of the window: leading growth per step, per-field summaries per iteration, final shadow u, v, T, S |
+| `frozen_buoyancy_gradients` config key (`src/frozen_mixing.jl`, `freeze_buoyancy_gradients!`; `materialize_buoyancy_gradients` keyword of the setups) | Stores the buoyancy gradients and holds them constant in derivatives: GM/Redi slopes, tapers and N² frozen like CATKE's diffusivities |
 | `AdjointTrace` (`src/adjoint_trace.jl`, config `adjoint_trace_every`) | Per-field summaries of the ocean adjoint (largest finite entry and its indices, root sum of squares, non-finite count) every N reversed steps, saved as `adjoint_trace` |
 | `reduce_gradients.jl`, `omip_cpu.slurm`, `plots/` | Reduction on LS6 CPU nodes; plots locally (`plot_lead_sensitivity.jl`, Pillar maps) |
 | `test_omip_adjoint.jl` keys since 11-07 | `checkpoints`, `average_days`, `frozen_mixing`, `eddy_diffusivity`, `advection`, `Nx`/`Ny`, `horizontal_diffusivity`, `biharmonic_tracer_timescale`, `convective_adjustment`, `laplacian_viscosity`, `adjoint_viscosity`/`adjoint_diffusivity`, `start_date`, `repeat_evaluation` |
@@ -286,15 +301,17 @@ Reference numbers (LS6 A100, Nz = 20):
 | Vista 1153999 / 1154000 | 90 days from 1993-01, frozen, traced daily: WENO / upwind3 (0.117.2, 0.2.309) | 1.3e22 (J 17.9094 Sv) / 2.3e101 (J 15.0931 Sv); finding 10 |
 | Vista 1155069 | 90 days from 1993-01, frozen, traced daily, GM/Redi off (WENO) | bounded: adjoint ≤ 1.25e5, max\|∂J/∂τx\| 2.7, J 18.2888 Sv; finding 11 |
 | Vista 1155076 | `step_jacobian` at x₉₇₈ and x₁₀₄₄ of the 90-day window, 60 iterations | 16.2 and 3.99 per step, single-cell modes (Barents Sea, Grand Banks, level 18); finding 11 |
+| Vista 1156053 | `step_jacobian` as 1155076, GM/Redi off | 1.21 and 1.30 per step; finding 12 |
+| Vista 1156065 | `step_jacobian` as 1155076, `frozen_buoyancy_gradients` | 1.00 and 0.99 per step; finding 12 |
+| Vista 1156066 | 90 days traced as 1153999, `frozen_buoyancy_gradients` | bounded: prognostic adjoint ≤ 4.9e3, max\|g\| 3.9, J 17.9075 Sv (1.1e-4 from 1153999); finding 12 |
 | LS6 3578000, 3580072 | 1° 1 year and 90 days (H100) | node c318-002 could not create a CUDA context |
 | LS6 3591885 | 1° 90 days (H100, c318-001) | forward NaN at Δt = 2 h, 50 substeps |
 
 ## Open
 
-- GM/Redi's linearization (finding 11). Confirm with `step_jacobian` at x₉₇₈ with GM/Redi off (growth
-  should drop to about 1); then hold the isopycnal slopes constant in derivatives, as frozen mixing does for
-  CATKE (`ϵκR₃₃` is a stored field; the skew and off-diagonal Redi fluxes compute slopes inside kernels, so
-  they need stored slopes or an Oceananigans hook). Also diff the closure between 0.113.5 and 0.117.2.
+- Frozen buoyancy gradients (finding 12): find why J moves 1.1e-4 (a few-step forward comparison of stored and
+  inline gradients on the tripolar grid), then try the 1-year window with them. Also diff the closure between
+  0.113.5 and 0.117.2.
 - 1°: forward health at Δt = 2 h with 100 substeps and at Δt = 1 h, then the 1° gradient.
 - Julia 1.13 compile stall with 0.2.309: rerun with the SIGUSR1 profile for an upstream report.
 - Upstream reports still open: Enzyme-JAX #3965 (batch fission); Oceananigans #6529, #6530, PR #6531 (posted
@@ -719,3 +736,10 @@ not attributed yet. Container: `$WORK/containers/julia_1.12_ls6.sif` links to a 
 - GM/Redi off, same traced window (1155069): bounded (adjoint ≤ 1.25e5, max|∂J/∂τx| 2.7). `step_jacobian`
   stage (`7fbf624e`; 1155076): one step's adjoint grows 16.2 per step at x₉₇₈ and 3.99 at x₁₀₄₄, in single
   cells near the surface (Barents Sea, Grand Banks) where Redi's `ϵκR₃₃` shadow also peaks (finding 11).
+
+### 2026-11-20
+
+- GM/Redi off, `step_jacobian` (1156053): 1.21 and 1.30 per step, so GM/Redi carried the 16.2.
+- `frozen_buoyancy_gradients` (`7f69e3bd`): one-step growth 1.00 and 0.99 (1156065); the traced 90-day window is
+  bounded, prognostic adjoint ≤ 4.9e3, max|g| 3.9 (1156066). J moved 1.1e-4 from 1153999, not yet explained
+  (finding 12).

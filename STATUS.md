@@ -1,4 +1,4 @@
-# OMIP adjoint: status as of 2026-11-19
+# OMIP adjoint: status as of 2026-11-20
 
 Branch `ajs/omip-adjoint-oc117` (fork GodotMisogi, Oceananigans 0.117.2, Reactant 0.2.309), shared by Vista and LS6
 through `/work/09603/ajseth/vista/.julia/dev/NumericalEarth-oc117`. Reactant 0.2.309 test branch
@@ -14,7 +14,7 @@ through `/work/09603/ajseth/vista/.julia/dev/NumericalEarth-oc117`. Reactant 0.2
 | Short-window gradient (ECCO4 prescribed fluxes, 2° × 20 levels, Δt = 2 h) | **exact**: 2-step Taylor verified on LS6 (3577970) and Vista (1144920, 1150765); 8-step checkpointed gradient on 0.117.2 is the reference (3577970) |
 | Checkpointed (Revolve) gradient | compile flat in window length (~23–30 min); averaged objective; forcing gradients wrt monthly stress, heat and freshwater flux |
 | Vista (aarch64) gradients | work since the per-step thunks (1144920); the `fixup` failure is gone |
-| Long windows on 0.117.2 | **adjoint explodes** (see below), forward model healthy; bounded with GM/Redi off (1155069) |
+| Long windows on 0.117.2 | **adjoint explodes** (see below), forward model healthy; bounded with GM/Redi off (1155069) and with frozen buoyancy gradients (1156066) |
 | Adjoint-only damping (`AdjointDamping`, `939d9986`) | implemented and verified (dot product 2.6e-15 LS6, 3.9e-14 Vista; zero damping reproduces the 8-step gradient to 2e-12); does **not** contain the growth |
 | Reactant 0.2.309 (git `2bb32e28`, Reactant_jll 0.0.445) | **on `oc117` since 11-19** (`8cfba671`): 2-step Taylor verified (1153869); 8-step gradient matches 3577970 to 1.7e-12 (stress) and 5e-10 (fluxes), compile 21.6 min, **first call 27 s instead of 14 min** (1153870); under Julia 1.13 the first compile stalls > 3 h 49 min (1147598) |
 | 1° (360 × 180) | forward model NaN within 90 days at Δt = 2 h, 50 substeps (3591885) |
@@ -55,6 +55,11 @@ before the end of the window, near coasts and fronts. What is known:
   step has the same eigenvalue. Frozen mixing holds CATKE constant but still differentiates the isopycnal
   slopes, whose derivative scales with 1/N². The 1-year blow-up on 0.113.5 is NaN without GM/Redi too
   (3576463), so it has a second cause.
+- **Frozen buoyancy gradients bound the 90-day adjoint (11-20, LOGBOOK finding 12).** Config key
+  `frozen_buoyancy_gradients` holds ∂xᵣb, ∂yᵣb, ∂zb (so the slopes and N²) constant in derivatives. One-step
+  growth 16.2 → 1.00 and 3.99 → 0.99 per step (1156065; GM/Redi off: 1.21, 1.30, 1156053). The traced 90-day
+  window stays bounded: prognostic adjoint ≤ 4.9e3, max|g| 3.9 (1156066). Open: J is 17.9075 Sv instead of
+  17.9094 (1.1e-4), though stored and inline gradients agree bitwise on a CPU rectilinear grid.
 - Adjoint damping at 10⁴ m²/s lowers the 90-day explosion only ~17×, and costs 1–2 % of the 8-step gradient.
 
 ## Waiting on the user
@@ -62,8 +67,9 @@ before the end of the window, near coasts and fronts. What is known:
 1. Done 11-19: `ajs/omip-adjoint-oc117` is on Reactant 0.2.309 (git pin until registered).
 2. Done 11-19: the upwind3 90-day window also explodes (1154000), so WENO's boundary change is not the cause.
 3. Done 11-19: reverse sweep traced (`AdjointTrace`; 1153999, 1154000); GM/Redi off is bounded (1155069);
-   one-step Jacobian 16.2 per step at the burst (1155076). Next: `step_jacobian` with GM/Redi off to confirm,
-   then freeze the isopycnal slopes in derivatives (frozen GM/Redi, like frozen CATKE).
+   one-step Jacobian 16.2 per step at the burst (1155076). Done 11-20: GM/Redi off gives 1.2–1.3 (1156053);
+   frozen buoyancy gradients give 1.00 and a bounded 90-day adjoint (1156065, 1156066). Next: explain the
+   1.1e-4 shift in J, then the 1-year window with frozen buoyancy gradients.
 4. 1° forward health check (Δt = 2 h with 100 substeps, and Δt = 1 h) to choose a stable step.
 5. Optional: Julia 1.13 + 0.2.309 rerun with the SIGUSR1 profile, for an upstream report.
 
