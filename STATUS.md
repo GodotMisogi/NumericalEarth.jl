@@ -14,7 +14,7 @@ through `/work/09603/ajseth/vista/.julia/dev/NumericalEarth-oc117`. Reactant 0.2
 | Short-window gradient (ECCO4 prescribed fluxes, 2° × 20 levels, Δt = 2 h) | **exact**: 2-step Taylor verified on LS6 (3577970) and Vista (1144920, 1150765); 8-step checkpointed gradient on 0.117.2 is the reference (3577970) |
 | Checkpointed (Revolve) gradient | compile flat in window length (~23–30 min); averaged objective; forcing gradients wrt monthly stress, heat and freshwater flux |
 | Vista (aarch64) gradients | work since the per-step thunks (1144920); the `fixup` failure is gone |
-| Long windows on 0.117.2 | **adjoint explodes** (see below), forward model healthy |
+| Long windows on 0.117.2 | **adjoint explodes** (see below), forward model healthy; bounded with GM/Redi off (1155069) |
 | Adjoint-only damping (`AdjointDamping`, `939d9986`) | implemented and verified (dot product 2.6e-15 LS6, 3.9e-14 Vista; zero damping reproduces the 8-step gradient to 2e-12); does **not** contain the growth |
 | Reactant 0.2.309 (git `2bb32e28`, Reactant_jll 0.0.445) | **on `oc117` since 11-19** (`8cfba671`): 2-step Taylor verified (1153869); 8-step gradient matches 3577970 to 1.7e-12 (stress) and 5e-10 (fluxes), compile 21.6 min, **first call 27 s instead of 14 min** (1153870); under Julia 1.13 the first compile stalls > 3 h 49 min (1147598) |
 | 1° (360 × 180) | forward model NaN within 90 days at Δt = 2 h, 50 substeps (3591885) |
@@ -48,14 +48,22 @@ before the end of the window, near coasts and fronts. What is known:
   2e4, then jumps several decades per day in short bursts: first at the Kuroshio separation (145–160°E,
   39–43°N), then at the Grand Banks (310°E, 43°N), both in the top levels, led by S and the momentum
   tendencies. WENO bursts at days 83–79 and 56–51 of the window, upwind3 at days 69–66 and 64–60.
+- **GM/Redi drives the 90-day explosion (11-19, LOGBOOK finding 11).** With GM/Redi off the same traced
+  window is bounded: adjoint ≤ 1.25e5, max\|∂J/∂τx\| 2.7, J 18.29 Sv (1155069). Power iteration of one step's
+  reverse pass at a fixed state (`step_jacobian`, 1155076) grows 16.2 per step at day 81.5 and 3.99 at day 87,
+  each in one cell at level 18 (Barents Sea; Grand Banks) where Redi's `ϵκR₃₃` shadow peaks. The tangent-linear
+  step has the same eigenvalue. Frozen mixing holds CATKE constant but still differentiates the isopycnal
+  slopes, whose derivative scales with 1/N². The 1-year blow-up on 0.113.5 is NaN without GM/Redi too
+  (3576463), so it has a second cause.
 - Adjoint damping at 10⁴ m²/s lowers the 90-day explosion only ~17×, and costs 1–2 % of the 8-step gradient.
 
 ## Waiting on the user
 
 1. Done 11-19: `ajs/omip-adjoint-oc117` is on Reactant 0.2.309 (git pin until registered).
 2. Done 11-19: the upwind3 90-day window also explodes (1154000), so WENO's boundary change is not the cause.
-3. Done 11-19: reverse sweep traced (`AdjointTrace`; 1153999, 1154000). Next, to name the operator: the same
-   window with GM/Redi off (`eddy_diffusivity = null`), and a one-step Jacobian at the first burst.
+3. Done 11-19: reverse sweep traced (`AdjointTrace`; 1153999, 1154000); GM/Redi off is bounded (1155069);
+   one-step Jacobian 16.2 per step at the burst (1155076). Next: `step_jacobian` with GM/Redi off to confirm,
+   then freeze the isopycnal slopes in derivatives (frozen GM/Redi, like frozen CATKE).
 4. 1° forward health check (Δt = 2 h with 100 substeps, and Δt = 1 h) to choose a stable step.
 5. Optional: Julia 1.13 + 0.2.309 rerun with the SIGUSR1 profile, for an upstream report.
 

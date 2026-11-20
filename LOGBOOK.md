@@ -191,6 +191,20 @@ Reference numbers (LS6 A100, Nz = 20):
    wintertime western-boundary-current separations near the surface, with growth of several decades per
    day in short bursts rather than a steady e-fold. Both branches build GM/Redi with `FluxTapering(1e-2)`
    through `omip_closure`, so the 0.113.5 → 0.117.2 change is not in OMIPSimulations' closure setup.
+11. **GM/Redi drives the 90-day explosion on 0.117.2, and one step's linearization is unstable at single cells
+   (11-19).** The traced WENO window with GM/Redi off (1155069) stays bounded: the adjoint peaks at 1.25e5
+   (day 70) and settles near 1e4, max|∂J/∂τx| 2.7 (with GM/Redi: 8.8e27 and 4.1e21); J 18.2888 Sv. Power
+   iteration of one step's reverse pass at fixed states (`step_jacobian` stage, 1155076; noise seed in u, v, T,
+   S; 60 iterations, converged by about 10) gives a leading growth of 16.2 per step at x₉₇₈ (inside the
+   sweep's Kuroshio burst) and 3.99 per step at x₁₀₄₄ (where the sweep grows 1.2 per day). Both modes sit in
+   one cell at level 18 of 20 (S leads, then the u tendency): the Barents Sea (35.2°E 69.7°N) and the Grand
+   Banks (313.0°E 43.7°N); the shadow of Redi's `ϵκR₃₃` peaks in the same cells. The tangent-linear step
+   has the same eigenvalue, so this is the linearization, not the reverse pass. Frozen mixing freezes only
+   CATKE's κu, κc, κe: the isopycnal slopes in the GM/Redi fluxes and in `ϵκR₃₃` (stored for the implicit
+   vertical solve) are still differentiated, and their derivative scales with 1/N², large in weakly
+   stratified winter cells. Caveats: the fixed-state growth is not the sweep's (the sweep grows only where
+   its adjoint already is, on a moving state), and the 1-year blow-up on 0.113.5 is NaN without GM/Redi too
+   (3576463), so it has another cause as well.
 
 ## Tooling added
 
@@ -206,6 +220,7 @@ Reference numbers (LS6 A100, Nz = 20):
 | `src/adjoint_damping.jl`, `test_adjoint_damping.jl` | `AdjointDamping`: forward damping step D on scratch fields, its transpose by Enzyme after each reverse step; forward check and dot-product test |
 | `forward_health.jl`, `plot_forward_health.jl`, `plot_convection_vs_adjoint.jl` | Forward diagnostics of an adjoint window (CFL, grid-scale noise, unstable columns, κ, SST against ECCO4) and their maps |
 | `perturbation_growth.jl` | Twin forward runs: growth of ε × noise added to T |
+| `step_jacobian` stage (`src/step_jacobian.jl`, configs `jacobian_steps`, `jacobian_iterations`) | Power iteration of one step's reverse pass at fixed states of the window: leading growth per step, per-field summaries per iteration, final shadow u, v, T, S |
 | `AdjointTrace` (`src/adjoint_trace.jl`, config `adjoint_trace_every`) | Per-field summaries of the ocean adjoint (largest finite entry and its indices, root sum of squares, non-finite count) every N reversed steps, saved as `adjoint_trace` |
 | `reduce_gradients.jl`, `omip_cpu.slurm`, `plots/` | Reduction on LS6 CPU nodes; plots locally (`plot_lead_sensitivity.jl`, Pillar maps) |
 | `test_omip_adjoint.jl` keys since 11-07 | `checkpoints`, `average_days`, `frozen_mixing`, `eddy_diffusivity`, `advection`, `Nx`/`Ny`, `horizontal_diffusivity`, `biharmonic_tracer_timescale`, `convective_adjustment`, `laplacian_viscosity`, `adjoint_viscosity`/`adjoint_diffusivity`, `start_date`, `repeat_evaluation` |
@@ -269,15 +284,17 @@ Reference numbers (LS6 A100, Nz = 20):
 | Vista 1153869 | Reactant 0.2.309 on `oc117`, 2-step ECCO4 test | primal 8.1e-13 from the CPU twin; Taylor verified; first gradient call 19.5 s |
 | Vista 1153870 | Reactant 0.2.309 on `oc117`, 8-step gradient with `adjoint_trace_every = 4` | J 4.6e-14, stress gradients 1.7e-12, flux gradients 5e-10 from 3577970; same Taylor rows; first call 27.1 s |
 | Vista 1153999 / 1154000 | 90 days from 1993-01, frozen, traced daily: WENO / upwind3 (0.117.2, 0.2.309) | 1.3e22 (J 17.9094 Sv) / 2.3e101 (J 15.0931 Sv); finding 10 |
+| Vista 1155069 | 90 days from 1993-01, frozen, traced daily, GM/Redi off (WENO) | bounded: adjoint ≤ 1.25e5, max\|∂J/∂τx\| 2.7, J 18.2888 Sv; finding 11 |
+| Vista 1155076 | `step_jacobian` at x₉₇₈ and x₁₀₄₄ of the 90-day window, 60 iterations | 16.2 and 3.99 per step, single-cell modes (Barents Sea, Grand Banks, level 18); finding 11 |
 | LS6 3578000, 3580072 | 1° 1 year and 90 days (H100) | node c318-002 could not create a CUDA context |
 | LS6 3591885 | 1° 90 days (H100, c318-001) | forward NaN at Δt = 2 h, 50 substeps |
 
 ## Open
 
-- Name the term whose derivative explodes (findings 7, 8, 10). The trace names the fields (S and the
-  momentum tendencies) and the places (Kuroshio and Grand Banks, top levels) but not the operator inside
-  the step. Candidates: GM/Redi on 0.117.2 (90-day window with `eddy_diffusivity = null`), and a one-step
-  Jacobian at the first burst (checkpoint at the burst, seed the hot cell, compare the closure terms).
+- GM/Redi's linearization (finding 11). Confirm with `step_jacobian` at x₉₇₈ with GM/Redi off (growth
+  should drop to about 1); then hold the isopycnal slopes constant in derivatives, as frozen mixing does for
+  CATKE (`ϵκR₃₃` is a stored field; the skew and off-diagonal Redi fluxes compute slopes inside kernels, so
+  they need stored slopes or an Oceananigans hook). Also diff the closure between 0.113.5 and 0.117.2.
 - 1°: forward health at Δt = 2 h with 100 substeps and at Δt = 1 h, then the 1° gradient.
 - Julia 1.13 compile stall with 0.2.309: rerun with the SIGUSR1 profile for an upstream report.
 - Upstream reports still open: Enzyme-JAX #3965 (batch fission); Oceananigans #6529, #6530, PR #6531 (posted
@@ -699,3 +716,6 @@ not attributed yet. Container: `$WORK/containers/julia_1.12_ls6.sif` links to a 
   WENO change is not the cause.
 - Job 3577970's own Taylor verdict is MISMATCH (relative error 4.3e-3): R1 is non-monotonic above h = 0.0125
   and flat below it, the jumps in J; the smallest-h secant matches gᵀd to 1e-5.
+- GM/Redi off, same traced window (1155069): bounded (adjoint ≤ 1.25e5, max|∂J/∂τx| 2.7). `step_jacobian`
+  stage (`7fbf624e`; 1155076): one step's adjoint grows 16.2 per step at x₉₇₈ and 3.99 at x₁₀₄₄, in single
+  cells near the surface (Barents Sea, Grand Banks) where Redi's `ϵκR₃₃` shadow also peaks (finding 11).
