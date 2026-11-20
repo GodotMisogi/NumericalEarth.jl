@@ -1,0 +1,20 @@
+{
+  "_comment": "The step Jacobian of ecco4_nz20_90day_frozen_step_jacobian.json (1155076: 16.2 and 3.99 per step) with GM/Redi off, to test whether GM/Redi's linearization carries the single-cell growth.",
+  "forcing": "ecco4",
+  "n_months": 5,
+  "Nz": 20,
+  "steps": 1080,
+  "dt": 7200.0,
+  "substeps": 50,
+  "backend": "gpu",
+  "stages": "step_jacobian",
+  "roll_barotropic_substeps": true,
+  "frozen_mixing": true,
+  "jacobian_steps": [
+    978,
+    1044
+  ],
+  "jacobian_iterations": 60,
+  "eddy_diffusivity": null,
+  "output": "results/ecco4_step_jacobian_nz20_90day_frozen_nogm.jld2"
+}
