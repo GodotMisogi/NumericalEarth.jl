@@ -39,6 +39,9 @@
 # Optional `advection` (default "weno"): "upwind3" replaces the WENO schemes with linear third-order upwind.
 # Optional `convective_adjustment` (m² s⁻¹; default none): implicit convective adjustment of tracers where N² < 0.
 # Optional `laplacian_viscosity` (m² s⁻¹; default none): Laplacian horizontal viscosity on top of the biharmonic one.
+# Optional `frozen_buoyancy_gradients` (default false): store the buoyancy gradients in fields and hold them
+# constant in derivatives (`freeze_buoyancy_gradients!`), so the GM/Redi slopes and tapers enter the gradient as
+# constants; the forward model is unchanged.
 # Optional `start_date` (ISO date, e.g. "1993-11-01"): the window's first day, for the initial state and the forcing.
 # Optional `adjoint_viscosity` and `adjoint_diffusivity` (m² s⁻¹; need `checkpoints`): adjoint-only horizontal Laplacian
 # damping of the adjoint velocities and tracers after each reverse step (`AdjointDamping`); the gradient is then
@@ -77,6 +80,7 @@ advection = Symbol(get(P, "advection", "weno"))
 λ_tracer = haskey(P, "biharmonic_tracer_timescale") ? P["biharmonic_tracer_timescale"] * 86400.0 : nothing
 κ_convective = get(P, "convective_adjustment", nothing)   # convective adjustment diffusivity (m² s⁻¹)
 ν_laplacian = get(P, "laplacian_viscosity", nothing)   # Laplacian horizontal viscosity (m² s⁻¹)
+frozen_gradients = get(P, "frozen_buoyancy_gradients", false)   # stored buoyancy gradients, constant in derivatives
 date_kwargs = haskey(P, "start_date") ? (; start_date = DateTime(P["start_date"])) : (;)
 if forcing == "ecco4"
     n_months = P["n_months"]
@@ -86,6 +90,7 @@ if forcing == "ecco4"
                                              horizontal_diffusivity = κ_horizontal,
                                              biharmonic_tracer_timescale = λ_tracer,
                                              convective_adjustment = κ_convective, laplacian_viscosity = ν_laplacian,
+                                             materialize_buoyancy_gradients = frozen_gradients,
                                              date_kwargs...)
     gradient_units = "Sv per N m⁻²"
 elseif forcing == "jra55"
@@ -96,6 +101,7 @@ elseif forcing == "jra55"
                                              horizontal_diffusivity = κ_horizontal,
                                              biharmonic_tracer_timescale = λ_tracer,
                                              convective_adjustment = κ_convective, laplacian_viscosity = ν_laplacian,
+                                             materialize_buoyancy_gradients = frozen_gradients,
                                              date_kwargs...)
     gradient_units = "Sv per m/s"
 else
@@ -162,6 +168,7 @@ if any(in(stages), reactant_stages)
     Reactant.set_default_backend(P["backend"])
     roll_barotropic_substeps!(P["roll_barotropic_substeps"])
     freeze_mixing!(get(P, "frozen_mixing", false))
+    freeze_buoyancy_gradients!(frozen_gradients)
     options = haskey(P, "excluded_passes") ? adjoint_compile_options(; excluded_passes = String.(P["excluded_passes"])) :
                                              adjoint_compile_options()
     while_unroll_threshold = get(P, "while_unroll_threshold", 0)

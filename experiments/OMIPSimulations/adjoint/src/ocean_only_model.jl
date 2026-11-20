@@ -50,7 +50,8 @@ The OMIP ocean simulation on `grid`: `omip_closure` (CATKE by default, GM/Redi w
 when given, implicit convective adjustment of tracers with diffusivity `convective_adjustment` (m² s⁻¹) where
 N² < 0, when given, and Laplacian horizontal viscosity `laplacian_viscosity` (m² s⁻¹) when given), advection by
 `advection`
-(`:weno`, split WENO, or `:upwind3`, linear third-order upwind; both explicit in the vertical),
+(`:weno`, split WENO, or `:upwind3`, linear third-order upwind; both explicit in the vertical), buoyancy gradients
+stored in fields when `materialize_buoyancy_gradients` (see [`freeze_buoyancy_gradients!`](@ref)),
 enstrophy-conserving Coriolis, `substeps` split-explicit
 barotropic substeps and SplitRK3 time stepping. The initial state is the WOA annual climatology
 converted to TEOS-10 variables on `cpu_grid` and copied onto `grid`, or ECCO4's monthly mean for
@@ -59,7 +60,8 @@ converted to TEOS-10 variables on `cpu_grid` and copied onto `grid`, or ECCO4's 
 function omip_adjoint_ocean(grid, cpu_grid; Δt, substeps = 50, vertical_closure = :catke,
                             κ_skew = 800, κ_symmetric = 800, biharmonic_timescale = 50days, initial_date = nothing,
                             advection = :weno, horizontal_diffusivity = nothing, biharmonic_tracer_timescale = nothing,
-                            convective_adjustment = nothing, laplacian_viscosity = nothing)
+                            convective_adjustment = nothing, laplacian_viscosity = nothing,
+                            materialize_buoyancy_gradients = false)
 
     closure = omip_closure(vertical_closure; grid, κ_skew, κ_symmetric, biharmonic_timescale, laplacian_viscosity,
                            background_vertical_diffusivity = :henyey)
@@ -98,6 +100,7 @@ function omip_adjoint_ocean(grid, cpu_grid; Δt, substeps = 50, vertical_closure
                              tracer_advection = (T = tracer_scheme, S = tracer_scheme),
                              radiative_forcing = nothing,
                              implicit_bottom_drag = true,
+                             materialize_buoyancy_gradients,
                              warn = false)
 
     T_init = CenterField(cpu_grid)
@@ -195,13 +198,13 @@ function omip_adjoint_setup(arch; Nx = 180, Ny = 60, Nz = 20, depth = 5500, Δt 
                             vertical_closure = :catke, κ_skew = 800, κ_symmetric = 800,
                             biharmonic_timescale = 50days, advection = :weno, horizontal_diffusivity = nothing,
                             biharmonic_tracer_timescale = nothing, convective_adjustment = nothing,
-                            laplacian_viscosity = nothing,
+                            laplacian_viscosity = nothing, materialize_buoyancy_gradients = false,
                             start_date = DateTime(1990, 1, 1), n_atmosphere_slices = 16)
 
     grid, cpu_grid = omip_adjoint_grid(arch; Nx, Ny, Nz, depth)
     ocean = omip_adjoint_ocean(grid, cpu_grid; Δt, substeps, vertical_closure, κ_skew, κ_symmetric,
                                biharmonic_timescale, advection, horizontal_diffusivity, biharmonic_tracer_timescale,
-                               convective_adjustment, laplacian_viscosity)
+                               convective_adjustment, laplacian_viscosity, materialize_buoyancy_gradients)
     forcing  = omip_adjoint_forcing(arch; start_date, n_slices = n_atmosphere_slices)
 
     # OMIP-2 Large & Yeager coefficients with a fixed iteration count, so the flux solver traces.

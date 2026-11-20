@@ -2,7 +2,7 @@ module OMIPAdjoint
 
 export omip_adjoint_setup, ecco_adjoint_setup, PrescribedFluxOcean,
        OverturningStrength, objective_host,
-       roll_barotropic_substeps!, freeze_mixing!,
+       roll_barotropic_substeps!, freeze_mixing!, freeze_buoyancy_gradients!,
        adjoint_compile_options, snapshot_state, build_primal, build_gradient, build_checkpointed_gradient,
        AdjointDamping, AdjointTrace, step_adjoint_growth,
        wind_gradient, forcing_gradient, surface_geometry, shadow_census, print_shadow_census,
@@ -22,6 +22,7 @@ using Oceananigans.Fields: Field, CenterField, interior, interpolate!, instantia
 using Oceananigans.OutputReaders: FieldTimeSeries, cpu_interpolating_time_indices
 using Oceananigans.ImmersedBoundaries: ImmersedBoundaryGrid, GridFittedBottom
 using Oceananigans.OrthogonalSphericalShellGrids: TripolarGrid
+using Oceananigans.BuoyancyFormulations: BuoyancyFormulations, BuoyancyForce
 using Oceananigans.Coriolis: HydrostaticSphericalCoriolis, EnstrophyConserving
 using Oceananigans.TurbulenceClosures: TurbulenceClosures, ExplicitTimeDiscretization, HorizontalScalarDiffusivity,
                                      HorizontalScalarBiharmonicDiffusivity, ConvectiveAdjustmentVerticalDiffusivity,

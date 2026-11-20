@@ -31,3 +31,28 @@ function TurbulenceClosures.compute_closure_fields!(closure_fields, closure::Fla
     end
     return nothing
 end
+
+const FREEZE_BUOYANCY_GRADIENTS = Ref(false)
+
+"""
+$(TYPEDSIGNATURES)
+
+Choose whether stored buoyancy gradients (∂xᵣb, ∂yᵣb, ∂zb of a `BuoyancyForce` built with
+`materialize_gradients = true`) are held constant in derivatives (`true`) or differentiated (`false`). Every
+isopycnal slope, slope taper and stratification test then enters the derivative as a constant, while the
+fluxes stay linear in the tracer they carry. The choice is read when a model step is traced, so it must be set
+before `@compile`. Returns `flag`.
+"""
+freeze_buoyancy_gradients!(flag::Bool) = (FREEZE_BUOYANCY_GRADIENTS[] = flag; flag)
+
+function BuoyancyFormulations.compute_buoyancy_gradients!(buoyancy::BuoyancyForce{<:Any, <:Any, <:NamedTuple}, grid,
+                                                         tracers; parameters = :xyz)
+    invoke(BuoyancyFormulations.compute_buoyancy_gradients!, Tuple{Any, Any, Any}, buoyancy, grid, tracers;
+           parameters)
+    if FREEZE_BUOYANCY_GRADIENTS[]
+        for g in buoyancy.gradients
+            parent(g) .= ignore_derivatives(parent(g))
+        end
+    end
+    return nothing
+end
