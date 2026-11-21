@@ -14,7 +14,7 @@ through `/work/09603/ajseth/vista/.julia/dev/NumericalEarth-oc117`. Reactant 0.2
 | Short-window gradient (ECCO4 prescribed fluxes, 2° × 20 levels, Δt = 2 h) | **exact**: 2-step Taylor verified on LS6 (3577970) and Vista (1144920, 1150765); 8-step checkpointed gradient on 0.117.2 is the reference (3577970) |
 | Checkpointed (Revolve) gradient | compile flat in window length (~23–30 min); averaged objective; forcing gradients wrt monthly stress, heat and freshwater flux |
 | Vista (aarch64) gradients | work since the per-step thunks (1144920); the `fixup` failure is gone |
-| Long windows on 0.117.2 | **adjoint explodes** (see below), forward model healthy; bounded with GM/Redi off (1155069) and with frozen buoyancy gradients (1156066) |
+| Long windows on 0.117.2 | **adjoint explodes** (see below), forward model healthy; bounded with GM/Redi off (1155069) and with frozen buoyancy gradients (1157589); 1 year with frozen gradients finite but bursts to 2.7e11 (1157526) |
 | Adjoint-only damping (`AdjointDamping`, `939d9986`) | implemented and verified (dot product 2.6e-15 LS6, 3.9e-14 Vista; zero damping reproduces the 8-step gradient to 2e-12); does **not** contain the growth |
 | Reactant 0.2.309 (git `2bb32e28`, Reactant_jll 0.0.445) | **on `oc117` since 11-19** (`8cfba671`): 2-step Taylor verified (1153869); 8-step gradient matches 3577970 to 1.7e-12 (stress) and 5e-10 (fluxes), compile 21.6 min, **first call 27 s instead of 14 min** (1153870); under Julia 1.13 the first compile stalls > 3 h 49 min (1147598) |
 | 1° (360 × 180) | forward model NaN within 90 days at Δt = 2 h, 50 substeps (3591885) |
@@ -30,6 +30,7 @@ before the end of the window, near coasts and fronts. What is known:
 | 90 days from 1993-01 (3588711) | 0.117.2 | **4.9e22–1.2e23** at 50°W 42–48°N (Grand Banks); J 17.91 Sv |
 | 60 days from 1993-11 (1149976) | 0.117.2 | 8.9e18 at 60°W 43°N |
 | 1 year and 180 days, all variants | both | NaN or ≥ 1e13 in the last two months |
+| 1 year from 1993-01, frozen buoyancy gradients (1157526) | 0.117.2 | finite; S 2.7e11 at 297°E 61°S on day 204, max\|g\| 7.6e5; J 21.21 Sv |
 
 - Ruled out for the 1-year blow-up (each run still NaN): Δt 1 h (3576780), no GM/Redi (3576463), linear
   third-order upwind advection (3576772, 1.5e161), Laplacian (1000 m²/s) and biharmonic (λ = 50 d) tracer
@@ -58,8 +59,12 @@ before the end of the window, near coasts and fronts. What is known:
 - **Frozen buoyancy gradients bound the 90-day adjoint (11-20, LOGBOOK finding 12).** Config key
   `frozen_buoyancy_gradients` holds ∂xᵣb, ∂yᵣb, ∂zb (so the slopes and N²) constant in derivatives. One-step
   growth 16.2 → 1.00 and 3.99 → 0.99 per step (1156065; GM/Redi off: 1.21, 1.30, 1156053). The traced 90-day
-  window stays bounded: prognostic adjoint ≤ 4.9e3, max|g| 3.9 (1156066). Open: J is 17.9075 Sv instead of
-  17.9094 (1.1e-4), though stored and inline gradients agree bitwise on a CPU rectilinear grid.
+  window stays bounded: prognostic adjoint ≤ 2.8e3, max|g| 3.9, J 2.1e-6 from the inline-gradient run
+  (1157589). The first try (1156066) moved J 1.1e-4 because CATKE's TKE step read lagged stored N²; fixed
+  in `6df20f28` (CPU agreement to rounding, `buoyancy_gradient_check.jl`).
+- **The 1-year window with frozen gradients is finite but not bounded (11-20, LOGBOOK finding 13).** 1157526:
+  ≤ 7e3 back to day 242 (one u spike of 2.5e6 on day 240), then S grows 1.8e5 → 2.7e11 within two days (day 204, 297°E 61°S, levels 6–8)
+  and stays near 1e9 in that column to day 0; max|∂J/∂τx| 7.6e5 (129°E 1°S).
 - Adjoint damping at 10⁴ m²/s lowers the 90-day explosion only ~17×, and costs 1–2 % of the 8-step gradient.
 
 ## Waiting on the user
@@ -68,8 +73,9 @@ before the end of the window, near coasts and fronts. What is known:
 2. Done 11-19: the upwind3 90-day window also explodes (1154000), so WENO's boundary change is not the cause.
 3. Done 11-19: reverse sweep traced (`AdjointTrace`; 1153999, 1154000); GM/Redi off is bounded (1155069);
    one-step Jacobian 16.2 per step at the burst (1155076). Done 11-20: GM/Redi off gives 1.2–1.3 (1156053);
-   frozen buoyancy gradients give 1.00 and a bounded 90-day adjoint (1156065, 1156066). Next: explain the
-   1.1e-4 shift in J, then the 1-year window with frozen buoyancy gradients.
+   frozen buoyancy gradients give 1.00 and a bounded 90-day adjoint (1156065, 1157589); the J shift was
+   lagged N² in CATKE's TKE step (`6df20f28`); the 1-year window is finite but bursts (1157526). Next
+   (proposed): `step_jacobian` at the day-204 burst (states 2448–2472) to find the growing term.
 4. 1° forward health check (Δt = 2 h with 100 substeps, and Δt = 1 h) to choose a stable step.
 5. Optional: Julia 1.13 + 0.2.309 rerun with the SIGUSR1 profile, for an upstream report.
 

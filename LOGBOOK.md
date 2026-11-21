@@ -215,10 +215,24 @@ Reference numbers (LS6 A100, Nz = 20):
    max|g| 3.9; the u tendency shadow peaks at 3.2e7 for one sample (state 996, 50.6°E 13.8°S, level 18). Its
    gradients differ from the GM/Redi-off run's by 30–98 % of max, as expected for different physics; the
    frozen gradient is an approximation (it drops the sensitivity through the slopes), like frozen mixing.
-   Caveat: J is 17.9075 Sv, not 17.9094 Sv (relative 1.1e-4), although stored and inline gradients agree
-   bitwise on a CPU rectilinear grid; not isolated between the tripolar fold patch for stored gradients
-   and XLA rounding grown over 1080 steps. The final shadow S now also holds 4 NaN in the top halo at the
-   fold (j = 61), next to the u, v fold-halo NaN already there with GM/Redi off; the gradient is finite.
+   The J of 1156066 (17.9075 Sv, 1.1e-4 from 1153999) came from a forward-model change, not rounding:
+   CATKE's TKE equation (`step_closure_prognostics!`) runs after each stage's tracer update and before
+   `update_state!`, so with stored gradients it read the stage's starting N² (CPU, `buoyancy_gradient_check.jl`:
+   e differs in every wet cell after stage 1, κc by up to 1.04 m²/s, T by 0.22 K after one step). `6df20f28`
+   recomputes stored gradients before the TKE step; the CPU models then agree to 4.4e-16 after one step and
+   1.4e-14 after four. Rerun 1157589: J 17.90934 Sv (2.1e-6 from 1153999's 17.90938), prognostic adjoint
+   ≤ 2.8e3, max|g| 3.9; its flux gradients differ from 1156066's by 26–34 % of max (stress 2–4 %).
+   Stored gradients still differ from inline ones in the vertical halos (k = 0, Nz + 1) and the fold's top halo,
+   which nothing reads beyond rounding. The final shadow S also holds 4 NaN in the top halo at the fold
+   (j = 61), next to the u, v fold-halo NaN already there with GM/Redi off; the gradient is finite.
+13. **With frozen buoyancy gradients the 1-year adjoint is finite but still bursts (11-20).** 1157526 (1993-01
+   start, 4380 steps, frozen mixing and gradients, traced daily, `6df20f28`): J 21.2056 Sv, gradient finite,
+   max|∂J/∂τx| 7.6e5 at 129°E 1°S (month 5), freshwater flux 3.9e7 at 121°E 23°N; every earlier 1-year
+   variant was NaN or ≥ 1e13. The prognostic adjoint is ≤ 7e3 from day 365 back to day 242 (one u spike of
+   2.5e6 on day 240 at 36.5°E 27°S, level 14, gone the next sample), then S grows
+   1.8e5 → 2.7e11 within days 206–204 in one column at 296–298°E 61°S (west of the Antarctic Peninsula),
+   levels 6–8, and stays at 0.5–2e9 in that column back to day 0 (no decay, as for a tracer adjoint with
+   little mixing). One-sample u, v spikes of 1e9–1.5e11 in the tropics (days 145, 137, 98, 74) do not persist.
 
 ## Tooling added
 
@@ -236,6 +250,7 @@ Reference numbers (LS6 A100, Nz = 20):
 | `perturbation_growth.jl` | Twin forward runs: growth of ε × noise added to T |
 | `step_jacobian` stage (`src/step_jacobian.jl`, configs `jacobian_steps`, `jacobian_iterations`) | Power iteration of one step's reverse pass at fixed states of the window: leading growth per step, per-field summaries per iteration, final shadow u, v, T, S |
 | `frozen_buoyancy_gradients` config key (`src/frozen_mixing.jl`, `freeze_buoyancy_gradients!`; `materialize_buoyancy_gradients` keyword of the setups) | Stores the buoyancy gradients and holds them constant in derivatives: GM/Redi slopes, tapers and N² frozen like CATKE's diffusivities |
+| `buoyancy_gradient_check.jl` (config `buoyancy_gradient_check_jan1993.json`) | CPU: stored against inline buoyancy gradients at every stencil index (interior and halos), then both models stepped side by side with per-step u, v, T, S, η differences |
 | `AdjointTrace` (`src/adjoint_trace.jl`, config `adjoint_trace_every`) | Per-field summaries of the ocean adjoint (largest finite entry and its indices, root sum of squares, non-finite count) every N reversed steps, saved as `adjoint_trace` |
 | `reduce_gradients.jl`, `omip_cpu.slurm`, `plots/` | Reduction on LS6 CPU nodes; plots locally (`plot_lead_sensitivity.jl`, Pillar maps) |
 | `test_omip_adjoint.jl` keys since 11-07 | `checkpoints`, `average_days`, `frozen_mixing`, `eddy_diffusivity`, `advection`, `Nx`/`Ny`, `horizontal_diffusivity`, `biharmonic_tracer_timescale`, `convective_adjustment`, `laplacian_viscosity`, `adjoint_viscosity`/`adjoint_diffusivity`, `start_date`, `repeat_evaluation` |
@@ -303,15 +318,18 @@ Reference numbers (LS6 A100, Nz = 20):
 | Vista 1155076 | `step_jacobian` at x₉₇₈ and x₁₀₄₄ of the 90-day window, 60 iterations | 16.2 and 3.99 per step, single-cell modes (Barents Sea, Grand Banks, level 18); finding 11 |
 | Vista 1156053 | `step_jacobian` as 1155076, GM/Redi off | 1.21 and 1.30 per step; finding 12 |
 | Vista 1156065 | `step_jacobian` as 1155076, `frozen_buoyancy_gradients` | 1.00 and 0.99 per step; finding 12 |
-| Vista 1156066 | 90 days traced as 1153999, `frozen_buoyancy_gradients` | bounded: prognostic adjoint ≤ 4.9e3, max\|g\| 3.9, J 17.9075 Sv (1.1e-4 from 1153999); finding 12 |
+| Vista 1156066 | 90 days traced as 1153999, `frozen_buoyancy_gradients` | bounded: prognostic adjoint ≤ 4.9e3, max\|g\| 3.9, J 17.9075 Sv (1.1e-4 from 1153999; lagged N² in CATKE's TKE step); finding 12 |
+| Vista 1157589 | 1156066 rerun with `6df20f28` | prognostic adjoint ≤ 2.8e3, max\|g\| 3.9, J 17.90934 Sv (2.1e-6 from 1153999); finding 12 |
+| Vista 1157526 | 1 year from 1993-01, traced daily, frozen mixing and gradients (`6df20f28`) | finite; S burst to 2.7e11 at 297°E 61°S on day 204, max\|g\| 7.6e5, J 21.2056 Sv; finding 13 |
 | LS6 3578000, 3580072 | 1° 1 year and 90 days (H100) | node c318-002 could not create a CUDA context |
 | LS6 3591885 | 1° 90 days (H100, c318-001) | forward NaN at Δt = 2 h, 50 substeps |
 
 ## Open
 
-- Frozen buoyancy gradients (finding 12): find why J moves 1.1e-4 (a few-step forward comparison of stored and
-  inline gradients on the tripolar grid), then try the 1-year window with them. Also diff the closure between
-  0.113.5 and 0.117.2.
+- 1-year window with frozen buoyancy gradients (finding 13): find what grows S 1e6× in two days at 297°E
+  61°S on day 204 (e.g. `step_jacobian` at states 2448–2472). Also diff the closure between 0.113.5 and 0.117.2.
+- Oceananigans: `step_closure_prognostics!` should refresh materialized buoyancy gradients itself (TODO in
+  `src/frozen_mixing.jl`); with `materialize_gradients = true` CATKE otherwise reads lagged N².
 - 1°: forward health at Δt = 2 h with 100 substeps and at Δt = 1 h, then the 1° gradient.
 - Julia 1.13 compile stall with 0.2.309: rerun with the SIGUSR1 profile for an upstream report.
 - Upstream reports still open: Enzyme-JAX #3965 (batch fission); Oceananigans #6529, #6530, PR #6531 (posted
@@ -741,5 +759,8 @@ not attributed yet. Container: `$WORK/containers/julia_1.12_ls6.sif` links to a 
 
 - GM/Redi off, `step_jacobian` (1156053): 1.21 and 1.30 per step, so GM/Redi carried the 16.2.
 - `frozen_buoyancy_gradients` (`7f69e3bd`): one-step growth 1.00 and 0.99 (1156065); the traced 90-day window is
-  bounded, prognostic adjoint ≤ 4.9e3, max|g| 3.9 (1156066). J moved 1.1e-4 from 1153999, not yet explained
-  (finding 12).
+  bounded, prognostic adjoint ≤ 4.9e3, max|g| 3.9 (1156066). J moved 1.1e-4 from 1153999 (finding 12).
+- The J shift: stored gradients made CATKE's TKE step read the stage's starting N² (CPU,
+  `buoyancy_gradient_check.jl`). Fixed in `6df20f28`; rerun 1157589 gives J 2.1e-6 from 1153999, still bounded.
+- 1-year window with frozen gradients (1157526): finite for the first time, but S bursts to 2.7e11 at 297°E
+  61°S on day 204 and max|g| is 7.6e5 (finding 13).
