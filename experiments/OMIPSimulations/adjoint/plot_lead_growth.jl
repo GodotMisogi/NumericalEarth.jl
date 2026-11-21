@@ -6,7 +6,8 @@
 #
 #   julia --project=adjoint/plots adjoint/plot_lead_growth.jl adjoint/configs/plot_lead_growth.json
 #
-# Config keys (paths relative to adjoint/): runs ([[results file, label], ...]), output.
+# Config keys (paths relative to adjoint/): runs ([[results file, label], ...]), output; optional ylims
+# ([low, high]) and legend_position ("rb", "rt", ...).
 # ==============================================================================
 
 using CairoMakie
@@ -37,8 +38,8 @@ for (n, (path, label)) in enumerate(P["runs"])
 end
 hlines!(ax, ceiling; color = :gray60, linestyle = :dash)
 text!(ax, 5, ceiling; text = "NaN", align = (:left, :top), color = :gray40, fontsize = 13)
-ylims!(ax, 1e-2, 1e200)
-axislegend(ax; position = :rb, framevisible = false)
+ylims!(ax, get(P, "ylims", [1e-2, 1e200])...)
+axislegend(ax; position = Symbol(get(P, "legend_position", "rb")), framevisible = false)
 
 output_path = joinpath(@__DIR__, P["output"])
 mkpath(dirname(output_path))

@@ -1,0 +1,10 @@
+{
+  "_comment": "Adjoint growth with lead on Oceananigans 0.117.2 (jobs 1153999, 1155069, 1157589, 1157526).",
+  "runs": [["results/ecco4_adjoint_nz20_90day_frozen_trace.jld2", "90 days"],
+           ["results/ecco4_adjoint_nz20_90day_frozen_nogm_trace.jld2", "90 days, GM/Redi off"],
+           ["results/ecco4_adjoint_nz20_90day_frozen_gradients_trace.jld2", "90 days, frozen buoyancy gradients"],
+           ["results/ecco4_adjoint_nz20_1year_frozen_gradients_trace.jld2", "1 year, frozen buoyancy gradients"]],
+  "ylims": [1e-2, 1e30],
+  "legend_position": "rt",
+  "output": "papers/figures/lead_growth_ecco4_nz20_oc117.png"
+}

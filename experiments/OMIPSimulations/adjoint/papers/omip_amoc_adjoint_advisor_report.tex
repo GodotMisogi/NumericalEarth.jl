@@ -1,6 +1,6 @@
-% Advisor report (up to seven pages): AMOC adjoint sensitivity in the 2° OMIP ocean, state as of mid-November 2026.
+% Advisor report (up to seven pages): AMOC adjoint sensitivity in the 2° OMIP ocean, state as of 20 November 2026.
 % Build with `latexmk -pdf omip_amoc_adjoint_advisor_report.tex` in this directory. Detail: omip_amoc_adjoint.tex,
-% ../REACTANT_ENZYME_ISSUES.md and the repository-root STATUS.md.
+% ../REACTANT_ENZYME_ISSUES.md and the repository-root STATUS.md and LOGBOOK.md.
 \documentclass[10pt]{article}
 
 \usepackage[margin=0.8in]{geometry}
@@ -24,7 +24,7 @@
 
 \title{\vspace{-2em}\textbf{Adjoint sensitivity of the AMOC at \ang{26.5}N in a differentiable OMIP ocean}\\[2pt]
        \large Progress report\vspace{-0.4em}}
-\date{15 November 2026\vspace{-1em}}
+\date{20 November 2026\vspace{-1em}}
 
 \begin{document}
 \maketitle
@@ -36,25 +36,26 @@ as in Pillar et al.\ (2016), computed with the Enzyme reverse-mode adjoint of a 
 \textsc{Oceananigans} ocean (NumericalEarth's OMIP configuration, 2\textdegree, 20 levels).
 \begin{enumerate}
   \item \textbf{The cost does not grow with window length.} One time step and its reverse pass are compiled once,
-        in about \SI{28}{min}, and run on a binomial (Revolve) checkpoint schedule. A compiled gradient then costs
-        \SI{104}{s} for 30 days with 3-hourly JRA55 forcing, and \SI{15}{min} for a year with monthly ECCO4 fluxes.
+        in about \SI{17}{min}, and run on a binomial (Revolve) checkpoint schedule. With Reactant 0.2.309 a gradient
+        costs \SI{3}{min} for 90 days and \SI{10}{min} for a year with monthly ECCO4 fluxes, from the first call on.
   \item \textbf{The adjoint is exact.} Finite differences agree with it to \numrange{e-9}{e-8} at 8, 84 and 360
-        steps where the objective is smooth. It also verifies after the move to Oceananigans 0.117.2.
+        steps where the objective is smooth. It also verifies on Oceananigans 0.117.2 (Taylor tests at 2 and 8 steps).
   \item \textbf{The objective is only piecewise smooth past about a day.} Discrete switches in the forward model
         make it jump by \SIrange{e-7}{e-3}{Sv}. At finite amplitude the gradient still predicts the 30-day response
         to within \SIrange{0.05}{2}{\percent}.
-  \item \textbf{CATKE must be frozen in the adjoint beyond a month.} At 90 days the full adjoint is NaN in every
-        wet cell; with frozen mixing it is finite and within \SI{2.2}{\percent} of finite differences.
-  \item \textbf{First Pillar-style lead-time maps} (90 days, ECCO4 fluxes): an Ekman band, then boundary and
-        equatorial waveguides spreading with lead, as in Pillar's $-1$ and $-3$ month rows.
-  \item \textbf{Windows of 180 days and longer blow up, even with frozen mixing.} The cause is in the forward
-        trajectory: grid-scale noise grows in fronts and convective regions, and SST drifts \SI{3}{\celsius}
-        from ECCO4 under fixed fluxes. Turning off GM/Redi or WENO does not fix it, and the time step is well inside
-        its limits. Laplacian tracer diffusion (\SI{1000}{m^2/s}) slows the growth $500\times$ at a one-month lead but
-        does not stop it. Scale-selective biharmonic tracer diffusion is now being tested (Section~\ref{sec:next}).
-  \item \textbf{The forward model departs from the OMIP base configuration} in resolution, time step, vertical
-        coordinate, vertical advection, sea ice, rivers, shortwave penetration and salinity restoring
-        (Section~\ref{sec:departures}).
+  \item \textbf{Two parts of the closure must be frozen in the adjoint.} CATKE's diffusivities (as Pillar et al.\
+        freeze KPP), and, new since the last report, the buoyancy gradients that set the GM/Redi slopes and $N^2$.
+        Without the second, the 90-day adjoint on Oceananigans 0.117.2 reaches \num{e23}.
+  \item \textbf{The cause of the long-window explosion is now located.} The forward model does not have the
+        growth. One step's linearization grows 16 times per step in single near-surface winter cells, through the
+        derivative of the isopycnal slopes (which scales with $1/N^2$). Freezing the buoyancy gradients brings
+        that to 1.00 per step and bounds the 90-day adjoint.
+  \item \textbf{Pillar-style lead-time maps at 90 days} on Oceananigans 0.117.2 (Fig.~\ref{fig:lead}): an Ekman
+        band, then boundary and equatorial waveguides spreading with lead. The stress sensitivities match the
+        earlier 0.113.5 maps (cosine 0.98--0.999 per monthly slice).
+  \item \textbf{The 1-year adjoint is finite for the first time, but not yet usable.} It bursts once, at
+        \ang{63}W \ang{61}S and \SIrange{1.1}{1.7}{km} depth in late July, and the slices before the burst carry
+        sensitivities of up to \num{7.6e5} Sv per N m$^{-2}$. A second, smaller cause remains.
 \end{enumerate}
 
 \section{Model and problem}
@@ -63,7 +64,7 @@ as in Pillar et al.\ (2016), computed with the Enzyme reverse-mode adjoint of a 
 \begin{tabular}{@{}lp{0.78\textwidth}@{}}
 \toprule
 Grid & \textsc{TripolarGrid} $180\times60\times20$ ($\approx\ang{2}$), exponential spacing to \SI{5500}{m}, ETOPO bathymetry,
-       immersed boundary; a $360\times180\times20$ (\ang{1}) version is queued \\
+       immersed boundary; a $360\times180\times20$ (\ang{1}) version exists but is not yet stable \\
 Dynamics & hydrostatic Boussinesq, TEOS-10; split Runge--Kutta 3, $\Delta t = \SI{2}{h}$; split-explicit free surface \\
 Closures & CATKE vertical mixing; GM/Redi ($\kappa = \SI{800}{m^2/s}$); biharmonic viscosity; WENO advection \\
 Forcing A & JRA55 repeat-year 3-hourly atmosphere and OMIP-2 bulk formulae, from the WOA state at rest; control:
@@ -72,8 +73,8 @@ Forcing B & ECCO4 monthly wind stress, net heat flux and net freshwater flux, fr
             four fluxes on every monthly slice (Pillar's controls) \\
 Objective & residual overturning $\psi$ at \SI{1000}{m} across a staircase of faces along \ang{26.5}N, \ang{80}W--\ang{14}W
             (RAPID line); at the window's end (A) or averaged over its last 30 days (B) \\
-Software & Float64; Oceananigans 0.117.2 (0.113.5 for the results of Sections~\ref{sec:verification}--\ref{sec:lead}),
-           Reactant 0.2.303, Enzyme 0.13.216, Julia 1.12.7; NVIDIA A100/H100 (Lonestar6) and GH200 (Vista) \\
+Software & Float64; Oceananigans 0.117.2 (0.113.5 where marked), Reactant 0.2.309, Enzyme 0.13.216, Julia 1.12.7;
+           NVIDIA A100/H100 (Lonestar6) and GH200 (Vista) \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -123,8 +124,7 @@ Forcing B & -- & ECCO4 prescribed fluxes and state & Pillar's controls \\
 \end{tabular}
 \end{center}
 The absence of salinity restoring and sea ice leaves the high-latitude surface free to drift. Explicit vertical
-advection and fixed levels are a different numerical path from the production model. Both may matter for the
-long-window behavior of Section~\ref{sec:long}.
+advection and fixed levels are a different numerical path from the production model.
 
 \section{Adjoint method}
 
@@ -139,22 +139,33 @@ checkpoint a host copy of the model's device memory. This replaced two dead ends
 For the 30-day-mean objective, the adjoint receives an extra seed after each of the last $n_{\text{avg}}$ reverse
 steps. Because $J$ is linear, that seed does not depend on the state.
 
-\emph{Frozen mixing} passes CATKE's diffusivities through a stop-gradient, as Pillar et al.\ do with KPP. The forward
-model is unchanged, and the adjoint treats mixing as fixed along the trajectory.
+\textbf{Frozen closures.} Both pass values through a stop-gradient. The forward model is unchanged; the adjoint
+treats them as fixed along the trajectory, and so omits the sensitivity that flows through them.
+\begin{itemize}
+  \item \emph{Frozen mixing:} CATKE's diffusivities, as Pillar et al.\ do with KPP.
+  \item \emph{Frozen buoyancy gradients} (new): $\partial_x b$, $\partial_y b$ and $\partial_z b$ are stored after each
+        refresh and held constant in the adjoint, so the GM/Redi slopes, their tapering and $N^2$ are frozen. The
+        GM/Redi fluxes are still differentiated with respect to the tracers they carry. A side effect had to be
+        fixed: CATKE's turbulent kinetic energy equation is stepped between a stage's tracer update and the
+        refresh, so with stored gradients it read the previous stage's $N^2$, and $J$ moved by \num{1.1e-4}. The
+        stored gradients are now recomputed before that step, and the two forward models agree to rounding
+        (\num{4e-16} in $T$ after one step on the CPU; $J$ within \num{2e-6} after 90 days on the GPU). The same
+        refresh belongs upstream in Oceananigans.
+\end{itemize}
 
 \begin{center}\small
 \begin{tabular}{@{}lrrrr@{}}
 \toprule
 & model build & gradient compile & first call & each later gradient \\
 \midrule
-A, 2 to 360 steps (2 h to 30 days) & 15--24 min & 27--29 min & 37--40 min & \SI{0.8}{s} to \SI{104}{s} \\
-B, 90 days / 1 year & 6 min & 28--29 min & 18 / 30 min & \SI{3.4}{min} / \SI{14.5}{min} \\
+A, 2 to 360 steps (2 h to 30 days), Reactant 0.2.303 & 15--24 min & 27--29 min & 37--40 min & \SI{0.8}{s} to \SI{104}{s} \\
+B, 90 days / 1 year, Reactant 0.2.309 (GH200) & 3.5 min & 17 min & \SI{183}{s} / \SI{599}{s} & the same \\
 \bottomrule
 \end{tabular}
 \end{center}
-The fixed first-call cost is host-side, most likely Julia compiling call wrappers for the very large model type.
-At \ang{1} one reverse step needs a single \SI{31.8}{GiB} allocation, more than an A100 (\SI{40}{GB}) holds, so the
-\ang{1} runs use the \SI{80}{GB} H100 nodes.
+Reactant 0.2.309 removed the 13--\SI{40}{min} host-side first-call cost: the 8-step gradient's first call fell from
+\SI{14}{min} to \SI{27}{s}, and its result matches the 0.2.303 one to \num{1.7e-12}. At \ang{1} one reverse step
+needs a single \SI{31.8}{GiB} allocation, so the \ang{1} runs use the \SI{80}{GB} H100 or \SI{96}{GB} GH200 nodes.
 
 \section{Verification}
 \label{sec:verification}
@@ -162,7 +173,7 @@ At \ang{1} one reverse step needs a single \SI{31.8}{GiB} allocation, more than 
 \begin{center}\small
 \begin{tabular}{@{}p{0.3\textwidth}rp{0.19\textwidth}p{0.36\textwidth}@{}}
 \toprule
-Window & $J$ [Sv] & Check & Result (relative error) \\
+Window (Oceananigans 0.113.5) & $J$ [Sv] & Check & Result (relative error) \\
 \midrule
 A, 1 step & $-14.35$ & Taylor; CPU twin & \num{6e-5}; primal vs.\ twin \num{7.5e-13} \\
 A, 2 steps (Revolve) & $-28.56$ & Taylor & \num{2e-7}; cosine to unrolled $\gvec$: $1 - \num{4e-10}$ \\
@@ -170,18 +181,20 @@ A, 8 / 84 / 360 steps & & FD scan, 25 octaves & central \numrange{4e-9}{2e-8} wh
 B, 8 steps, 4-step average & $-7.59$ & Taylor & \num{7.4e-4} (\num{5.5e-4} unaveraged) \\
 B, 90 days, 30-day average & $16.71$ & secants $h = 0.025$--$0.1$ & full adjoint: NaN; frozen: 2.2\,\% \\
 \midrule
-A, 2 steps, Oceananigans 0.117.2 & $-28.51$ & Taylor & \num{1.6e-4}, error falls $4\times$ per halving of $h$ \\
-B, 8 steps, Oceananigans 0.117.2 & $24.13$ & Taylor & \numrange{5e-6}{9e-6} at the smallest $h$; jumps at $h \approx 0.01$ \\
+\multicolumn{4}{@{}l}{Oceananigans 0.117.2} \\
+A, 2 steps & $-28.51$ & Taylor & \num{1.6e-4}, error falls $4\times$ per halving of $h$ \\
+B, 8 steps & $24.13$ & Taylor & \numrange{5e-6}{9e-6} at the smallest $h$; jumps at $h \approx 0.01$ \\
+B, 8 steps, Reactant 0.2.309 & $24.13$ & against 0.2.303 & stress \num{1.7e-12}, fluxes \num{5e-10} \\
 \bottomrule
 \end{tabular}
 \end{center}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.7\textwidth]{figures/fd_scans_twodegree_nz20.png}
-\caption{Finite differences of $J$ along $d = \gvec/\lVert\gvec\rVert$ at 8, 84 and 360 steps (forcing A). Top:
-error of the central and forward differences relative to $\gvec^{\mathsf T}d$. Bottom: residual of the linear
-prediction on each side, with the signal $h\,\gvec^{\mathsf T}d$ dashed. A plateau as $h$ shrinks is a jump in $J$.}
+\includegraphics[width=0.66\textwidth]{figures/fd_scans_twodegree_nz20.png}
+\caption{Finite differences of $J$ along $d = \gvec/\lVert\gvec\rVert$ at 8, 84 and 360 steps (forcing A, Oceananigans
+0.113.5). Top: error of the central and forward differences relative to $\gvec^{\mathsf T}d$. Bottom: residual of the
+linear prediction on each side, with the signal $h\,\gvec^{\mathsf T}d$ dashed. A plateau as $h$ shrinks is a jump in $J$.}
 \label{fig:fd}
 \end{figure}
 
@@ -192,17 +205,17 @@ matches $\gvec^{\mathsf T}d$ to \num{4e-4} at 8 steps, \numrange{5e-3}{7e-3} at 
 
 \textbf{Frozen against full mixing.} At 84 and 360 steps the frozen gradient has cosine 0.9996 and 0.994 with the
 full one. It predicts the finite-amplitude response \SIrange{0.4}{1.7}{\percent} less accurately and saves no time.
-Its uniform-wind sums can differ by $2.4\times$, because those sums cancel large values of both signs. At 90 days the
-full adjoint is NaN, and only the frozen one is usable.
+At 90 days the full adjoint is NaN, and only the frozen one is usable. The frozen-buoyancy-gradient adjoint has not
+yet been checked against finite differences.
 
 \section{Results}
 \label{sec:lead}
 
-\subsection{Wind sensitivity over 30 days (forcing A)}
+\subsection{Wind sensitivity over 30 days (forcing A, Oceananigans 0.113.5)}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.8\textwidth,trim=0 60 0 40,clip]{figures/amoc_sensitivity_twodegree_nz20_360step.png}
+\includegraphics[width=0.74\textwidth,trim=0 60 0 40,clip]{figures/amoc_sensitivity_twodegree_nz20_360step.png}
 \caption{Sensitivity of $J$ after 30 days to the zonal and meridional \SI{10}{m} wind, summed over the window's
 forcing slices, in \ang{2.25} boxes. Dashed: the RAPID section.}
 \label{fig:wind}
@@ -213,132 +226,112 @@ transport), and the meridional-wind sensitivity at the African coast near \ang{1
 (Fig.~\ref{fig:wind}) the pattern has broken into isolated boxes, the largest in the Caribbean. These windows start
 from rest, so they sample the adjustment from rest, not an equilibrium sensitivity.
 
-\subsection{Lead-time sensitivity over 90 days (forcing B, frozen mixing)}
+\subsection{Lead-time sensitivity over 90 days (forcing B, frozen mixing and buoyancy gradients)}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.68\textwidth]{figures/lead_sensitivity_ecco4_nz20_90day_frozen.png}
-\caption{Sensitivity of the 30-day-mean AMOC (days 61--90, $J = \SI{16.71}{Sv}$) to each monthly flux slice, per unit
-area, by lead (rows) and forcing (columns), after Pillar et al.\ (2016, Fig.~1). Signs follow Pillar: upward heat flux
-and evaporation are positive. Colors are logarithmic over three decades.}
+\includegraphics[width=0.68\textwidth]{figures/lead_sensitivity_ecco4_nz20_90day_frozen_gradients.png}
+\caption{Sensitivity of the 30-day-mean AMOC (days 61--90, $J = \SI{17.91}{Sv}$, Oceananigans 0.117.2) to each
+monthly flux slice, per unit area, by lead (rows) and forcing (columns), after Pillar et al.\ (2016, Fig.~1). Signs
+follow Pillar: upward heat flux and evaporation are positive. Colors are logarithmic over three decades.}
 \label{fig:lead}
 \end{figure}
 
 At a one-month lead the zonal-stress sensitivity lies in zonal bands at and north of the section, the local Ekman
 response. The meridional-stress sensitivity lies along the western boundary, the African coast and the equator, and
 spreads into the tropics and South Atlantic with longer lead, as in Pillar's $-1$ and $-3$ month rows. Stress
-magnitudes, about \SI{e-10}{Sv} per N, match ReactOcean's 90-day maps. The heat- and freshwater-flux columns show
-the cell-scale checkerboard ReactOcean also found, and should not be interpreted yet.
+magnitudes, about \SI{e-10}{Sv} per N, match ReactOcean's 90-day maps. Against the 0.113.5 frozen-mixing maps of the
+last report, the stress sensitivities have cosine 0.98 (at the 90-day lead) to 0.999 (shortest lead) per slice and
+the same maximum to \SI{1}{\percent}; the heat- and freshwater-flux sensitivities have cosine 0.76--0.90. Those two
+columns still show a cell-scale checkerboard and should not be interpreted yet.
 
 \section{Longer windows: an instability of the linearized model}
 \label{sec:long}
 
+\textbf{Earlier tests} (frozen mixing). On Oceananigans 0.113.5 the 90-day window was healthy, but every longer
+window grew by about one e-fold per \SI{17}{h} backward in time and reached NaN within two months. No single change
+bounded the 1-year window: a window ending in June, GM/Redi off, linear third-order upwind advection,
+$\Delta t = \SI{1}{h}$, Laplacian or biharmonic tracer diffusion, convective adjustment, forward Laplacian viscosity up
+to \SI{5e4}{m^2/s}, and an adjoint-only damping (verified by a dot-product test to \num{4e-14}). A noisy, drifting
+forward state was the leading suspect in the last report.
+
+\textbf{The forward model does not have the growth.} Twin forward runs of the same compiled step, with
+\SI{e-6}{K} noise added to $T$, separate with an e-folding time of 12--15 days, not \SI{17}{h}; \SI{e-3}{K} noise
+saturates. Single cells do jump $100\times$ within three days, so the forward map has steep but continuous switches. The
+explosion is therefore a property of the linearization, and damping can only mask it.
+
+\textbf{Oceananigans 0.117.2 made the 90-day window explode too} ($J$ \SI{16.71}{} $\to$ \SI{17.91}{Sv}, adjoint
+\num{3.9} $\to$ \num{e23}), which gave a short window in which to find the cause:
+\begin{itemize}
+  \item \emph{Trace of the reverse sweep}, daily: the adjoint holds near \num{2e4}, then jumps several decades per day
+        in short bursts, first at the Kuroshio separation (\ang{146}E \ang{39}N), then at the Grand Banks
+        (\ang{49}W \ang{43}N), near the surface and led by salinity. The same happens without WENO (linear upwind,
+        \num{2e101}), so the 0.117.2 change in WENO's near-boundary reconstruction is not the cause.
+  \item \emph{GM/Redi off}: bounded (adjoint $\le \num{1.3e5}$, $\max|\partial J/\partial\tau_x| = 2.7$).
+  \item \emph{One step's Jacobian}, by power iteration of the reverse step at a fixed state inside a burst: the
+        leading growth is 16.2 per \SI{2}{h} step, and 3.99 at a second state. Both modes sit in a single cell near
+        \SI{60}{m} depth (Barents Sea; Grand Banks), where the shadow of Redi's vertical diffusivity term peaks. The
+        tangent-linear step has the same eigenvalue. With GM/Redi off the growth is 1.21 and 1.30.
+  \item \emph{Interpretation}: frozen mixing holds CATKE constant but still differentiates the isopycnal slopes
+        $\nabla_h b/\partial_z b$, whose derivative scales with $1/N^2$ and is huge in weakly stratified winter cells.
+  \item \emph{Frozen buoyancy gradients}: the same two states grow 1.00 and 0.99 per step, and the 90-day window is
+        bounded (adjoint $\le \num{2.8e3}$, $\max|\partial J/\partial\tau_x| = 3.9$; Fig.~\ref{fig:growth}).
+\end{itemize}
+
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.64\textwidth]{figures/lead_growth_ecco4_nz20.png}
-\caption{Largest $|\partial J/\partial\tau_x|$ over cells for each monthly slice, against lead, for forcing B with
-frozen mixing. Points on the dashed line are NaN.}
+\includegraphics[width=0.64\textwidth]{figures/lead_growth_ecco4_nz20_oc117.png}
+\caption{Largest $|\partial J/\partial\tau_x|$ over cells for each monthly slice, against lead, on Oceananigans 0.117.2
+with frozen mixing. The GM/Redi-off curve lies under the frozen-buoyancy-gradient one.}
 \label{fig:growth}
 \end{figure}
 
-The 90-day window is healthy (values of order one at every lead). Every longer window grows by roughly one e-fold
-every \SI{17}{h} backward in time, beginning within a month of its end, and reaches NaN by two months
-(Fig.~\ref{fig:growth}). The tests so far each change one thing:
+\textbf{One year with frozen buoyancy gradients.} The gradient is finite ($J = \SI{21.21}{Sv}$), where every earlier
+1-year run was NaN or above \num{e13}. The trace shows one remaining instability:
 \begin{itemize}
-  \item \textbf{Window ending in June} (180 days) instead of December (1 year): the same growth, so it is not tied
-        to the autumn state.
-  \item \textbf{GM/Redi off:} slower at first but still about $10^{16}$ per month, and NaN beyond eight months.
-  \item \textbf{WENO replaced by linear third-order upwind:} no NaN, but steady growth to $10^{161}$.
+  \item From the end of the year back to day 242 the adjoint stays below \num{7e3}, apart from one velocity spike that
+        is gone a day later.
+  \item Around day 204 (late July) the salinity adjoint grows from \num{1.8e5} to \num{2.7e11} within two days in a single
+        column at \ang{63}W \ang{61}S, west of the Antarctic Peninsula, at \SIrange{1.1}{1.7}{km} depth.
+  \item It then stays near \num{e9} in that column back to day 0 without decaying, as expected for a tracer adjoint
+        with little mixing. The forcing slices before the burst carry sensitivities of \num{e5} to \num{7.6e5} Sv per N
+        m$^{-2}$ (Fig.~\ref{fig:growth}), which are not physical.
 \end{itemize}
-So no single adjoint term is responsible. The forward model stays bounded throughout. Some nonlinearity therefore
-keeps finite perturbations in check while infinitesimal ones grow, consistent with the jumps of
-Fig.~\ref{fig:fd}.
-
-\textbf{Forward health check.} To see what changes in the forward run, the 180-day window was stepped with the same
-compiled step, recording diagnostics every 5 days (Fig.~\ref{fig:health}).
-\begin{itemize}
-  \item \textbf{CFL numbers stay small:} vertical $\le 0.03$ and horizontal $\le 0.07$ after spin-up. In the smallest
-        wet cell (\SI{49.6}{km}), an internal wave at \SI{3}{m/s} has a CFL number of 0.44. The time step does not
-        appear to be the cause; a $\Delta t = \SI{1}{h}$ run is queued to confirm.
-  \item \textbf{SST drifts} away from ECCO4 to \SI{3.1}{\celsius} rms by day 180. ECCO4's prescribed fluxes do not
-        respond to SST, so nothing pulls the model back.
-  \item \textbf{Grid-scale surface temperature noise} (the field minus its four-neighbor mean) grows steadily, from
-        \SI{0.26}{K} to \SI{0.66}{K} rms, with single cells 11--\SI{14}{K} off their neighbors. It concentrates where
-        the adjoint explodes: the Gulf Stream and North Atlantic Current, the subpolar North Atlantic, the Kuroshio and
-        the western equatorial Pacific. It also forms zonal stripes along tripolar rows in the Pacific.
-  \item \textbf{Statically unstable interfaces} rise to about 4900 after day 90, and CATKE's diffusivity sits at its
-        \SI{3}{m^2/s} cap in winter convective regions.
-\end{itemize}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.9\textwidth]{figures/forward_health_ecco4_nz20_180day.png}
-\caption{Forward health of the 180-day window (forcing B). Top: $J$, rms SST error against ECCO4, rms grid-scale
-surface temperature residual, and the number of statically unstable interfaces. Middle and bottom: the surface
-grid-scale temperature residual and CATKE's surface diffusivity at days 30 and 180.}
-\label{fig:health}
-\end{figure}
-
-A noisy, drifting forward state is the kind a linearized model can amplify enormously while the forward model
-limits itself. This points to the forward configuration (fixed fluxes, no explicit horizontal tracer diffusion)
-rather than the adjoint machinery.
-
-\textbf{Laplacian tracer diffusion} (\SI{1000}{m^2/s}, 0.3\,\% of its explicit stability limit).
-\begin{itemize}
-  \item \emph{Forward:} the grid-scale noise at day 180 falls from \SI{0.66}{K} to \SI{0.55}{K} rms, and the worst
-        cell from 11.3 to \SI{6.2}{K}. The SST drift is unchanged (\SI{3.05}{\celsius}).
-  \item \emph{Adjoint, 1 year:} the slice one month back drops from \num{1.2e4} to 22.6 Sv per N m$^{-2}$, but every
-        earlier slice is still NaN.
-\end{itemize}
-At \ang{2} a Laplacian of this size damps a two-cell oscillation in about two months, slower than the noise grows.
-
-\textbf{Biharmonic tracer diffusion}, $\kappa_4 = A_z^2/\lambda$ with $\lambda = 50$ days (the biharmonic viscosity's
-form), damps two-cell oscillations in 1--3 days and leaves large scales nearly untouched. Its forward check and
-1-year gradient are running on Vista.
+The 1-year window on 0.113.5 was NaN even with GM/Redi off, so a second cause was expected. A one-step Jacobian at
+the day-204 burst should identify the term.
 
 \section{Software and infrastructure}
 
 \textbf{Oceananigans 0.117.2.} NumericalEarth's OMIP branch moved from a deleted Oceananigans development branch
 (0.113.5) to the registered 0.117.2. That release includes the fix for a Reactant adjoint bug on the tripolar fold
 (CliMA/Oceananigans.jl\#6396). The merged OMIP code also patches two other fold bugs: the buoyancy-gradient sign, and
-the T-pivot vertical halos. Of the 13 OMIP feature branches, 8 are in 0.117.2. The one that matters for us, high-order WENO
-boundary reconstruction (\#5932), is not, so advection near boundaries now falls back to a low-order upwind buffer.
-$J$ moves by \SI{0.17}{\percent}, and the adjoint still verifies (Section~\ref{sec:verification}). ReactOcean, the
-companion code, is on the same versions: Oceananigans 0.117.2, Reactant 0.2.303, Enzyme 0.13.216.
+the T-pivot vertical halos. High-order WENO boundary reconstruction (\#5932) is not in 0.117.2, so advection near
+boundaries falls back to a low-order upwind buffer; this was ruled out as the cause of the 0.117.2 explosion.
 
-\textbf{Julia 1.13.} Under Julia 1.13.3 nothing compiles with Reactant 0.2.303. The newer LLVM emits unsigned
-integer-to-float conversions that Reactant's XLA export rejects (\texttt{arith.uitofp}). The CPU model is
-unaffected, so the GPU runs stay on Julia 1.12.7.
+\textbf{Reactant 0.2.309} (a git pin until it is registered) removes the first-call cost and includes three
+Enzyme-JAX fixes reported from ReactOcean: the zero-valued loop-carried shadow state (\#3971), the slow
+\texttt{cse\_reduce\_transposed} pattern (\#3970) and the \texttt{arith.uitofp} export failure under Julia 1.13 (\#3969).
+Under Julia 1.13 the first compile now stalls for more than \SI{3.8}{h} at zero GPU use, so the GPU runs stay on
+Julia 1.12.7.
 
-\textbf{Reactant and Enzyme issues.} Eight are recorded with evidence and workarounds. Only the tripolar-fold one has
-been reported upstream (EnzymeAD/Reactant.jl\#3636). The others:
-\begin{itemize}
-  \item zero-valued loop-carried shadow state in Enzyme-JAX (\SI{73}{GiB});
-  \item two rewrite patterns (\texttt{while\_deadresult}, \texttt{cse\_reduce\_transposed}) that cost tens of
-        minutes of compile time;
-  \item \texttt{WHILE\_UNROLL\_THRESHOLD} acting after differentiation;
-  \item the aarch64 ``fixup value out of range'' failure, now resolved: with per-step compiles the gradient runs on
-        Vista (compile \SI{21}{min}, first call \SI{52}{min}, Taylor \num{2.2e-4});
-  \item the 13--\SI{40}{min} first-call cost;
-  \item the Julia 1.13 export failure.
-\end{itemize}
+\textbf{Issues still open upstream:} Enzyme-JAX \#3965 (batch fission); Oceananigans \#6529 and \#6530 and PR \#6531;
+the cost of the \texttt{while\_deadresult} pattern. To report: Oceananigans' CATKE step should refresh stored
+buoyancy gradients itself.
 
 \section{Next steps and decisions}
 \label{sec:next}
 
 \begin{enumerate}
-  \item \textbf{Stabilize the forward state for long windows.} Laplacian tracer diffusion slowed the growth but did
-        not stop it. Biharmonic tracer diffusion ($\lambda = 50$ days) is running on Vista. If it is not enough, the
-        next option is SST/SSS feedback on the ECCO4 fluxes, $\lambda(\mathrm{SST}_{\mathrm{ECCO}} - \mathrm{SST})$
-        with $\lambda \approx \SI{40}{W\,m^{-2}\,K^{-1}}$. That is standard with prescribed fluxes and removes the drift,
-        but makes the heat-flux control less pure.
+  \item \textbf{The second cause.} A one-step Jacobian at the day-204 burst of the 1-year window, as for GM/Redi, to
+        find the growing term; then freeze or regularize it.
+  \item \textbf{How much do the frozen closures cost in accuracy?} Secant checks of the 90-day frozen-gradient
+        adjoint along a few forcing directions, as was done for frozen mixing (2.2\,\%).
+  \item Compare the closures of Oceananigans 0.113.5 and 0.117.2, to explain why the 90-day window only explodes on
+        0.117.2.
+  \item \ang{1}: the forward model goes NaN within 90 days at $\Delta t = \SI{2}{h}$ with 50 substeps; check 100 substeps
+        and $\Delta t = \SI{1}{h}$ before the \ang{1} gradient.
   \item \textbf{Closer to the OMIP base configuration} (Section~\ref{sec:departures}): salinity restoring, $z^\star$
         coordinates and implicit vertical advection under Reactant, then sea ice.
-  \item \textbf{Queued on Lonestar6:} \ang{1} windows of 90 days and 1 year on H100 (does resolution change the
-        growth?), and $\Delta t = \SI{1}{h}$ at \ang{2} (does the time step?). Vista's GH200s (\SI{96}{GB}) can now
-        take these instead.
-  \item Finite differences along uniform-wind directions, to settle the full- versus frozen-mixing large-scale
-        sums.
   \item Then a spun-up initial state instead of rest, Nz = 70, and one-year lead-time maps after Pillar et al.
 \end{enumerate}
 
