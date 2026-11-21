@@ -233,6 +233,15 @@ Reference numbers (LS6 A100, Nz = 20):
    1.8e5 → 2.7e11 within days 206–204 in one column at 296–298°E 61°S (west of the Antarctic Peninsula),
    levels 6–8, and stays at 0.5–2e9 in that column back to day 0 (no decay, as for a tracer adjoint with
    little mixing). One-sample u, v spikes of 1e9–1.5e11 in the tropics (days 145, 137, 98, 74) do not persist.
+14. **At 1° the barotropic substep sets stability (11-21).** Forward-only health runs, 90 days from 1993-01,
+   360 × 180 × 20, ECCO4 fluxes, daily snapshots: Δt = 2 h with 50 substeps (144 s) is NaN by day 1
+   (1158106), so 3591885 failed in its first day, not late in the window. Δt = 2 h with 100 substeps (72 s,
+   1158107) and Δt = 1 h with 50 substeps (72 s, 1158108) both run 90 days and agree: J 15.35 and 15.40 Sv on
+   day 90, SST rms 1.89 K for both, max vertical CFL 0.08–0.16 (2 h) and 0.04–0.08 (1 h) at 125°E 5°N, κc max 3.00 m²/s
+   throughout. Both start with a transient, J 34 → 45 Sv over days 1–3, then settle. Halving the
+   barotropic substep is enough, so Δt = 2 h with 100 substeps is the cheaper setting (3.1 min per 90 days,
+   the same as 50 substeps; Δt = 1 h takes 4.2 min). A barotropic CFL limit on the finer grid would explain
+   it; not checked.
 
 ## Tooling added
 
@@ -323,6 +332,9 @@ Reference numbers (LS6 A100, Nz = 20):
 | Vista 1157526 | 1 year from 1993-01, traced daily, frozen mixing and gradients (`6df20f28`) | finite; S burst to 2.7e11 at 297°E 61°S on day 204, max\|g\| 7.6e5, J 21.2056 Sv; finding 13 |
 | LS6 3578000, 3580072 | 1° 1 year and 90 days (H100) | node c318-002 could not create a CUDA context |
 | LS6 3591885 | 1° 90 days (H100, c318-001) | forward NaN at Δt = 2 h, 50 substeps |
+| Vista 1158106 | 1° forward health, 90 days, Δt = 2 h, 50 substeps | NaN by day 1; finding 14 |
+| Vista 1158107 | as 1158106, 100 substeps | finite 90 days, J 15.353 Sv on day 90; finding 14 |
+| Vista 1158108 | as 1158106, Δt = 1 h, 50 substeps | finite 90 days, J 15.396 Sv on day 90; finding 14 |
 
 ## Open
 
@@ -330,7 +342,8 @@ Reference numbers (LS6 A100, Nz = 20):
   61°S on day 204 (e.g. `step_jacobian` at states 2448–2472). Also diff the closure between 0.113.5 and 0.117.2.
 - Oceananigans: `step_closure_prognostics!` should refresh materialized buoyancy gradients itself (TODO in
   `src/frozen_mixing.jl`); with `materialize_gradients = true` CATKE otherwise reads lagged N².
-- 1°: forward health at Δt = 2 h with 100 substeps and at Δt = 1 h, then the 1° gradient.
+- 1°: the 90-day gradient at Δt = 2 h with 100 substeps, frozen mixing and frozen buoyancy gradients
+  (finding 14).
 - Julia 1.13 compile stall with 0.2.309: rerun with the SIGUSR1 profile for an upstream report.
 - Upstream reports still open: Enzyme-JAX #3965 (batch fission); Oceananigans #6529, #6530, PR #6531 (posted
   from ReactOcean); `while_deadresult`'s cost.
@@ -764,3 +777,8 @@ not attributed yet. Container: `$WORK/containers/julia_1.12_ls6.sif` links to a 
   `buoyancy_gradient_check.jl`). Fixed in `6df20f28`; rerun 1157589 gives J 2.1e-6 from 1153999, still bounded.
 - 1-year window with frozen gradients (1157526): finite for the first time, but S bursts to 2.7e11 at 297°E
   61°S on day 204 and max|g| is 7.6e5 (finding 13).
+
+### 2026-11-21
+
+- 1° forward health (1158106–8): Δt = 2 h with 50 substeps is NaN by day 1; 100 substeps and Δt = 1 h both
+  finite for 90 days and agree to 0.04 Sv in J (finding 14). Next: the 1° gradient at Δt = 2 h, 100 substeps.
