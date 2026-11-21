@@ -1,0 +1,15 @@
+{
+  "_comment": "1° forward health, 90 days from 1993-01 at Δt = 1 h with 50 substeps: the barotropic step of the 100-substep run with half the baroclinic step.",
+  "forcing": "ecco4",
+  "n_months": 5,
+  "Nx": 360,
+  "Ny": 180,
+  "Nz": 20,
+  "steps": 2160,
+  "dt": 3600.0,
+  "substeps": 50,
+  "backend": "gpu",
+  "roll_barotropic_substeps": true,
+  "snapshot_days": 1,
+  "output": "results/forward_health_ecco4_onedegree_nz20_90day_dt3600.jld2"
+}
