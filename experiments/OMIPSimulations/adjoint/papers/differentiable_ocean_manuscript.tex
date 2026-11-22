@@ -35,8 +35,8 @@
         and Enzyme, and verified.
   \item Compile time does not depend on the window: one step and its reverse pass are compiled once and driven by
         binomial checkpointing.
-  \item The adjoint explodes through the derivative of the isopycnal slopes; holding the buoyancy gradients fixed
-        in derivatives bounds it.
+  \item The adjoint explodes through the derivative of the isopycnal slopes; fixing the buoyancy gradients in
+        derivatives bounds it at 2 degrees, not at 1.
 \end{itemize}
 
 \begin{abstract}
@@ -52,9 +52,10 @@ e-fold per 17 hours and reaches \num{e23}, while twin forward experiments separa
 15 days. We trace the growth to single near-surface cells in which one step of the linearized model amplifies a
 perturbation 16 times. The amplification comes from the derivative of the isopycnal slopes in the mesoscale
 closure, which scales with the inverse of the stratification. Holding the buoyancy gradients constant in
-derivatives, with the forward model unchanged, reduces the one-step growth to 1.00 and bounds the 90-day adjoint.
-We show the resulting sensitivities of the overturning at \ang{26.5}N to wind stress, heat flux and freshwater flux
-by lead time, and report what still fails: the one-year window has a second, undiagnosed instability.
+derivatives, with the forward model unchanged, reduces the one-step growth to 1.00 and bounds the 90-day adjoint
+at \ang{2}. We show the resulting sensitivities of the overturning at \ang{26.5}N to wind stress, heat flux and
+freshwater flux by lead time, and report what still fails: the one-year window at \ang{2} and the 90-day window at
+\ang{1} have further instabilities that this remedy does not remove.
 \end{abstract}
 
 \section*{Plain Language Summary}
@@ -64,8 +65,9 @@ calculation, but writing one by hand takes years. Here the adjoint is generated 
 modern ocean model that runs on graphics cards. We check that the result is correct, and we measure its cost. We
 also find that over a few months the adjoint blows up even though the ocean model itself is well behaved. The cause
 is one formula, the slope of density surfaces, which is very sensitive where the ocean is weakly layered in winter.
-Treating that slope as fixed when taking derivatives removes the blow-up for three-month calculations. A one-year
-calculation still fails for a reason we have not yet found.
+Treating that slope as fixed when taking derivatives removes the blow-up for three-month calculations on a coarse
+grid. A one-year calculation, and a three-month calculation on a finer grid, still fail for reasons we have not
+yet found.
 
 \section{Introduction}
 
@@ -83,8 +85,12 @@ level of the compiler's intermediate representation, including GPU kernels \cite
 Differentiable programming is now proposed as a general foundation for Earth system models
 \citep{gelbrecht2023}, and differentiable atmospheric models have been trained end to end \citep{kochkov2024}.
 \citet{oceananigansenzyme} apply Enzyme and the compiler Reactant \citep{reactant} to four Earth system model
-components written in Julia, Oceananigans among them. \pending{State precisely which Oceananigans configurations
-that paper differentiates, after reading it, so that the difference from this work is exact.}
+components written in Julia, Oceananigans among them. Their ocean application is an idealized re-entrant channel
+on a rectilinear grid of $80\times160\times32$ cells, with no vertical mixing scheme, differentiated over 14 days
+with square-root checkpointing inside the compiled program and checked against finite differences. The present
+work extends that demonstration to a global configuration: a tripolar grid with realistic bathymetry, a
+prognostic turbulence closure and mesoscale closures, forcing from reanalysis and state estimates, and windows of
+months, where the stability of the adjoint becomes the limiting factor.
 
 This paper makes three contributions.
 \begin{enumerate}
@@ -309,7 +315,8 @@ Table~\ref{tab:cost} gives the costs. The compile time does not depend on the wi
 first gradient spent about \SI{39}{min} on the host before the first step ran; Reactant 0.2.309 removed that
 cost. A 90-day gradient at \ang{2} then takes \SI{3}{min} and a one-year gradient \SI{10}{min}. At \ang{1} one
 reverse step makes a single allocation of \SI{31.8}{GiB}, so those runs need a GPU with \SI{80}{GB} or more.
-\pending{1° gradient cost and the ratio of gradient to forward cost: job 1158947.}
+At \ang{1} the compile takes \SI{16.6}{min} and a 90-day reverse sweep \SI{9.7}{min}, against \SI{3.1}{min} for
+the forward model alone.
 
 \section{Stability of the adjoint}
 \label{sec:stability}
@@ -339,8 +346,16 @@ sweep. The adjoint does not grow steadily. It stays near \num{2e4} and then rise
 short bursts. In the 90-day window the first burst is at the separation of the Kuroshio
 (\ang{146}E \ang{39}N) and the second at the Grand Banks (\ang{49}W \ang{43}N), both near the surface in winter and
 both led by the adjoint of salinity. With upwind advection the bursts occur at the same two places, so the
-advection scheme is not the cause. \pending{Figure: daily maximum of the adjoint for the three runs, from the
-traces of jobs 1153999, 1155069 and 1157589.}
+advection scheme is not the cause (Figure~\ref{fig:trace}).
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.8\textwidth]{figures/adjoint_trace_ecco4_nz20_oc117.png}
+\caption{Largest adjoint of the prognostic fields (velocities, temperature, salinity and free surface) at each
+model day of the reverse sweep of the 90-day window, which runs from day 90 to day 0. A curve ends where the adjoint
+overflows.}
+\label{fig:trace}
+\end{figure}
 
 \subsection{One step of the linearized model}
 
@@ -409,6 +424,17 @@ buoyancy gradients.}
 \label{fig:growth}
 \end{figure}
 
+\subsection{One degree}
+
+At \ang{1} the forward model needs a shorter barotropic step: with 50 substeps per \SI{2}{h} step it is not finite
+after one day, and with 100 it runs the 90 days ($J = \SI{16.36}{Sv}$). The adjoint of that window, with frozen
+mixing and frozen buoyancy gradients, is not bounded (Figure~\ref{fig:trace}). It stays below \num{4e3} for five
+days of the reverse sweep, then grows by two to five decades per day and overflows after 21 days. The growth
+occurs in three groups of cells in the southwest Indian Ocean: the Mozambique Channel (\ang{36}E \ang{26}S, near
+the surface), the Agulhas Return Current (\ang{45}E \ang{41}S, at mid-depth) and north of Madagascar
+(\ang{51}E \ang{11}S). None of these is a site of the \ang{2} bursts. \pending{One-step Jacobian at two states of
+this sweep, with frozen buoyancy gradients and without the mesoscale closure: jobs 1159828 and 1159829.}
+
 \subsection{One year}
 
 With frozen buoyancy gradients the one-year gradient is finite, where every earlier one-year run was not finite or
@@ -445,10 +471,7 @@ only, the cosine per monthly field is 0.98 to 0.999 and the maxima agree to \SI{
 freshwater flux sensitivities are less robust (cosine 0.76 to 0.90) and show a checkerboard at the grid scale. We
 do not interpret them.
 
-\pending{Section 6.1, \ang{1}: the forward model needs 100 barotropic substeps at $\Delta t = \SI{2}{h}$ (it is not
-finite after one day with 50); with 100 it runs 90 days, $J = \SI{15.35}{Sv}$ on day 90. The \ang{1} gradient is
-job 1158947. Present as a demonstration of cost and scaling: the state is still adjusting, with a sea surface
-temperature error of \SI{1.9}{K} against ECCO after 90 days.}
+We have no sensitivities at \ang{1}, because the adjoint is not bounded there (Section~\ref{sec:stability}).
 
 \section{Limitations and outlook}
 \label{sec:limits}
@@ -457,7 +480,9 @@ temperature error of \SI{1.9}{K} against ECCO after 90 days.}
   \item \emph{The frozen adjoint is an approximation.} It omits the sensitivity that acts through changes in
         vertical mixing and in isopycnal slopes. For frozen mixing we measured the cost in accuracy
         (Section~\ref{sec:verification}); \pending{for frozen buoyancy gradients the check is pending}.
-  \item \emph{One year is out of reach.} A second instability remains (Section~\ref{sec:stability}).
+  \item \emph{One year, and \ang{1}, are out of reach.} Further instabilities remain
+        (Section~\ref{sec:stability}), and the bounded \ang{2} result may not survive a change of resolution,
+        season or model version.
   \item \emph{The initial states are not in equilibrium.} The windows start from rest or from the ECCO state
         interpolated to a different grid, and the model adjusts during the window.
   \item \emph{The configuration is simplified}: no sea ice, no surface restoring, fixed levels, explicit vertical

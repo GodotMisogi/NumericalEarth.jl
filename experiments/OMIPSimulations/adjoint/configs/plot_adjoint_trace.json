@@ -1,0 +1,9 @@
+{
+  "_comment": "Daily maximum of the prognostic adjoint in the traced 90-day sweeps on Oceananigans 0.117.2 (jobs 1153999, 1155069, 1157589, 1158947).",
+  "runs": [["results/ecco4_adjoint_nz20_90day_frozen_trace.jld2", "2°, frozen mixing"],
+           ["results/ecco4_adjoint_nz20_90day_frozen_nogm_trace.jld2", "2°, frozen mixing, GM/Redi off"],
+           ["results/ecco4_adjoint_nz20_90day_frozen_gradients_trace.jld2", "2°, frozen mixing and buoyancy gradients"],
+           ["results/ecco4_adjoint_onedegree_nz20_90day_frozen_gradients_trace.jld2", "1°, frozen mixing and buoyancy gradients"]],
+  "ylims": [1e0, 1e40],
+  "output": "papers/figures/adjoint_trace_ecco4_nz20_oc117.png"
+}
