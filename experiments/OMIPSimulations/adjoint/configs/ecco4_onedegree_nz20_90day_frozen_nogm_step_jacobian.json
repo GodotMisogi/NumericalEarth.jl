@@ -13,8 +13,8 @@
   "roll_barotropic_substeps": true,
   "frozen_mixing": true,
   "jacobian_steps": [
-    1026,
-    1002
+    1002,
+    1026
   ],
   "jacobian_iterations": 60,
   "eddy_diffusivity": null,
