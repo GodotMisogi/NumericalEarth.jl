@@ -127,7 +127,8 @@ Compile the gradient of the `n_steps`-step window objective one step at a time a
 which restores the snapshot `state`, evaluates, and returns `(J, gradient, dmodel)` as from
 [`build_gradient`](@ref). The objective is `obj` averaged over the window's last `average_steps` states (1, the
 default, is the final state alone); averaging needs `obj` linear in the model state. `gradient` holds every
-forcing gradient from [`forcing_gradient`](@ref), averaged likewise, and `dmodel` the unscaled sum. The forward
+forcing gradient from [`forcing_gradient`](@ref) and, for GM/Redi diffusivity fields, the gradients from
+[`eddy_diffusivity_gradient`](@ref), averaged likewise, and `dmodel` the unscaled sum. The forward
 and reverse steps run on Revolve's binomial schedule with at most `checkpoints` stored copies of the model's
 device arrays (host memory), so the compile cost does not depend on `n_steps` and the recomputation grows only
 logarithmically with it. With `adjoint_damping`, an [`AdjointDamping`](@ref), the adjoint is damped after each
@@ -166,7 +167,7 @@ function build_checkpointed_gradient(model, state, obj; n_steps, Δt, checkpoint
                            adjoint_trace)
         restore_memory!(model, arrays, start)
         thunks.reverse_refresh(model, dmodel)
-        gradient = map(g -> g ./ average_steps, forcing_gradient(dmodel))
+        gradient = map(g -> g ./ average_steps, (; forcing_gradient(dmodel)..., eddy_diffusivity_gradient(dmodel)...))
         return J / average_steps, gradient, dmodel
     end
     return evaluate!

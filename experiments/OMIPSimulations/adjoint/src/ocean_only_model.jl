@@ -51,7 +51,9 @@ when given, implicit convective adjustment of tracers with diffusivity `convecti
 N² < 0, when given, and Laplacian horizontal viscosity `laplacian_viscosity` (m² s⁻¹) when given), advection by
 `advection`
 (`:weno`, split WENO, or `:upwind3`, linear third-order upwind; both explicit in the vertical), buoyancy gradients
-stored in fields when `materialize_buoyancy_gradients` (see [`freeze_buoyancy_gradients!`](@ref)),
+stored in fields when `materialize_buoyancy_gradients` (see [`freeze_buoyancy_gradients!`](@ref)), GM/Redi
+diffusivities held in uniform center fields instead of numbers when `eddy_diffusivity_fields` (so that they are
+device arrays with a gradient, see [`eddy_diffusivity_gradient`](@ref)),
 enstrophy-conserving Coriolis, `substeps` split-explicit
 barotropic substeps and SplitRK3 time stepping. The initial state is the WOA annual climatology
 converted to TEOS-10 variables on `cpu_grid` and copied onto `grid`, or ECCO4's monthly mean for
@@ -61,8 +63,11 @@ function omip_adjoint_ocean(grid, cpu_grid; Δt, substeps = 50, vertical_closure
                             κ_skew = 800, κ_symmetric = 800, biharmonic_timescale = 50days, initial_date = nothing,
                             advection = :weno, horizontal_diffusivity = nothing, biharmonic_tracer_timescale = nothing,
                             convective_adjustment = nothing, laplacian_viscosity = nothing,
-                            materialize_buoyancy_gradients = false)
+                            materialize_buoyancy_gradients = false, eddy_diffusivity_fields = false)
 
+    if eddy_diffusivity_fields && !isnothing(κ_skew)
+        κ_skew, κ_symmetric = uniform_center_field(grid, κ_skew), uniform_center_field(grid, κ_symmetric)
+    end
     closure = omip_closure(vertical_closure; grid, κ_skew, κ_symmetric, biharmonic_timescale, laplacian_viscosity,
                            background_vertical_diffusivity = :henyey)
     isnothing(horizontal_diffusivity) ||
@@ -118,6 +123,19 @@ function omip_adjoint_ocean(grid, cpu_grid; Δt, substeps = 50, vertical_closure
     parent(ocean.model.tracers.S) .= Array(parent(S_init))
 
     return ocean
+end
+
+# TODO: Oceananigans has `νᶜᶜᶜ` for array viscosities at cell centers but not `κᶜᶜᶜ`, which the Redi term ϵκR₃₃
+# reads; add this method there.
+@inline TurbulenceClosures.κᶜᶜᶜ(i, j, k, grid, ::Tuple{Center, Center, Center}, κ::AbstractArray, clock, fields) =
+    @inbounds κ[i, j, k]
+
+# A center field equal to `value` in every cell, halos included.
+uniform_center_field(grid, value) = fill_everywhere!(CenterField(grid), value)
+
+function fill_everywhere!(field, value)
+    copyto!(parent(field), fill(convert(eltype(field), value), size(parent(field))))
+    return field
 end
 
 # Apply `op!(dst, src)` to every forcing slice, pairing the destination atmosphere / radiation with the source set.

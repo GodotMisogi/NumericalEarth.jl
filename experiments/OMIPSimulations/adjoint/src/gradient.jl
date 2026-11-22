@@ -149,6 +149,42 @@ Gradient of the objective with respect to the forcing controls of `dmodel`'s mod
 """
 forcing_gradient(dmodel) = wind_gradient(dmodel)
 
+# The GM/Redi closure of the ocean model, or nothing.
+function eddy_closure(model)
+    closures = ocean_model(model).closure
+    i = findfirst(c -> c isa IsopycnalSkewSymmetricDiffusivity, closures)
+    return isnothing(i) ? nothing : closures[i]
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+Gradient of the objective with respect to uniform GM/Redi diffusivities, read from the shadows of `dmodel`'s
+diffusivity fields (an ocean built with `eddy_diffusivity_fields = true`): `(; κ_skew, κ_symmetric)`, each the
+sum of its shadow over every cell, halos included, which is the derivative with respect to one value held in all
+of them. Empty when the diffusivities are numbers.
+"""
+function eddy_diffusivity_gradient(dmodel)
+    closure = eddy_closure(dmodel)
+    (isnothing(closure) || !(closure.κ_skew isa Field)) && return (;)
+    return (κ_skew = sum(Array(parent(closure.κ_skew))), κ_symmetric = sum(Array(parent(closure.κ_symmetric))))
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+The uniform value of the GM/Redi diffusivity field `name` (`:κ_skew` or `:κ_symmetric`) of `model`.
+"""
+eddy_diffusivity(model, name) = first(Array(parent(getproperty(eddy_closure(model), name))))
+
+"""
+$(TYPEDSIGNATURES)
+
+Set the GM/Redi diffusivity field `name` (`:κ_skew` or `:κ_symmetric`) of `model` to `value` in every cell,
+halos included.
+"""
+set_eddy_diffusivity!(model, name, value) = (fill_everywhere!(getproperty(eddy_closure(model), name), value); nothing)
+
 """
 $(TYPEDSIGNATURES)
 
@@ -324,21 +360,51 @@ function taylor_remainder_check(model, evaluate!; h0 = 1.0, nh = 6, tolerance = 
     d = gvec ./ max(sqrt(sum(abs2, gvec)), eps())
     gd = sum(gvec .* d)
     println("taylor_remainder_check (h0 = $h0, nh = $nh):")
+    result = taylor_remainder(f0, gd; h0, nh, tolerance) do h
+        set_wind_control!(model, x0 .+ h .* d)
+        first(evaluate!())
+    end
+    set_wind_control!(model, x0)
+    return result
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+Taylor-remainder check of the compiled gradient `evaluate!` with respect to the uniform GM/Redi diffusivity
+`name` (`:κ_skew` or `:κ_symmetric`) of an ocean built with `eddy_diffusivity_fields = true`: compares
+`Δf = f(κ₀ + h) − f(κ₀)` with `h ∂f/∂κ` for `h = h0 / 2ⁱ` (m² s⁻¹), `i = 0:nh-1`, as
+[`taylor_remainder_check`](@ref) does along the wind gradient. Restores κ₀ and returns the rows and the verdict.
+"""
+function eddy_diffusivity_taylor_check(model, evaluate!, name; h0, nh = 6, tolerance = 1e-3)
+    nh >= 3 || throw(ArgumentError("the quadratic fit needs nh ≥ 3 step sizes, got nh = $nh"))
+    κ₀ = eddy_diffusivity(model, name)
+    f0, g, _ = evaluate!()
+    haskey(g, name) || throw(ArgumentError("the gradient has no $name; build the ocean with eddy_diffusivity_fields = true"))
+    println("eddy_diffusivity_taylor_check of $name (κ₀ = $κ₀ m² s⁻¹, h0 = $h0, nh = $nh):")
+    result = taylor_remainder(f0, g[name]; h0, nh, tolerance) do h
+        set_eddy_diffusivity!(model, name, κ₀ + h)
+        first(evaluate!())
+    end
+    set_eddy_diffusivity!(model, name, κ₀)
+    return result
+end
+
+# Δf = f(h) − f0 against h gᵀd for h = h0 / 2ⁱ, with `objective_at(h)` the objective at the perturbed control.
+function taylor_remainder(objective_at, f0, gd; h0, nh, tolerance)
     @printf("  f0 = %.8e   gᵀd = %+.8e\n", f0, gd)
     @printf("  %12s  %15s  %14s  %8s\n", "h", "Δf", "|Δf - h gᵀd|", "rate")
     rows = NamedTuple[]
     previous = NaN
     for i in 0:(nh - 1)
         h = h0 / 2.0^i
-        set_wind_control!(model, x0 .+ h .* d)
-        Δf = first(evaluate!()) - f0
+        Δf = objective_at(h) - f0
         R1 = abs(Δf - h * gd)
         rate = isnan(previous) ? NaN : previous / R1
         @printf("  %12.4e  %+15.6e  %14.6e  %8.3f\n", h, Δf, R1, rate)
         push!(rows, (; h, Δf, R1, rate))
         previous = R1
     end
-    set_wind_control!(model, x0)
     # Only the smallest h: over a wide range of h the cubic and higher terms of the largest h dominate a fit.
     smallest = rows[end-2:end]
     hs = [r.h for r in smallest]

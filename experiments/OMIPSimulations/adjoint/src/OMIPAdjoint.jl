@@ -6,7 +6,8 @@ export omip_adjoint_setup, ecco_adjoint_setup, PrescribedFluxOcean,
        adjoint_compile_options, snapshot_state, build_primal, build_gradient, build_checkpointed_gradient,
        AdjointDamping, AdjointTrace, step_adjoint_growth,
        wind_gradient, forcing_gradient, surface_geometry, shadow_census, print_shadow_census,
-       taylor_remainder_check, finite_difference_scan
+       taylor_remainder_check, finite_difference_scan,
+       eddy_diffusivity_gradient, eddy_diffusivity, set_eddy_diffusivity!, eddy_diffusivity_taylor_check
 
 using Oceananigans
 using Oceananigans: prognostic_state, restore_prognostic_state!
@@ -26,7 +27,7 @@ using Oceananigans.BuoyancyFormulations: BuoyancyFormulations, BuoyancyForce
 using Oceananigans.Coriolis: HydrostaticSphericalCoriolis, EnstrophyConserving
 using Oceananigans.TurbulenceClosures: TurbulenceClosures, ExplicitTimeDiscretization, HorizontalScalarDiffusivity,
                                      HorizontalScalarBiharmonicDiffusivity, ConvectiveAdjustmentVerticalDiffusivity,
-                                     ∂ⱼ_τ₁ⱼ, ∂ⱼ_τ₂ⱼ, ∇_dot_qᶜ, with_tracers
+                                     IsopycnalSkewSymmetricDiffusivity, ∂ⱼ_τ₁ⱼ, ∂ⱼ_τ₂ⱼ, ∇_dot_qᶜ, with_tracers
 using Oceananigans.TurbulenceClosures.TKEBasedVerticalDiffusivities: FlavorOfCATKE
 using Oceananigans.Models.HydrostaticFreeSurfaceModels: HydrostaticFreeSurfaceModel
 using Oceananigans.TimeSteppers: TimeSteppers, Clock, time_step!, update_state!

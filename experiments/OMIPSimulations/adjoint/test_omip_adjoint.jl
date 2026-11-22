@@ -43,6 +43,9 @@
 # constant in derivatives (`freeze_buoyancy_gradients!`), so the GM/Redi slopes and tapers enter the gradient as
 # constants; the forward model is unchanged.
 # Optional `start_date` (ISO date, e.g. "1993-11-01"): the window's first day, for the initial state and the forcing.
+# Optional `eddy_diffusivity_fields` (ecco4 only; default false): hold the GM/Redi diffusivities in uniform fields, so
+# the gradient also has ∂J/∂κ_skew and ∂J/∂κ_symmetric; with `eddy_taylor_h0` and `eddy_taylor_nh` (m² s⁻¹) the gradient
+# stage then runs a Taylor remainder check of each (`eddy_diffusivity_taylor_check`).
 # Optional `adjoint_viscosity` and `adjoint_diffusivity` (m² s⁻¹; need `checkpoints`): adjoint-only horizontal Laplacian
 # damping of the adjoint velocities and tracers after each reverse step (`AdjointDamping`); the gradient is then
 # approximate, so the Taylor check is refused.
@@ -82,6 +85,7 @@ advection = Symbol(get(P, "advection", "weno"))
 ν_laplacian = get(P, "laplacian_viscosity", nothing)   # Laplacian horizontal viscosity (m² s⁻¹)
 frozen_gradients = get(P, "frozen_buoyancy_gradients", false)   # stored buoyancy gradients, constant in derivatives
 date_kwargs = haskey(P, "start_date") ? (; start_date = DateTime(P["start_date"])) : (;)
+eddy_fields = get(P, "eddy_diffusivity_fields", false)   # GM/Redi diffusivities as fields, with a gradient
 if forcing == "ecco4"
     n_months = P["n_months"]
     (n_months - 1) * 28 * 86400 > n_steps * Δt || error("$(n_months) monthly slices do not cover $(n_steps) steps of $(Δt) s")
@@ -91,9 +95,10 @@ if forcing == "ecco4"
                                              biharmonic_tracer_timescale = λ_tracer,
                                              convective_adjustment = κ_convective, laplacian_viscosity = ν_laplacian,
                                              materialize_buoyancy_gradients = frozen_gradients,
-                                             date_kwargs...)
+                                             eddy_diffusivity_fields = eddy_fields, date_kwargs...)
     gradient_units = "Sv per N m⁻²"
 elseif forcing == "jra55"
+    eddy_fields && error("eddy_diffusivity_fields needs the ecco4 forcing")
     n_slices = P["n_atmosphere_slices"]
     n_slices * 3 * 3600 > n_steps * Δt || error("$(n_slices) three-hourly slices do not cover $(n_steps) steps of $(Δt) s")
     model_setup = arch -> omip_adjoint_setup(arch; Nx, Ny, Nz, Δt, substeps, n_atmosphere_slices = n_slices,
@@ -238,6 +243,7 @@ if :gradient in stages
         results["J_gradient_vs_primal"] = rel
         rel < 1e-8 || @warn "gradient's objective differs from the primal window's" rel
     end
+    haskey(g, :κ_skew) && stamp(@sprintf("∂J/∂κ_skew %+.6e, ∂J/∂κ_symmetric %+.6e Sv per m² s⁻¹", g.κ_skew, g.κ_symmetric))
     census = shadow_census(dmodel; cpu_grid = setup.cpu_grid)
     print_shadow_census(census); flush(stdout)
 
@@ -270,6 +276,17 @@ if :gradient in stages
         results["taylor"] = taylor
         save_results()
         @test taylor.verified
+    end
+
+    if finite && haskey(P, "eddy_taylor_h0")
+        eddy_taylor = map((:κ_skew, :κ_symmetric)) do name
+            stamp("Taylor remainder check of ", name, "...")
+            check = eddy_diffusivity_taylor_check(model, evaluate!, name; h0 = P["eddy_taylor_h0"], nh = P["eddy_taylor_nh"])
+            results["eddy_taylor_$name"] = check
+            save_results()
+            check
+        end
+        @test all(c -> c.verified, eddy_taylor)
     end
 end
 
