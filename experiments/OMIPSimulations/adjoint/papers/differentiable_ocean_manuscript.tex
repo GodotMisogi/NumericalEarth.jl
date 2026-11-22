@@ -444,8 +444,17 @@ first bursts (days 83.5 and 85.5) the leading growth is 23.7 and 19.2 per step w
 four cases the mode sits in the horizontal velocities, with 87 to \SI{90}{\percent} of its energy in a
 $3\times3\times3$ box of cells at mid-depth; the mode at day 85.5 with frozen buoyancy gradients is at the Agulhas
 Return Current site of the sweep (\ang{45}E \ang{42}S). Neither the mesoscale closure nor the buoyancy gradients
-carry this growth. \pending{Identify the term: momentum advection and the vertical friction are the candidates
-not yet tested, and the \SI{2}{h} step may be closer to a stability limit at \ang{1}.}
+carry this growth.
+
+The advection scheme does. With linear third-order upwind advection of momentum and tracers in place of WENO, and
+frozen buoyancy gradients, the leading growth at the same two model days is 0.99 per step, and the mode is spread
+over the domain (the largest $3\times3\times3$ box holds under \SI{1}{\percent} of its energy). WENO's weights
+depend on the advected field, and their derivative enters the linearized step; a linear scheme has none. The
+growth is not an effect of the step length: at $\Delta t = \SI{1}{h}$ with WENO it is 2.9 and 4.7 per step, that
+is 8.5 and 22 per \SI{2}{h}. Each variant follows its own forward trajectory, so these compare model days and not
+states. \pending{A 90-day reverse sweep at \ang{1} with linear upwind advection and frozen buoyancy gradients, to
+test whether the adjoint is then bounded; and why WENO's weights are benign at \ang{2}, where the sweep with frozen
+buoyancy gradients is bounded.}
 
 \subsection{One year}
 

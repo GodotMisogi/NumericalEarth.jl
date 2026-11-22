@@ -17,7 +17,7 @@ through `/work/09603/ajseth/vista/.julia/dev/NumericalEarth-oc117`. Reactant 0.2
 | Long windows on 0.117.2 | **adjoint explodes** (see below), forward model healthy; bounded with GM/Redi off (1155069) and with frozen buoyancy gradients (1157589); 1 year with frozen gradients finite but bursts to 2.7e11 (1157526) |
 | Adjoint-only damping (`AdjointDamping`, `939d9986`) | implemented and verified (dot product 2.6e-15 LS6, 3.9e-14 Vista; zero damping reproduces the 8-step gradient to 2e-12); does **not** contain the growth |
 | Reactant 0.2.309 (git `2bb32e28`, Reactant_jll 0.0.445) | **on `oc117` since 11-19** (`8cfba671`): 2-step Taylor verified (1153869); 8-step gradient matches 3577970 to 1.7e-12 (stress) and 5e-10 (fluxes), compile 21.6 min, **first call 27 s instead of 14 min** (1153870); under Julia 1.13 the first compile stalls > 3 h 49 min (1147598) |
-| 1° (360 × 180) | forward model NaN by day 1 at Δt = 2 h, 50 substeps (3591885, 1158106); finite for 90 days with 100 substeps (1158107) or Δt = 1 h (1158108); 90-day adjoint NaN even with frozen mixing and buoyancy gradients (1158947); one-step Jacobian 19–24 per step with frozen gradients, 6.5–10 with GM/Redi off, in momentum (1160770/1, 1160555) |
+| 1° (360 × 180) | forward model NaN by day 1 at Δt = 2 h, 50 substeps (3591885, 1158106); finite for 90 days with 100 substeps (1158107) or Δt = 1 h (1158108); 90-day adjoint NaN even with frozen mixing and buoyancy gradients (1158947); one-step Jacobian 19–24 per step with frozen gradients, 6.5–10 with GM/Redi off, in momentum (1160770/1, 1160555), 0.99 with upwind3 advection (1161247) |
 
 ## The long-window adjoint growth
 
@@ -81,8 +81,9 @@ before the end of the window, near coasts and fronts. What is known:
    (finding 15). Done 11-22: the 2° frozen-gradient 90-day adjoint matches secants along its own direction to
    0.2–0.6 % (1159299, finding 16). The 1° one-step Jacobian grows 19–24 per step with frozen gradients
    (1160770, 1160771) and 6.5–10 with GM/Redi off (1160555), in momentum: not the 2° mechanism (finding 17).
-   Next (proposed): 1° `step_jacobian` with upwind3 advection and at Δt = 1 h. JAMES manuscript draft in
-   `adjoint/papers/`.
+   With upwind3 advection it is 0.99 per step (1161247); at Δt = 1 h with WENO 2.9 and 4.7 (1161248): WENO's
+   weights carry the 1° growth (finding 18). Next (proposed): the 1° 90-day traced gradient with upwind3 and
+   frozen gradients. JAMES manuscript draft in `adjoint/papers/`.
 5. Optional: Julia 1.13 + 0.2.309 rerun with the SIGUSR1 profile, for an upstream report.
 
 ## Constraints to remember

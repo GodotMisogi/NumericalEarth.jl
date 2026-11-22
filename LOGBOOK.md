@@ -264,6 +264,14 @@ Reference numbers (LS6 A100, Nz = 20):
    their tendencies, 87–90 % of its sum of squares in a 3×3×3 box. At 2° the same tests gave 1.00/0.99 and
    1.21/1.30 (finding 12), so 1° has another unstable term, not GM/Redi and not the buoyancy gradients;
    unidentified (untested: momentum advection, vertical friction, Δt = 1 h).
+18. **At 1° WENO's weights carry the one-step growth (11-22).** Same window and model days as finding 17,
+   frozen mixing and buoyancy gradients. Linear third-order upwind advection (1161247): 0.99 per step at
+   both states, the mode spread over the domain (largest 3×3×3 box < 1 % of its sum of squares). WENO at
+   Δt = 1 h, 50 substeps (1161248, states 2004 and 2052): 2.91 (358°E 44°S, level 16) and 4.66 (6°E 55°N,
+   level 20, with η and the barotropic transports), i.e. 8.5 and 22 per 2 h against 23.7 and 19.2: not a
+   time-step effect. Each variant has its own forward trajectory. Not yet run: the 1° 90-day sweep with
+   upwind3 and frozen gradients. At 2° upwind3 alone did not bound the sweep (1154000), but that run
+   differentiated the slopes.
 ## Tooling added
 
 | File | Purpose |
@@ -362,6 +370,8 @@ Reference numbers (LS6 A100, Nz = 20):
 | Vista 1160555 | 1° `step_jacobian` at 1002, 1026, GM/Redi off | 10.28 and 6.462 per step, momentum-led; finding 17 |
 | Vista 1160554, 1160721, 1160722 | 1° `step_jacobian`, frozen gradients (both states; one state each) | GPU out of memory in the forward steps; fixed by `GC.gc()` every 20 steps (`be2f14a4`) |
 | Vista 1160770, 1160771 | 1° `step_jacobian` at 1002 / 1026, frozen mixing and gradients | 23.7 and 19.2 per step, momentum-led; finding 17 |
+| Vista 1161247 | 1° `step_jacobian` at 1002, 1026, frozen mixing and gradients, upwind3 | 0.99 per step at both, diffuse mode; finding 18 |
+| Vista 1161248 | 1° `step_jacobian` at 2004, 2052, frozen mixing and gradients, Δt = 1 h | 2.91 and 4.66 per step; finding 18 |
 
 ## Open
 
@@ -370,8 +380,8 @@ Reference numbers (LS6 A100, Nz = 20):
 - Oceananigans: `step_closure_prognostics!` should refresh materialized buoyancy gradients itself (TODO in
   `src/frozen_mixing.jl`); with `materialize_gradients = true` CATKE otherwise reads lagged N².
 - 1°: the 90-day adjoint explodes with frozen mixing and gradients (finding 15); the one-step Jacobian is
-  unstable in momentum with or without GM/Redi (finding 17). Find the term: `step_jacobian` with upwind3
-  advection, and at Δt = 1 h.
+  unstable in momentum with or without GM/Redi (finding 17) and neutral with upwind3 advection (finding 18).
+  Next: the 1° 90-day traced gradient with upwind3 and frozen gradients.
 - JAMES manuscript draft `adjoint/papers/differentiable_ocean_manuscript.tex`: placeholders in red.
 - Julia 1.13 compile stall with 0.2.309: rerun with the SIGUSR1 profile for an upstream report.
 - Upstream reports still open: Enzyme-JAX #3965 (batch fission); Oceananigans #6529, #6530, PR #6531 (posted
@@ -821,3 +831,5 @@ not attributed yet. Container: `$WORK/containers/julia_1.12_ls6.sif` links to a 
 - Secant check of the 2° 90-day frozen-gradient adjoint: 0.2–0.6 % along its own direction (1159299, finding 16).
 - 1° `step_jacobian`: 19–24 per step with frozen gradients, 6.5–10 with GM/Redi off, all in momentum
   (finding 17). The stage ran out of GPU memory at 1° until the stepping loop collected garbage (`be2f14a4`).
+- 1° `step_jacobian` with upwind3: 0.99 per step; at Δt = 1 h with WENO: 2.9 and 4.7 per step (finding 18).
+  WENO's weights carry the 1° one-step growth.
