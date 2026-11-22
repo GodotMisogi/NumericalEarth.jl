@@ -70,7 +70,11 @@ function step_adjoint_growth(model, state; steps, iterations, Δt, compile_optio
     thunks.refresh(model)
     position = 0
     return map(steps) do s
-        foreach(_ -> thunks.step(model, Δt), (position + 1):s)
+        for n in (position + 1):s
+            thunks.step(model, Δt)
+            # Finalizers free the device buffers of earlier steps; host memory pressure alone does not run them.
+            n % 20 == 0 && GC.gc()
+        end
         position = s
         xₛ = memory_snapshot(model, arrays)
         dmodel = make_zero(model)
