@@ -1,0 +1,19 @@
+{
+  "_comment": "1° step Jacobian inside the first two bursts of the traced 90-day sweep (1158947: 2.4e3 → 2.2e6 over states 1032–1020, 4e7 → 5.8e10 over 1008–996), frozen mixing and buoyancy gradients. One state per job: both states in one job exhausted the GPU memory (1160554). State 1026.",
+  "forcing": "ecco4",
+  "n_months": 5,
+  "Nx": 360,
+  "Ny": 180,
+  "Nz": 20,
+  "steps": 1080,
+  "dt": 7200.0,
+  "substeps": 100,
+  "backend": "gpu",
+  "stages": "step_jacobian",
+  "roll_barotropic_substeps": true,
+  "frozen_mixing": true,
+  "jacobian_steps": [1026],
+  "jacobian_iterations": 60,
+  "frozen_buoyancy_gradients": true,
+  "output": "results/ecco4_step_jacobian_onedegree_nz20_90day_frozen_gradients_1026.jld2"
+}
