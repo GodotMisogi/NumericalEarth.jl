@@ -1,0 +1,23 @@
+{
+  "_comment": "1° step Jacobian of the frozen-mixing, frozen-gradient window (finding 17: 23.7 and 19.2 per step with WENO) with linear third-order upwind advection, to test whether WENO's nonlinear weights carry the 1° growth. The forward trajectory differs from the WENO run.",
+  "forcing": "ecco4",
+  "n_months": 5,
+  "Nx": 360,
+  "Ny": 180,
+  "Nz": 20,
+  "steps": 1080,
+  "dt": 7200.0,
+  "substeps": 100,
+  "backend": "gpu",
+  "stages": "step_jacobian",
+  "roll_barotropic_substeps": true,
+  "frozen_mixing": true,
+  "jacobian_steps": [
+    1002,
+    1026
+  ],
+  "jacobian_iterations": 60,
+  "frozen_buoyancy_gradients": true,
+  "output": "results/ecco4_step_jacobian_onedegree_nz20_90day_frozen_gradients_upwind3.jld2",
+  "advection": "upwind3"
+}
