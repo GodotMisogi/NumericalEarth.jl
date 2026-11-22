@@ -256,6 +256,14 @@ Reference numbers (LS6 A100, Nz = 20):
    extrapolated slope 19.129 (rel. error 1.6 %) and its "MISMATCH" verdict are the small-h Taylor criterion,
    not a gradient error; the job is FAILED for that `@test` only. One direction tested.
 
+17. **At 1° the one-step Jacobian is unstable in momentum, with or without GM/Redi (11-22).** `step_jacobian`
+   at states 1002 and 1026 (days 83.5, 85.5) of the 1° 90-day window, 60 iterations, converged by iteration 10.
+   Frozen mixing and buoyancy gradients (1160770, 1160771): 23.7 per step (42°E 3°S, level 15) and 19.2
+   (45°E 42°S, level 12, the Agulhas Return Current site of 1158947's sweep). GM/Redi off, inline gradients
+   (1160555): 10.3 (154°E 35°S, level 16) and 6.46 (346°E 51°S, level 11). Every mode is led by u, v and
+   their tendencies, 87–90 % of its sum of squares in a 3×3×3 box. At 2° the same tests gave 1.00/0.99 and
+   1.21/1.30 (finding 12), so 1° has another unstable term, not GM/Redi and not the buoyancy gradients;
+   unidentified (untested: momentum advection, vertical friction, Δt = 1 h).
 ## Tooling added
 
 | File | Purpose |
@@ -350,6 +358,10 @@ Reference numbers (LS6 A100, Nz = 20):
 | Vista 1158108 | as 1158106, Δt = 1 h, 50 substeps | finite 90 days, J 15.396 Sv on day 90; finding 14 |
 | Vista 1158947 | 1° 90 days traced, 100 substeps, frozen mixing and gradients | adjoint NaN, growth from day 85 in the SW Indian Ocean; J 16.3630 Sv; finding 15 |
 | Vista 1159299 | 90 days, frozen mixing and gradients, secant check (h = 0.1, 0.05, 0.025) | gᵀd 18.823 vs secants 18.93, 18.94, 18.87 (0.2–0.6 %); `@test taylor.verified` fails on the small-h criterion; finding 16 |
+| Vista 1159828, 1159829 | 1° `step_jacobian`, frozen gradients / GM/Redi off | failed at once: `jacobian_steps` not ascending (config error) |
+| Vista 1160555 | 1° `step_jacobian` at 1002, 1026, GM/Redi off | 10.28 and 6.462 per step, momentum-led; finding 17 |
+| Vista 1160554, 1160721, 1160722 | 1° `step_jacobian`, frozen gradients (both states; one state each) | GPU out of memory in the forward steps; fixed by `GC.gc()` every 20 steps (`be2f14a4`) |
+| Vista 1160770, 1160771 | 1° `step_jacobian` at 1002 / 1026, frozen mixing and gradients | 23.7 and 19.2 per step, momentum-led; finding 17 |
 
 ## Open
 
@@ -357,8 +369,9 @@ Reference numbers (LS6 A100, Nz = 20):
   61°S on day 204 (e.g. `step_jacobian` at states 2448–2472). Also diff the closure between 0.113.5 and 0.117.2.
 - Oceananigans: `step_closure_prognostics!` should refresh materialized buoyancy gradients itself (TODO in
   `src/frozen_mixing.jl`); with `materialize_gradients = true` CATKE otherwise reads lagged N².
-- 1°: the 90-day adjoint explodes with frozen mixing and gradients (finding 15); `step_jacobian` at states
-  1026 and 1002, with frozen gradients and with GM/Redi off, to find the term.
+- 1°: the 90-day adjoint explodes with frozen mixing and gradients (finding 15); the one-step Jacobian is
+  unstable in momentum with or without GM/Redi (finding 17). Find the term: `step_jacobian` with upwind3
+  advection, and at Δt = 1 h.
 - JAMES manuscript draft `adjoint/papers/differentiable_ocean_manuscript.tex`: placeholders in red.
 - Julia 1.13 compile stall with 0.2.309: rerun with the SIGUSR1 profile for an upstream report.
 - Upstream reports still open: Enzyme-JAX #3965 (batch fission); Oceananigans #6529, #6530, PR #6531 (posted
@@ -802,3 +815,9 @@ not attributed yet. Container: `$WORK/containers/julia_1.12_ls6.sif` links to a 
   day 85 in the southwest Indian Ocean (finding 15). Next: 1° `step_jacobian`, with and without GM/Redi.
 - First draft of the JAMES manuscript (`8678e808`). Forget et al. (2015, Sect. 4.2): the MITgcm adjoint already
   omits the dependence of the isopycnal slopes on density, so the paper claims the diagnosis, not the remedy.
+
+### 2026-11-22
+
+- Secant check of the 2° 90-day frozen-gradient adjoint: 0.2–0.6 % along its own direction (1159299, finding 16).
+- 1° `step_jacobian`: 19–24 per step with frozen gradients, 6.5–10 with GM/Redi off, all in momentum
+  (finding 17). The stage ran out of GPU memory at 1° until the stepping loop collected garbage (`be2f14a4`).

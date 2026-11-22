@@ -436,8 +436,16 @@ mixing and frozen buoyancy gradients, is not bounded (Figure~\ref{fig:trace}). I
 days of the reverse sweep, then grows by two to five decades per day and overflows after 21 days. The growth
 occurs in three groups of cells in the southwest Indian Ocean: the Mozambique Channel (\ang{36}E \ang{26}S, near
 the surface), the Agulhas Return Current (\ang{45}E \ang{41}S, at mid-depth) and north of Madagascar
-(\ang{51}E \ang{11}S). None of these is a site of the \ang{2} bursts. \pending{One-step Jacobian at two states of
-this sweep, with frozen buoyancy gradients and without the mesoscale closure: jobs 1159828 and 1159829.}
+(\ang{51}E \ang{11}S). None of these is a site of the \ang{2} bursts. 
+
+The one-step Jacobian shows that this is a different instability from the one at \ang{2}. At two states inside the
+first bursts (days 83.5 and 85.5) the leading growth is 23.7 and 19.2 per step with frozen buoyancy gradients, and
+10.3 and 6.5 per step without the mesoscale closure, where the same test at \ang{2} gave 1.0 and 1.2 to 1.3. In all
+four cases the mode sits in the horizontal velocities, with 87 to \SI{90}{\percent} of its energy in a
+$3\times3\times3$ box of cells at mid-depth; the mode at day 85.5 with frozen buoyancy gradients is at the Agulhas
+Return Current site of the sweep (\ang{45}E \ang{42}S). Neither the mesoscale closure nor the buoyancy gradients
+carry this growth. \pending{Identify the term: momentum advection and the vertical friction are the candidates
+not yet tested, and the \SI{2}{h} step may be closer to a stability limit at \ang{1}.}
 
 \subsection{One year}
 
