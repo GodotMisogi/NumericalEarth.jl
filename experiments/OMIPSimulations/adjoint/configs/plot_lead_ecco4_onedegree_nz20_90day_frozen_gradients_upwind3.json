@@ -1,0 +1,5 @@
+{
+  "_comment": "Pillar-style lead-time maps of the 1° 90-day ECCO4 window on Oceananigans 0.117.2, linear third-order upwind advection, frozen mixing and buoyancy gradients in the adjoint (job 1161433): slices Mar, Feb, Jan 1993.",
+  "results": "results/ecco4_adjoint_onedegree_nz20_90day_frozen_gradients_upwind3_trace.jld2",
+  "output": "papers/figures/lead_sensitivity_ecco4_onedegree_nz20_90day_frozen_gradients_upwind3.png"
+}

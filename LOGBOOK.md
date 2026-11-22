@@ -843,3 +843,7 @@ not attributed yet. Container: `$WORK/containers/julia_1.12_ls6.sif` links to a 
 - 1° `step_jacobian` with upwind3: 0.99 per step; at Δt = 1 h with WENO: 2.9 and 4.7 per step (finding 18).
   WENO's weights carry the 1° one-step growth.
 - 1° 90-day traced gradient with upwind3 (1161433): bounded, ≤ 7.2e2, max|g| 1.2, J 14.51 Sv (finding 19).
+- 1° lead-time sensitivity maps from 1161433 (`configs/plot_lead_ecco4_onedegree_nz20_90day_frozen_gradients_upwind3.json`)
+  and `uniform_response.jl`: the response to a uniform unit flux over the Atlantic agrees with 2° (WENO) to
+  1–7 % at a one-month lead for all four fluxes; zonal stress 20–55 % at 59 and 90 days; meridional stress, a
+  small residual, does not agree beyond one month. 1° per-area maxima are 1.7–5.5× the 2° ones.
