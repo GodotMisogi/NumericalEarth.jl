@@ -35,8 +35,8 @@
         and Enzyme, and verified.
   \item Compile time does not depend on the window: one step and its reverse pass are compiled once and driven by
         binomial checkpointing.
-  \item The adjoint explodes through the derivative of the isopycnal slopes; fixing the buoyancy gradients in
-        derivatives bounds it at 2 degrees, not at 1.
+  \item The adjoint explodes through the derivative of the isopycnal slopes and, at 1 degree, of the WENO
+        weights; fixing the buoyancy gradients in derivatives, and linear advection at 1 degree, bound it.
 \end{itemize}
 
 \begin{abstract}
@@ -53,9 +53,10 @@ e-fold per 17 hours and reaches \num{e23}, while twin forward experiments separa
 perturbation 16 times. The amplification comes from the derivative of the isopycnal slopes in the mesoscale
 closure, which scales with the inverse of the stratification. Holding the buoyancy gradients constant in
 derivatives, with the forward model unchanged, reduces the one-step growth to 1.00 and bounds the 90-day adjoint
-at \ang{2}. We show the resulting sensitivities of the overturning at \ang{26.5}N to wind stress, heat flux and
-freshwater flux by lead time, and report what still fails: the one-year window at \ang{2} and the 90-day window at
-\ang{1} have further instabilities that this remedy does not remove.
+at \ang{2}. At \ang{1} a second instability appears, in the derivative of the WENO advection weights; with
+linear upwind advection the \ang{1} 90-day adjoint is bounded as well. We show the resulting sensitivities of the
+overturning at \ang{26.5}N to wind stress, heat flux and freshwater flux by lead time, and report what still
+fails: the one-year window at \ang{2} has a further instability that these remedies do not remove.
 \end{abstract}
 
 \section*{Plain Language Summary}
@@ -66,8 +67,8 @@ modern ocean model that runs on graphics cards. We check that the result is corr
 also find that over a few months the adjoint blows up even though the ocean model itself is well behaved. The cause
 is one formula, the slope of density surfaces, which is very sensitive where the ocean is weakly layered in winter.
 Treating that slope as fixed when taking derivatives removes the blow-up for three-month calculations on a coarse
-grid. A one-year calculation, and a three-month calculation on a finer grid, still fail for reasons we have not
-yet found.
+grid. On a finer grid a second formula, the weights of the advection scheme, has the same effect, and a simpler
+advection scheme removes it. A one-year calculation still fails for reasons we have not yet found.
 
 \section{Introduction}
 
@@ -357,7 +358,7 @@ advection scheme is not the cause (Figure~\ref{fig:trace}).
 \includegraphics[width=0.8\textwidth]{figures/adjoint_trace_ecco4_nz20_oc117.png}
 \caption{Largest adjoint of the prognostic fields (velocities, temperature, salinity and free surface) at each
 model day of the reverse sweep of the 90-day window, which runs from day 90 to day 0. A curve ends where the adjoint
-overflows.}
+overflows. All runs use WENO advection except the last, which uses linear third-order upwind advection.}
 \label{fig:trace}
 \end{figure}
 
@@ -452,9 +453,16 @@ over the domain (the largest $3\times3\times3$ box holds under \SI{1}{\percent} 
 depend on the advected field, and their derivative enters the linearized step; a linear scheme has none. The
 growth is not an effect of the step length: at $\Delta t = \SI{1}{h}$ with WENO it is 2.9 and 4.7 per step, that
 is 8.5 and 22 per \SI{2}{h}. Each variant follows its own forward trajectory, so these compare model days and not
-states. \pending{A 90-day reverse sweep at \ang{1} with linear upwind advection and frozen buoyancy gradients, to
-test whether the adjoint is then bounded; and why WENO's weights are benign at \ang{2}, where the sweep with frozen
-buoyancy gradients is bounded.}
+states.
+
+With linear upwind advection the \ang{1} 90-day adjoint is bounded (Figure~\ref{fig:trace}). With frozen mixing and
+frozen buoyancy gradients its largest prognostic value stays between \num{4e1} and \num{7.2e2} over the whole
+sweep, led by the adjoint of salinity in the subtropical North Atlantic near the objective's section (\ang{17}W to
+\ang{78}W, \ang{11}N to \ang{35}N), and the largest sensitivity to wind stress is \SI{1.2}{Sv} per \si{N.m^{-2}}.
+The forward model changes with the scheme: $J$ is \SI{14.51}{Sv} with upwind advection and \SI{16.36}{Sv} with WENO.
+\pending{Why WENO's weights are benign at \ang{2}, where the sweep with WENO and frozen buoyancy gradients is
+bounded; and whether the weights can be held constant in derivatives, as the buoyancy gradients are, so that the
+forward model keeps WENO.}
 
 \subsection{One year}
 
@@ -492,7 +500,9 @@ only, the cosine per monthly field is 0.98 to 0.999 and the maxima agree to \SI{
 freshwater flux sensitivities are less robust (cosine 0.76 to 0.90) and show a checkerboard at the grid scale. We
 do not interpret them.
 
-We have no sensitivities at \ang{1}, because the adjoint is not bounded there (Section~\ref{sec:stability}).
+We do not yet show sensitivities at \ang{1}: the bounded \ang{1} adjoint uses upwind advection, whose forward
+state differs from the WENO configuration of this section. \pending{\ang{1} sensitivities with upwind advection,
+or with WENO and frozen weights.}
 
 \section{Limitations and outlook}
 \label{sec:limits}
@@ -502,9 +512,10 @@ We have no sensitivities at \ang{1}, because the adjoint is not bounded there (S
         vertical mixing and in isopycnal slopes. For frozen mixing we measured the cost in accuracy
         (Section~\ref{sec:verification}); with frozen buoyancy gradients the 90-day gradient matches secants
         along its own direction to under \SI{1}{\percent}, which does not test other directions.
-  \item \emph{One year, and \ang{1}, are out of reach.} Further instabilities remain
-        (Section~\ref{sec:stability}), and the bounded \ang{2} result may not survive a change of resolution,
-        season or model version.
+  \item \emph{One year is out of reach, and \ang{1} needs a different advection scheme.} A further instability
+        remains in the one-year window (Section~\ref{sec:stability}). At \ang{1} the adjoint is bounded only with
+        linear upwind advection, which changes the forward model. Each bounded result may not survive a change of
+        resolution, season or model version.
   \item \emph{The initial states are not in equilibrium.} The windows start from rest or from the ECCO state
         interpolated to a different grid, and the model adjusts during the window.
   \item \emph{The configuration is simplified}: no sea ice, no surface restoring, fixed levels, explicit vertical

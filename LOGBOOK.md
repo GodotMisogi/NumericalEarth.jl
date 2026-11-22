@@ -272,6 +272,13 @@ Reference numbers (LS6 A100, Nz = 20):
    time-step effect. Each variant has its own forward trajectory. Not yet run: the 1° 90-day sweep with
    upwind3 and frozen gradients. At 2° upwind3 alone did not bound the sweep (1154000), but that run
    differentiated the slopes.
+19. **At 1° the 90-day adjoint is bounded with upwind3 advection (11-22).** 1161433: 1158947's window (Δt = 2 h,
+   100 substeps, frozen mixing and buoyancy gradients, traced daily) with linear third-order upwind advection.
+   J 14.5108 Sv (16.3630 with WENO), max|∂J/∂τx| 1.198, compile 12.8 min, gradient 437 s. Prognostic adjoint
+   4.2e1 at day 90, then 3e2–7.2e2 over the whole sweep (peak 7.23e2 on day 60), led by S in the subtropical
+   North Atlantic (343°E 26°N level 8–9; 282–287°E 26–35°N near the surface; 341°E 11°N). Only u, v and S at the
+   fold row (j = 181) are NaN, as in every run. So at 1° WENO's weights are the remaining linearization
+   instability; why they are benign at 2° is open.
 ## Tooling added
 
 | File | Purpose |
@@ -372,6 +379,7 @@ Reference numbers (LS6 A100, Nz = 20):
 | Vista 1160770, 1160771 | 1° `step_jacobian` at 1002 / 1026, frozen mixing and gradients | 23.7 and 19.2 per step, momentum-led; finding 17 |
 | Vista 1161247 | 1° `step_jacobian` at 1002, 1026, frozen mixing and gradients, upwind3 | 0.99 per step at both, diffuse mode; finding 18 |
 | Vista 1161248 | 1° `step_jacobian` at 2004, 2052, frozen mixing and gradients, Δt = 1 h | 2.91 and 4.66 per step; finding 18 |
+| Vista 1161433 | 1° 90 days traced, frozen mixing and gradients, upwind3 | bounded: adjoint ≤ 7.2e2, max\|g\| 1.198, J 14.5108 Sv; finding 19 |
 
 ## Open
 
@@ -381,7 +389,8 @@ Reference numbers (LS6 A100, Nz = 20):
   `src/frozen_mixing.jl`); with `materialize_gradients = true` CATKE otherwise reads lagged N².
 - 1°: the 90-day adjoint explodes with frozen mixing and gradients (finding 15); the one-step Jacobian is
   unstable in momentum with or without GM/Redi (finding 17) and neutral with upwind3 advection (finding 18).
-  Next: the 1° 90-day traced gradient with upwind3 and frozen gradients.
+  The 1° 90-day adjoint with upwind3 and frozen gradients is bounded (finding 19). Open: why WENO is benign at
+  2°; holding WENO's weights constant in derivatives.
 - JAMES manuscript draft `adjoint/papers/differentiable_ocean_manuscript.tex`: placeholders in red.
 - Julia 1.13 compile stall with 0.2.309: rerun with the SIGUSR1 profile for an upstream report.
 - Upstream reports still open: Enzyme-JAX #3965 (batch fission); Oceananigans #6529, #6530, PR #6531 (posted
@@ -833,3 +842,4 @@ not attributed yet. Container: `$WORK/containers/julia_1.12_ls6.sif` links to a 
   (finding 17). The stage ran out of GPU memory at 1° until the stepping loop collected garbage (`be2f14a4`).
 - 1° `step_jacobian` with upwind3: 0.99 per step; at Δt = 1 h with WENO: 2.9 and 4.7 per step (finding 18).
   WENO's weights carry the 1° one-step growth.
+- 1° 90-day traced gradient with upwind3 (1161433): bounded, ≤ 7.2e2, max|g| 1.2, J 14.51 Sv (finding 19).
