@@ -847,3 +847,11 @@ not attributed yet. Container: `$WORK/containers/julia_1.12_ls6.sif` links to a 
   and `uniform_response.jl`: the response to a uniform unit flux over the Atlantic agrees with 2° (WENO) to
   1–7 % at a one-month lead for all four fluxes; zonal stress 20–55 % at 59 and 90 days; meridional stress, a
   small residual, does not agree beyond one month. 1° per-area maxima are 1.7–5.5× the 2° ones.
+- Pillar et al. (2016), read from the CC BY 4.0 copy on Oxford ORA: MITgcm 1°, 33 levels, 1300-year
+  equilibrium under climatological NCEP forcing; objective the monthly-mean *maximum* overturning at 25°N;
+  their adjoint neglects KPP ("standard practice", citing Hoteit et al. 2005) and the GM eddy advection ("for
+  technical reasons"). So the advisor report's "as Pillar et al. freeze KPP" stands. Their only number for
+  Fig. 1: +0.01 N m⁻² eastward stress over 3° × basin width at 25°N in the averaging month → −0.84 Sv
+  (per-area ≈ −0.4e-10 Sv N⁻¹). Ours (`uniform_response.jl`, last two slices together, 25–28°N, 80.5–13.5°W):
+  −0.53 Sv at 2° (WENO), −0.78 Sv at 1° (upwind3); earlier slices +0.02 to +0.07 Sv, as their positive 3-month
+  band.
