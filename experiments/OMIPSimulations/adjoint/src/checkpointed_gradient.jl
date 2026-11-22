@@ -136,15 +136,23 @@ step's reverse pass, so the result approximates the gradient; the forward trajec
 `adjoint_trace`, an [`AdjointTrace`](@ref), each evaluation records per-field summaries of the adjoint during
 the reverse sweep.
 """
-function build_checkpointed_gradient(model, state, obj; n_steps, Δt, checkpoints, average_steps = 1,
-                                     adjoint_damping = nothing, adjoint_trace = nothing,
-                                     compile_options = adjoint_compile_options(),
-                                     while_unroll_threshold = 0)
-    n_steps >= 1 || throw(ArgumentError("n_steps must be at least 1, got $n_steps"))
-    checkpoints >= 1 || throw(ArgumentError("checkpoints must be at least 1, got $checkpoints"))
-    1 <= average_steps <= n_steps ||
-        throw(ArgumentError("average_steps must be between 1 and n_steps = $n_steps, got $average_steps"))
-    thunks = with_while_unroll_threshold(while_unroll_threshold) do
+function build_checkpointed_gradient(model, state, obj; Δt, adjoint_damping = nothing,
+                                     compile_options = adjoint_compile_options(), while_unroll_threshold = 0,
+                                     kwargs...)
+    thunks = compile_checkpointed_thunks(model, obj; Δt, adjoint_damping, compile_options, while_unroll_threshold)
+    return checkpointed_gradient(thunks, model, state, obj; Δt, kwargs...)
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+The compiled pieces of [`build_checkpointed_gradient`](@ref): the diagnostic refresh, one time step, the reverse
+passes of the refresh, the step and the objective `obj`, the objective itself, and the adjoint damping. `obj` may
+hold device arrays, which are inputs of the compiled objective and can be overwritten between calls.
+"""
+function compile_checkpointed_thunks(model, obj; Δt, adjoint_damping = nothing,
+                                     compile_options = adjoint_compile_options(), while_unroll_threshold = 0)
+    return with_while_unroll_threshold(while_unroll_threshold) do
         dmodel = make_zero(model)
         (refresh = @compile(compile_options = compile_options, refresh_diagnostics!(model)),
          step = @compile(compile_options = compile_options, time_step!(model, Δt)),
@@ -154,6 +162,20 @@ function build_checkpointed_gradient(model, state, obj; n_steps, Δt, checkpoint
          objective = @compile(compile_options = compile_options, objective_value(model, obj)),
          damp = compile_adjoint_damping(model, dmodel, adjoint_damping, compile_options))
     end
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+`evaluate!()` of [`build_checkpointed_gradient`](@ref) from already compiled `thunks`
+([`compile_checkpointed_thunks`](@ref)).
+"""
+function checkpointed_gradient(thunks, model, state, obj; n_steps, Δt, checkpoints, average_steps = 1,
+                               adjoint_trace = nothing)
+    n_steps >= 1 || throw(ArgumentError("n_steps must be at least 1, got $n_steps"))
+    checkpoints >= 1 || throw(ArgumentError("checkpoints must be at least 1, got $checkpoints"))
+    1 <= average_steps <= n_steps ||
+        throw(ArgumentError("average_steps must be between 1 and n_steps = $n_steps, got $average_steps"))
     arrays = device_arrays(model)
 
     function evaluate!()
