@@ -242,6 +242,13 @@ Reference numbers (LS6 A100, Nz = 20):
    barotropic substep is enough, so Δt = 2 h with 100 substeps is the cheaper setting (3.1 min per 90 days,
    the same as 50 substeps; Δt = 1 h takes 4.2 min). A barotropic CFL limit on the finer grid would explain
    it; not checked.
+15. **At 1° frozen buoyancy gradients do not bound the 90-day adjoint (11-21).** 1158947 (Δt = 2 h, 100
+   substeps, frozen mixing and gradients, traced daily): J 16.3630 Sv, compile 16.6 min, gradient 585 s, every
+   forcing gradient NaN. The prognostic adjoint is 4e1–4e3 over days 90–86, then 2.2e6 on day 85 (u at 36°E
+   26°S, level 18), 4e7–1e15 over days 84–80 (S and u at 45°E 41°S, levels 7–12), 1e17–2e35 over days 78–71
+   (u, v, S at 51°E 11°S, levels 5–20), and overflows by day 69: two to five decades per day, all in the
+   southwest Indian Ocean (Mozambique Channel, Agulhas Return Current, north of Madagascar), not only near
+   the surface.
 
 ## Tooling added
 
@@ -335,6 +342,7 @@ Reference numbers (LS6 A100, Nz = 20):
 | Vista 1158106 | 1° forward health, 90 days, Δt = 2 h, 50 substeps | NaN by day 1; finding 14 |
 | Vista 1158107 | as 1158106, 100 substeps | finite 90 days, J 15.353 Sv on day 90; finding 14 |
 | Vista 1158108 | as 1158106, Δt = 1 h, 50 substeps | finite 90 days, J 15.396 Sv on day 90; finding 14 |
+| Vista 1158947 | 1° 90 days traced, 100 substeps, frozen mixing and gradients | adjoint NaN, growth from day 85 in the SW Indian Ocean; J 16.3630 Sv; finding 15 |
 
 ## Open
 
@@ -342,8 +350,10 @@ Reference numbers (LS6 A100, Nz = 20):
   61°S on day 204 (e.g. `step_jacobian` at states 2448–2472). Also diff the closure between 0.113.5 and 0.117.2.
 - Oceananigans: `step_closure_prognostics!` should refresh materialized buoyancy gradients itself (TODO in
   `src/frozen_mixing.jl`); with `materialize_gradients = true` CATKE otherwise reads lagged N².
-- 1°: the 90-day gradient at Δt = 2 h with 100 substeps, frozen mixing and frozen buoyancy gradients
-  (finding 14).
+- 1°: the 90-day adjoint explodes with frozen mixing and gradients (finding 15); `step_jacobian` at states
+  1026 and 1002, with frozen gradients and with GM/Redi off, to find the term.
+- Secant check of the 2° 90-day frozen-gradient adjoint (`ecco4_nz20_90day_frozen_gradients_taylor.json`).
+- JAMES manuscript draft `adjoint/papers/differentiable_ocean_manuscript.tex`: placeholders in red.
 - Julia 1.13 compile stall with 0.2.309: rerun with the SIGUSR1 profile for an upstream report.
 - Upstream reports still open: Enzyme-JAX #3965 (batch fission); Oceananigans #6529, #6530, PR #6531 (posted
   from ReactOcean); `while_deadresult`'s cost.
@@ -782,3 +792,7 @@ not attributed yet. Container: `$WORK/containers/julia_1.12_ls6.sif` links to a 
 
 - 1° forward health (1158106–8): Δt = 2 h with 50 substeps is NaN by day 1; 100 substeps and Δt = 1 h both
   finite for 90 days and agree to 0.04 Sv in J (finding 14). Next: the 1° gradient at Δt = 2 h, 100 substeps.
+- 1° gradient (1158947): forward fine (J 16.36 Sv), adjoint NaN with frozen mixing and gradients; bursts from
+  day 85 in the southwest Indian Ocean (finding 15). Next: 1° `step_jacobian`, with and without GM/Redi.
+- First draft of the JAMES manuscript (`8678e808`). Forget et al. (2015, Sect. 4.2): the MITgcm adjoint already
+  omits the dependence of the isopycnal slopes on density, so the paper claims the diagnosis, not the remedy.

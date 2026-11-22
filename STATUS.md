@@ -17,7 +17,7 @@ through `/work/09603/ajseth/vista/.julia/dev/NumericalEarth-oc117`. Reactant 0.2
 | Long windows on 0.117.2 | **adjoint explodes** (see below), forward model healthy; bounded with GM/Redi off (1155069) and with frozen buoyancy gradients (1157589); 1 year with frozen gradients finite but bursts to 2.7e11 (1157526) |
 | Adjoint-only damping (`AdjointDamping`, `939d9986`) | implemented and verified (dot product 2.6e-15 LS6, 3.9e-14 Vista; zero damping reproduces the 8-step gradient to 2e-12); does **not** contain the growth |
 | Reactant 0.2.309 (git `2bb32e28`, Reactant_jll 0.0.445) | **on `oc117` since 11-19** (`8cfba671`): 2-step Taylor verified (1153869); 8-step gradient matches 3577970 to 1.7e-12 (stress) and 5e-10 (fluxes), compile 21.6 min, **first call 27 s instead of 14 min** (1153870); under Julia 1.13 the first compile stalls > 3 h 49 min (1147598) |
-| 1° (360 × 180) | forward model NaN by day 1 at Δt = 2 h, 50 substeps (3591885, 1158106); finite for 90 days with 100 substeps (1158107) or Δt = 1 h (1158108) |
+| 1° (360 × 180) | forward model NaN by day 1 at Δt = 2 h, 50 substeps (3591885, 1158106); finite for 90 days with 100 substeps (1158107) or Δt = 1 h (1158108); 90-day adjoint NaN even with frozen mixing and buoyancy gradients (1158947) |
 
 ## The long-window adjoint growth
 
@@ -77,7 +77,9 @@ before the end of the window, near coasts and fronts. What is known:
    lagged N² in CATKE's TKE step (`6df20f28`); the 1-year window is finite but bursts (1157526). Next
    (proposed): `step_jacobian` at the day-204 burst (states 2448–2472) to find the growing term.
 4. Done 11-21: 1° forward health; Δt = 2 h needs 100 barotropic substeps (LOGBOOK finding 14). Next
-   (proposed): the 1° 90-day gradient at Δt = 2 h, 100 substeps, frozen mixing and buoyancy gradients.
+   was the 1° 90-day gradient (1158947): adjoint NaN, bursts from day 85 in the southwest Indian Ocean
+   (finding 15). Running: 1° `step_jacobian` with frozen gradients and with GM/Redi off; the secant check of
+   the 2° frozen-gradient adjoint. JAMES manuscript draft in `adjoint/papers/`.
 5. Optional: Julia 1.13 + 0.2.309 rerun with the SIGUSR1 profile, for an upstream report.
 
 ## Constraints to remember
