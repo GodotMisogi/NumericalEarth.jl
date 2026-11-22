@@ -249,6 +249,12 @@ Reference numbers (LS6 A100, Nz = 20):
    (u, v, S at 51°E 11°S, levels 5–20), and overflows by day 69: two to five decades per day, all in the
    southwest Indian Ocean (Mozambique Channel, Agulhas Return Current, north of Madagascar), not only near
    the surface.
+16. **The 2° 90-day frozen-gradient adjoint matches finite-amplitude secants to 0.2–0.6 % (11-22).** 1159299
+   (frozen mixing and buoyancy gradients, same window as 1157589; J 17.9093 Sv, max|g| 3.901): along the
+   stress-gradient direction gᵀd = 18.8228; secants Δf/h = 18.9268, 18.9426, 18.8652 at h = 0.1, 0.05, 0.025
+   (gᵀd lower by 0.55 %, 0.63 %, 0.22 %). The secants are not monotone in h (jumps in J), so the script's
+   extrapolated slope 19.129 (rel. error 1.6 %) and its "MISMATCH" verdict are the small-h Taylor criterion,
+   not a gradient error; the job is FAILED for that `@test` only. One direction tested.
 
 ## Tooling added
 
@@ -343,6 +349,7 @@ Reference numbers (LS6 A100, Nz = 20):
 | Vista 1158107 | as 1158106, 100 substeps | finite 90 days, J 15.353 Sv on day 90; finding 14 |
 | Vista 1158108 | as 1158106, Δt = 1 h, 50 substeps | finite 90 days, J 15.396 Sv on day 90; finding 14 |
 | Vista 1158947 | 1° 90 days traced, 100 substeps, frozen mixing and gradients | adjoint NaN, growth from day 85 in the SW Indian Ocean; J 16.3630 Sv; finding 15 |
+| Vista 1159299 | 90 days, frozen mixing and gradients, secant check (h = 0.1, 0.05, 0.025) | gᵀd 18.823 vs secants 18.93, 18.94, 18.87 (0.2–0.6 %); `@test taylor.verified` fails on the small-h criterion; finding 16 |
 
 ## Open
 
@@ -352,7 +359,6 @@ Reference numbers (LS6 A100, Nz = 20):
   `src/frozen_mixing.jl`); with `materialize_gradients = true` CATKE otherwise reads lagged N².
 - 1°: the 90-day adjoint explodes with frozen mixing and gradients (finding 15); `step_jacobian` at states
   1026 and 1002, with frozen gradients and with GM/Redi off, to find the term.
-- Secant check of the 2° 90-day frozen-gradient adjoint (`ecco4_nz20_90day_frozen_gradients_taylor.json`).
 - JAMES manuscript draft `adjoint/papers/differentiable_ocean_manuscript.tex`: placeholders in red.
 - Julia 1.13 compile stall with 0.2.309: rerun with the SIGUSR1 profile for an upstream report.
 - Upstream reports still open: Enzyme-JAX #3965 (batch fission); Oceananigans #6529, #6530, PR #6531 (posted

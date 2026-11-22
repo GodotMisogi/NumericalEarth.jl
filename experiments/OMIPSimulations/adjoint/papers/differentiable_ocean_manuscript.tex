@@ -285,7 +285,11 @@ gradient, and predicts the finite-amplitude response 0.4 to \SI{1.7}{\percent} l
 gradient that cancel are less robust: the response to a uniform meridional wind at 30 days is
 \SI{0.76}{Sv} per m/s with frozen mixing and \SI{0.32}{Sv} per m/s without. Over 90 days with prescribed fluxes
 the frozen-mixing gradient predicted secants along its own direction to \SI{2.2}{\percent} (Oceananigans 0.113.5).
-\pending{Secant check of the 90-day gradient with frozen mixing and frozen buoyancy gradients: job 1159299.}
+With frozen buoyancy gradients as well (Oceananigans 0.117.2), the 90-day gradient predicts secants along the
+direction of the wind-stress gradient to \SIrange{0.2}{0.6}{\percent}: the secant slopes at
+$h = 0.1$, 0.05 and \SI{0.025}{N.m^{-2}} are 18.93, 18.94 and \SI{18.87}{Sv} per \si{N.m^{-2}}, and
+$\gvec^{\mathsf T}d$ is 18.82. The secants do not converge monotonically, as expected of a piecewise-smooth $J$,
+so the agreement cannot be tightened by reducing $h$.
 
 \subsection{Cost}
 \label{sec:cost}
@@ -479,7 +483,8 @@ We have no sensitivities at \ang{1}, because the adjoint is not bounded there (S
 \begin{itemize}
   \item \emph{The frozen adjoint is an approximation.} It omits the sensitivity that acts through changes in
         vertical mixing and in isopycnal slopes. For frozen mixing we measured the cost in accuracy
-        (Section~\ref{sec:verification}); \pending{for frozen buoyancy gradients the check is pending}.
+        (Section~\ref{sec:verification}); with frozen buoyancy gradients the 90-day gradient matches secants
+        along its own direction to under \SI{1}{\percent}, which does not test other directions.
   \item \emph{One year, and \ang{1}, are out of reach.} Further instabilities remain
         (Section~\ref{sec:stability}), and the bounded \ang{2} result may not survive a change of resolution,
         season or model version.

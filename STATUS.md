@@ -1,4 +1,4 @@
-# OMIP adjoint: status as of 2026-11-21
+# OMIP adjoint: status as of 2026-11-22
 
 Branch `ajs/omip-adjoint-oc117` (fork GodotMisogi, Oceananigans 0.117.2, Reactant 0.2.309), shared by Vista and LS6
 through `/work/09603/ajseth/vista/.julia/dev/NumericalEarth-oc117`. Reactant 0.2.309 test branch
@@ -78,8 +78,9 @@ before the end of the window, near coasts and fronts. What is known:
    (proposed): `step_jacobian` at the day-204 burst (states 2448–2472) to find the growing term.
 4. Done 11-21: 1° forward health; Δt = 2 h needs 100 barotropic substeps (LOGBOOK finding 14). Next
    was the 1° 90-day gradient (1158947): adjoint NaN, bursts from day 85 in the southwest Indian Ocean
-   (finding 15). Running: 1° `step_jacobian` with frozen gradients and with GM/Redi off; the secant check of
-   the 2° frozen-gradient adjoint. JAMES manuscript draft in `adjoint/papers/`.
+   (finding 15). Done 11-22: the 2° frozen-gradient 90-day adjoint matches secants along its own direction to
+   0.2–0.6 % (1159299, finding 16). Queued: 1° `step_jacobian` with frozen gradients (1159828) and with GM/Redi
+   off (1159829). JAMES manuscript draft in `adjoint/papers/`.
 5. Optional: Julia 1.13 + 0.2.309 rerun with the SIGUSR1 profile, for an upstream report.
 
 ## Constraints to remember
