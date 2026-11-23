@@ -32,13 +32,34 @@ function omip_adjoint_grid(arch; Nx = 180, Ny = 60, Nz = 20, depth = 5500)
     cpu_underlying = TripolarGrid(CPU(); size, z, halo)
     cpu_bottom = regrid_bathymetry(cpu_underlying; minimum_depth = 20, major_basins = 1, interpolation_passes = 25)
     close_central_american_isthmus!(cpu_bottom)
+    regularize_fold_metrics!(cpu_underlying)
     cpu_grid = ImmersedBoundaryGrid(cpu_underlying, GridFittedBottom(cpu_bottom))
     arch isa CPU && return (; grid = cpu_grid, cpu_grid)
 
-    underlying = TripolarGrid(arch; size, z, halo)
+    underlying = regularize_fold_metrics!(TripolarGrid(arch; size, z, halo))
     bottom = Field{Center, Center, Nothing}(underlying)
     parent(bottom) .= Array(parent(cpu_bottom))
     return (; grid = ImmersedBoundaryGrid(underlying, GridFittedBottom(bottom)), cpu_grid)
+end
+
+# TODO: Oceananigans' `TripolarGrid` sets Δxᶠᶜᵃ, Δyᶠᶜᵃ and Azᶠᶜᵃ to zero at the fold's singular u-points (i = 1 and
+# Nx ÷ 2 + 1, j = Ny), so their inverses are Inf. The cells there are land and the forward model masks the 0/0, but
+# reverse mode multiplies zero adjoints by the masked NaN, which pollutes the shadows beside the fold, the GM/Redi
+# diffusivity fields' included. Giving those points their eastern neighbor's metrics leaves the forward model
+# bit-identical (2°, CPU) and the shadows finite; Oceananigans should give them finite metrics.
+function regularize_fold_metrics!(grid)
+    j = grid.Ny + grid.Hy   # the fold row in the parent arrays
+    for (metric, inverse) in ((:Δxᶠᶜᵃ, :Δx⁻¹ᶠᶜᵃ), (:Δyᶠᶜᵃ, :Δy⁻¹ᶠᶜᵃ), (:Azᶠᶜᵃ, :Az⁻¹ᶠᶜᵃ))
+        a, a⁻¹ = Array(parent(getproperty(grid, metric))), Array(parent(getproperty(grid, inverse)))
+        for i in findall(iszero, view(a, :, j))
+            a[i + 1, j] > 0 || error("$metric is zero at both ($i, $j) and its eastern neighbor in the parent array")
+            a[i, j] = a[i + 1, j]
+            a⁻¹[i, j] = 1 / a[i, j]
+        end
+        copyto!(parent(getproperty(grid, metric)), a)
+        copyto!(parent(getproperty(grid, inverse)), a⁻¹)
+    end
+    return grid
 end
 
 """
