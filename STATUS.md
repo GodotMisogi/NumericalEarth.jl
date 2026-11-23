@@ -6,6 +6,8 @@ through `/work/09603/ajseth/vista/.julia/dev/NumericalEarth-oc117`. Reactant 0.2
 `ss/for-omip`) is `ajs/omip-adjoint`, worktree `NumericalEarth-adjoint` on TACC. Records: `LOGBOOK.md`
 (decisions, dead ends, jobs), `experiments/OMIPSimulations/adjoint/PROGRESS.md` (detail to 11-06),
 `adjoint/REACTANT_ENZYME_ISSUES.md`, reports in `adjoint/papers/`.
+On 2026-11-23 the branch was squashed into nine commits on `ss/omip-prototype` (`c5ad24b9`); the commit
+hashes cited in these records before then are on `ajs/omip-adjoint-oc117-history` (fork).
 
 ## Where we are
 
