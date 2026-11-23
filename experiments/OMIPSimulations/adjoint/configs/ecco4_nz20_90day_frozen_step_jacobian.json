@@ -1,0 +1,16 @@
+{
+  "_comment": "Leading growth of one step's adjoint (power iteration) in the 90-day 1993-01 frozen-mixing window (WENO): at step 978 (day 81.5), inside the Kuroshio burst of the traced sweep 1153999 (1e5 per day), and at step 1044 (day 87), where the sweep's adjoint grows 1.2 per day.",
+  "forcing": "ecco4",
+  "n_months": 5,
+  "Nz": 20,
+  "steps": 1080,
+  "dt": 7200.0,
+  "substeps": 50,
+  "backend": "gpu",
+  "stages": "step_jacobian",
+  "roll_barotropic_substeps": true,
+  "frozen_mixing": true,
+  "jacobian_steps": [978, 1044],
+  "jacobian_iterations": 60,
+  "output": "results/ecco4_step_jacobian_nz20_90day_frozen.jld2"
+}

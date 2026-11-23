@@ -1,0 +1,20 @@
+{
+  "_comment": "Sub-chunk 159:166 (abs_positive_simplify, transpose_elementwise_transpose, select_comp_iota_const_simplify, sign_abs_simplify, broadcastindim_is_reshape, reduce_window_wrap, slice_reduce_window, while_deadresult) took 147 s in pass_bisect_ocean_1step_chunk3; the other seven sub-chunks 3 to 4 s. One pattern per segment on the module after sub-chunk 151:158, then the control (whole main list without 159:166, on the module after post_enzyme_inline; with chunk 3 removed it took 41 s instead of 1570 s) followed by the lowering set, to see whether the slow convergence moves into the next application.",
+  "tag": "ocean_1step_p159_166",
+  "module": "logs/bisect_ocean_1step_chunk3/05_p151_158.mlir",
+  "backend": "gpu",
+  "pass_timing": true,
+  "segments": [
+    {"name": "p159_abs_positive_simplify", "patterns": [159, 159]},
+    {"name": "p160_transpose_elementwise_transpose", "patterns": [160, 160]},
+    {"name": "p161_select_comp_iota_const_simplify", "patterns": [161, 161]},
+    {"name": "p162_sign_abs_simplify", "patterns": [162, 162]},
+    {"name": "p163_broadcastindim_is_reshape", "patterns": [163, 163]},
+    {"name": "p164_reduce_window_wrap", "patterns": [164, 164]},
+    {"name": "p165_slice_reduce_window", "patterns": [165, 165]},
+    {"name": "p166_while_deadresult", "patterns": [166, 166]},
+    {"name": "all_but_159_166", "patterns_except": [159, 166], "module": "logs/bisect_ocean_1step_all/05_post_enzyme_inline.mlir"},
+    {"name": "then_lower_patterns", "pipeline": "{lower_patterns}"}
+  ],
+  "output": "results/pass_bisect_ocean_1step_p159_166.jld2"
+}

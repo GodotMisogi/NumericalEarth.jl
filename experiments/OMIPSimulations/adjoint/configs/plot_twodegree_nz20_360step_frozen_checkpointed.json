@@ -1,0 +1,8 @@
+{
+  "_comment": "AMOC sensitivity map of the 360-step frozen-mixing checkpointed gradient (job 3572832).",
+  "reduced": "results/reduced_twodegree_nz20.jld2",
+  "label": "360step_frozen",
+  "output": "papers/figures/amoc_sensitivity_twodegree_nz20_360step_frozen.png",
+  "title": "AMOC sensitivity to the 10-m winds, frozen mixing in the adjoint: 360 steps (30 days), 2° OMIP, Nz = 20",
+  "limits": [[-100, 10], [0, 60]]
+}

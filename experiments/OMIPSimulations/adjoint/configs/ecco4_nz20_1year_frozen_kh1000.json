@@ -1,0 +1,17 @@
+{
+  "_comment": "1-year ECCO4 window, frozen mixing, with Laplacian horizontal tracer diffusion of 1000 m²/s: whether damping the forward state's grid-scale noise keeps the adjoint bounded (3576176 without it: NaN beyond a month).",
+  "forcing": "ecco4",
+  "n_months": 15,
+  "Nz": 20,
+  "steps": 4380,
+  "dt": 7200.0,
+  "substeps": 50,
+  "backend": "gpu",
+  "stages": "gradient",
+  "roll_barotropic_substeps": true,
+  "frozen_mixing": true,
+  "horizontal_diffusivity": 1000,
+  "checkpoints": 60,
+  "average_days": 30,
+  "output": "results/ecco4_adjoint_nz20_1year_frozen_kh1000.jld2"
+}

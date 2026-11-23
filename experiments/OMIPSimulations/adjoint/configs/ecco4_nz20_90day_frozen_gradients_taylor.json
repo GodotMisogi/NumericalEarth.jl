@@ -1,0 +1,20 @@
+{
+  "_comment": "Secant check of the 90-day frozen-mixing, frozen-buoyancy-gradient adjoint (1157589): finite differences of the 30-day-mean AMOC along the stress gradient at h = 0.1, 0.05, 0.025 N m⁻², as ecco4_nz20_90day_frozen did for frozen mixing on 0.113.5 (2.2 %). The frozen adjoint is not the exact derivative, so the Taylor verdict may fail; the secant slopes are the result.",
+  "forcing": "ecco4",
+  "n_months": 5,
+  "Nz": 20,
+  "steps": 1080,
+  "dt": 7200.0,
+  "substeps": 50,
+  "backend": "gpu",
+  "stages": "gradient",
+  "roll_barotropic_substeps": true,
+  "frozen_mixing": true,
+  "checkpoints": 40,
+  "average_days": 30,
+  "repeat_evaluation": false,
+  "frozen_buoyancy_gradients": true,
+  "taylor_h0": 0.1,
+  "taylor_nh": 3,
+  "output": "results/ecco4_adjoint_nz20_90day_frozen_gradients_taylor.jld2"
+}

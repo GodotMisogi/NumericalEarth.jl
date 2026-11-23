@@ -1,0 +1,13 @@
+{
+  "_comment": "Forward health check of the 180-day ECCO4 window whose frozen-mixing adjoint blew up (3576763): CFL numbers, grid-scale noise, static stability, CATKE diffusivity and SST drift every 5 days.",
+  "forcing": "ecco4",
+  "n_months": 8,
+  "Nz": 20,
+  "steps": 2160,
+  "dt": 7200.0,
+  "substeps": 50,
+  "backend": "gpu",
+  "roll_barotropic_substeps": true,
+  "snapshot_days": 5,
+  "output": "results/forward_health_ecco4_nz20_180day.jld2"
+}

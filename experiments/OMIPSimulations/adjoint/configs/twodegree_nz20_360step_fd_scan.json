@@ -1,0 +1,15 @@
+{
+  "_comment": "Finite differences of the 360-step primal along its saved checkpointed gradient, h from 1 m/s down to 6e-8 m/s: where does the objective stop being smooth?",
+  "Nz": 20,
+  "steps": 360,
+  "dt": 7200.0,
+  "substeps": 50,
+  "n_atmosphere_slices": 248,
+  "backend": "gpu",
+  "stages": "primal,fd_scan",
+  "roll_barotropic_substeps": true,
+  "fd_gradient": "results/omip_adjoint_twodegree_nz20_360step_checkpointed.jld2",
+  "fd_h0": 1.0,
+  "fd_nh": 25,
+  "output": "results/omip_adjoint_twodegree_nz20_360step_fd_scan.jld2"
+}

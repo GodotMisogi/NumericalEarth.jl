@@ -1,0 +1,14 @@
+{
+  "_comment": "Forward health of the 1-year ECCO4 window with Laplacian horizontal viscosity 5×10⁴ m²/s on top of the biharmonic one (diagnostic: does momentum dissipation control the adjoint growth?), against health_ecco4_nz20_1year.",
+  "forcing": "ecco4",
+  "n_months": 15,
+  "Nz": 20,
+  "steps": 4380,
+  "dt": 7200.0,
+  "substeps": 50,
+  "backend": "gpu",
+  "roll_barotropic_substeps": true,
+  "laplacian_viscosity": 50000,
+  "snapshot_days": 5,
+  "output": "results/forward_health_ecco4_nz20_1year_nu5e4.jld2"
+}

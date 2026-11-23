@@ -1,0 +1,15 @@
+{
+  "_comment": "Twin forward runs of the compiled step from ECCO's state on 1 January 1993 (the 90-day adjoint from here is bounded), 60 days, with ε × noise added to the wet temperature: whether forward perturbations grow at the adjoint's rate (one e-fold per ~17 h).",
+  "start_date": "1993-01-01",
+  "n_months": 4,
+  "Nz": 20,
+  "steps": 720,
+  "dt": 7200.0,
+  "substeps": 50,
+  "backend": "gpu",
+  "roll_barotropic_substeps": true,
+  "snapshot_hours": 12,
+  "amplitudes": [0, 1e-6, 1e-3],
+  "seed": 1,
+  "output": "results/perturbation_growth_jan1993.jld2"
+}

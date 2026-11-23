@@ -1,0 +1,21 @@
+{
+  "_comment": "ecco4_nz20_90day_frozen_gradients_trace from 1993-10-01 with linear third-order upwind advection: WENO's momentum bursts made the July frozen-gradient window grow to 8.5e14 (1161900) and April and October burst to 1e8-1e9; is upwind3 bounded in every month? Calibration window candidate.",
+  "forcing": "ecco4",
+  "n_months": 5,
+  "Nz": 20,
+  "steps": 1080,
+  "dt": 7200.0,
+  "substeps": 50,
+  "backend": "gpu",
+  "stages": "gradient",
+  "roll_barotropic_substeps": true,
+  "frozen_mixing": true,
+  "checkpoints": 40,
+  "adjoint_trace_every": 12,
+  "average_days": 30,
+  "repeat_evaluation": false,
+  "frozen_buoyancy_gradients": true,
+  "output": "results/ecco4_adjoint_nz20_90day_frozen_gradients_upwind3_trace_199310.jld2",
+  "start_date": "1993-10-01",
+  "advection": "upwind3"
+}

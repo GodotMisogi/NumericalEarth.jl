@@ -1,0 +1,5 @@
+{
+  "_comment": "Pillar-style lead-time maps of the 90-day ECCO4 window (full mixing in the adjoint): slices Mar, Feb, Jan 1993 (leads ~1, 2, 3 months).",
+  "results": "results/ecco4_adjoint_nz20_90day_full.jld2",
+  "output": "papers/figures/lead_sensitivity_ecco4_nz20_90day_full.png"
+}

@@ -1,0 +1,19 @@
+{
+  "_comment": "The traced 90-day 1993-01 frozen-mixing window (WENO, 1153999) with GM/Redi off, to test whether the GM/Redi closure drives the adjoint's bursts on 0.117.2.",
+  "forcing": "ecco4",
+  "n_months": 5,
+  "Nz": 20,
+  "steps": 1080,
+  "dt": 7200.0,
+  "substeps": 50,
+  "backend": "gpu",
+  "stages": "gradient",
+  "roll_barotropic_substeps": true,
+  "frozen_mixing": true,
+  "checkpoints": 40,
+  "adjoint_trace_every": 12,
+  "average_days": 30,
+  "repeat_evaluation": false,
+  "eddy_diffusivity": null,
+  "output": "results/ecco4_adjoint_nz20_90day_frozen_nogm_trace.jld2"
+}

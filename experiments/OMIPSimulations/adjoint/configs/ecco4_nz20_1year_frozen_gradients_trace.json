@@ -1,0 +1,19 @@
+{
+  "_comment": "The 1-year 1993-01 frozen-mixing window (ecco4_nz20_1year_frozen, NaN on 0.113.5) with the buoyancy gradients held constant in derivatives, traced daily (finding 12: bounded at 90 days).",
+  "forcing": "ecco4",
+  "n_months": 15,
+  "Nz": 20,
+  "steps": 4380,
+  "dt": 7200.0,
+  "substeps": 50,
+  "backend": "gpu",
+  "stages": "gradient",
+  "roll_barotropic_substeps": true,
+  "frozen_mixing": true,
+  "checkpoints": 60,
+  "average_days": 30,
+  "output": "results/ecco4_adjoint_nz20_1year_frozen_gradients_trace.jld2",
+  "frozen_buoyancy_gradients": true,
+  "adjoint_trace_every": 12,
+  "repeat_evaluation": false
+}

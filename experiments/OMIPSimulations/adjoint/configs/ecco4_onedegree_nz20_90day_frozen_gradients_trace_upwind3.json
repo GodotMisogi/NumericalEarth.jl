@@ -1,0 +1,22 @@
+{
+  "_comment": "ecco4_onedegree_nz20_90day_frozen_gradients_trace (1158947, adjoint NaN with WENO) with linear third-order upwind advection: the 1° one-step Jacobian is 0.99 per step with upwind3 (LOGBOOK finding 18), so this tests whether the 90-day adjoint is then bounded.",
+  "forcing": "ecco4",
+  "n_months": 5,
+  "Nx": 360,
+  "Ny": 180,
+  "Nz": 20,
+  "steps": 1080,
+  "dt": 7200.0,
+  "substeps": 100,
+  "backend": "gpu",
+  "stages": "gradient",
+  "roll_barotropic_substeps": true,
+  "frozen_mixing": true,
+  "checkpoints": 30,
+  "adjoint_trace_every": 12,
+  "average_days": 30,
+  "repeat_evaluation": false,
+  "frozen_buoyancy_gradients": true,
+  "output": "results/ecco4_adjoint_onedegree_nz20_90day_frozen_gradients_upwind3_trace.jld2",
+  "advection": "upwind3"
+}

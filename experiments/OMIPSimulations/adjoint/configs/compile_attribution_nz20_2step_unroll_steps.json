@@ -1,0 +1,17 @@
+{
+  "_comment": "Stage split of the coupled 2-step gradient with the steps unrolled at trace time (unroll_steps), the production 2-step window. Reactant 0.2.303 compiles it in 99.6 min (job 3543332) against 53.2 min on 0.2.290 (3536598), while the 1-step compile got faster (33.8 -> 29.9 min). Run on both versions to find the stage that regressed; per-pass timing on stderr, no stage dumps (they write to /work during the timed stage).",
+  "Nz": 20,
+  "steps": 2,
+  "dt": 7200.0,
+  "substeps": 50,
+  "n_atmosphere_slices": 16,
+  "backend": "gpu",
+  "roll_barotropic_substeps": true,
+  "unroll_steps": true,
+  "variants": ["coupled"],
+  "modes": ["gradient"],
+  "xla": true,
+  "pass_timing": true,
+  "dump_stages": false,
+  "output": "results/compile_attribution_nz20_2step_unroll_steps.jld2"
+}

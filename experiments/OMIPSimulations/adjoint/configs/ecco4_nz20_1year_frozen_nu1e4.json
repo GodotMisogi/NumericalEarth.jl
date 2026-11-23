@@ -1,0 +1,18 @@
+{
+  "_comment": "1-year ECCO4 window, frozen mixing, with Laplacian horizontal viscosity 10⁴ m²/s on top of the biharmonic one: diagnostic of whether momentum dissipation bounds the adjoint growth. One evaluation (fits gh-dev on Vista).",
+  "forcing": "ecco4",
+  "n_months": 15,
+  "Nz": 20,
+  "steps": 4380,
+  "dt": 7200.0,
+  "substeps": 50,
+  "backend": "gpu",
+  "stages": "gradient",
+  "roll_barotropic_substeps": true,
+  "frozen_mixing": true,
+  "laplacian_viscosity": 10000,
+  "checkpoints": 60,
+  "average_days": 30,
+  "repeat_evaluation": false,
+  "output": "results/ecco4_adjoint_nz20_1year_frozen_nu1e4.jld2"
+}

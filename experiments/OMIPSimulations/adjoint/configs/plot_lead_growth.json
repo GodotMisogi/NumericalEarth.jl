@@ -1,0 +1,9 @@
+{
+  "_comment": "Adjoint growth with lead for the ECCO4 frozen-mixing windows (jobs 3574422, 3576763, 3576176, 3576463, 3576772).",
+  "runs": [["results/ecco4_adjoint_nz20_90day_frozen.jld2", "90 days"],
+           ["results/ecco4_adjoint_nz20_180day_frozen.jld2", "180 days"],
+           ["results/ecco4_adjoint_nz20_1year_frozen.jld2", "1 year"],
+           ["results/ecco4_adjoint_nz20_1year_frozen_nogm.jld2", "1 year, GM/Redi off"],
+           ["results/ecco4_adjoint_nz20_1year_frozen_upwind3.jld2", "1 year, linear upwind"]],
+  "output": "papers/figures/lead_growth_ecco4_nz20.png"
+}

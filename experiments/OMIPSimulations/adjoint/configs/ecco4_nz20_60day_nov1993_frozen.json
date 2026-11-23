@@ -1,0 +1,18 @@
+{
+  "_comment": "60-day ECCO4 window from ECCO's own 1 November 1993 state, frozen mixing, AMOC averaged over December: whether the 1-year adjoints' blow-up in Nov-Dec comes from the late-year state itself or from the 10 months of drift that precede it in the 1-year window.",
+  "forcing": "ecco4",
+  "start_date": "1993-11-01",
+  "n_months": 4,
+  "Nz": 20,
+  "steps": 720,
+  "dt": 7200.0,
+  "substeps": 50,
+  "backend": "gpu",
+  "stages": "gradient",
+  "roll_barotropic_substeps": true,
+  "frozen_mixing": true,
+  "checkpoints": 40,
+  "average_days": 30,
+  "repeat_evaluation": false,
+  "output": "results/ecco4_adjoint_nz20_60day_nov1993_frozen.jld2"
+}

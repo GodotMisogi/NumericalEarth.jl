@@ -1,0 +1,22 @@
+{
+  "_comment": "1° step Jacobian of the frozen-mixing, frozen-gradient window (finding 17: 23.7 and 19.2 per step at Δt = 2 h) at Δt = 1 h with 50 substeps, at the same model days 83.5 and 85.5, to test whether the 1° growth depends on the time step.",
+  "forcing": "ecco4",
+  "n_months": 5,
+  "Nx": 360,
+  "Ny": 180,
+  "Nz": 20,
+  "steps": 2160,
+  "dt": 3600.0,
+  "substeps": 50,
+  "backend": "gpu",
+  "stages": "step_jacobian",
+  "roll_barotropic_substeps": true,
+  "frozen_mixing": true,
+  "jacobian_steps": [
+    2004,
+    2052
+  ],
+  "jacobian_iterations": 60,
+  "frozen_buoyancy_gradients": true,
+  "output": "results/ecco4_step_jacobian_onedegree_nz20_90day_frozen_gradients_dt3600.jld2"
+}

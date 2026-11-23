@@ -1,0 +1,15 @@
+{
+  "_comment": "One-week (84-step) AMOC gradient one step at a time on Revolve's schedule; 12 checkpoints keep it to two forward sweeps.",
+  "Nz": 20,
+  "steps": 84,
+  "dt": 7200.0,
+  "substeps": 50,
+  "n_atmosphere_slices": 60,
+  "backend": "gpu",
+  "stages": "primal,gradient",
+  "roll_barotropic_substeps": true,
+  "checkpoints": 12,
+  "taylor_h0": 1.0,
+  "taylor_nh": 6,
+  "output": "results/omip_adjoint_twodegree_nz20_84step_checkpointed.jld2"
+}

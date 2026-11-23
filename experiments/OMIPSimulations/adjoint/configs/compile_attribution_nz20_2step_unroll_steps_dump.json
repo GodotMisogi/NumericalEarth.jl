@@ -1,0 +1,17 @@
+{
+  "_comment": "The modules of the coupled 2-step unrolled gradient compile (compile_attribution_nz20_2step_unroll_steps) kept after every pass pipeline, without the XLA stage: the traced module (pre_all) and the module entering post_op_transpose_reshape (post_all) start pass_bisect runs that find which post-Enzyme rewrite makes Reactant 0.2.303 slower than 0.2.290 (jobs 3555512, 3555525). Run on both versions.",
+  "Nz": 20,
+  "steps": 2,
+  "dt": 7200.0,
+  "substeps": 50,
+  "n_atmosphere_slices": 16,
+  "backend": "gpu",
+  "roll_barotropic_substeps": true,
+  "unroll_steps": true,
+  "variants": ["coupled"],
+  "modes": ["gradient"],
+  "xla": false,
+  "pass_timing": true,
+  "dump_stages": true,
+  "output": "results/compile_attribution_nz20_2step_unroll_steps_dump.jld2"
+}
