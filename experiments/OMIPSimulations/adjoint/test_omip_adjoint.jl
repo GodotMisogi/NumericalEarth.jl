@@ -18,8 +18,7 @@
 #             of the same configuration) for `fd_nh` step sizes halving from `fd_h0`; needs `primal`
 #   step_jacobian  leading growth of one step's adjoint at the states `jacobian_steps` (step indices) by
 #             `jacobian_iterations` of power iteration (`step_adjoint_growth`)
-# Optional `excluded_passes`: pattern names left out of Reactant's rewrite lists, replacing
-# adjoint_compile_options' default (["while_deadresult", "cse_reduce_transposed"]); [] runs every pattern.
+# Optional `excluded_passes`: pattern names left out of Reactant's rewrite lists (default none).
 # Optional `while_unroll_threshold` (default 0, every loop rolled): Reactant's unroll pattern acts on
 # loops of at most this many iterations in every rewrite application, before and after Enzyme.
 # Optional `frozen_mixing` (default false): the CATKE viscosity and diffusivities enter the gradient as

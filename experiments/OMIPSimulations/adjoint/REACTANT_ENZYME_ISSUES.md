@@ -19,8 +19,10 @@ reproduce the 0.2.303 results), still with the `cse_reduce_transposed` exclusion
 0.0.446, 11 commits past the pin (#3826 enables mincut in `@trace` loops, #3472 a kernel AD pipeline, #3685
 parallel compilation). Issue 3 was reported independently as Reactant.jl #3573 (closed 2026-11-04); Enzyme-JAX
 #3662, #3663, #3733 and #3734 (2026-10-20 to 10-30, all in the pin) sped up `WhileDeadResults` and
-`WhileLoopInfo`, and #3734 makes the unroller measure nested regions (issue 5). Both excluded patterns are being
-retested on the pin (Vista 1164260–1164263: both excluded, each re-enabled, both re-enabled). Issue 6's
+`WhileLoopInfo`, and #3734 makes the unroller measure nested regions (issue 5). Both excluded patterns were
+retested on the pin with the 8-step checkpointed gradient (Vista 1164260–1164263: both excluded, each
+re-enabled, both re-enabled): compile 21.3, 21.8, 21.4 and 21.4 min, and J, the gradient and the Taylor table
+agree to every printed digit. Neither pattern is excluded any more (`adjoint_compile_options`, 2026-11-23). Issue 6's
 upstream thread, Reactant.jl #3511, is open; Julia #64681 (thunk LLVM compile) is merged and queued for 1.12.8
 (#63196) and 1.13.5 (#64974), and Reactant.jl #3710 is open. Julia 1.13.4 is out; 1.13 waits for 1.13.5.
 
@@ -33,8 +35,8 @@ Versions, unless stated otherwise: Julia 1.12.7, Reactant.jl 0.2.303, Reactant_j
 |---|---|---|---|---|---|
 | 1 | Reactant_jll raise + Enzyme-JAX | Empty kernel raised to an operand-free `enzymexla.jit_call` that Enzyme cannot differentiate | Gradient fails to compile | Yes: EnzymeAD/Reactant.jl#3636 | `cd417288` (Oceananigans fix #6396 is in v0.117.1+) |
 | 2 | Enzyme-JAX (Enzyme-MLIR) | Zero-in/zero-out loop-carried shadows in reverse `while` loops | 72.9 GiB of loop state; rolled time loop does not fit on a GPU | Yes: Enzyme-JAX #3967, fixed by #3971 (in Reactant 0.2.309, unregistered) | Revolve checkpointing (rolled loop not retested) |
-| 3 | Enzyme-JAX pattern `while_deadresult` | 25 of 26 min of one rewrite application, removing 250 of 430k ops | Gradient compile 122 → 34 min without it | No; independently Reactant.jl #3573, sped up by Enzyme-JAX #3662/#3663/#3733 | Excluded by default; retest 1164261 |
-| 4 | Enzyme-JAX pattern `cse_reduce_transposed` (new in 0.2.303) | Quadratic candidate search; never fires on our modules | 2-step compile 53 → 100 min | Yes: Enzyme-JAX #3966, fixed by #3970 (in Reactant 0.2.309, unregistered) | Excluded by default; retest 1164262 |
+| 3 | Enzyme-JAX pattern `while_deadresult` | 25 of 26 min of one rewrite application, removing 250 of 430k ops | Gradient compile 122 → 34 min without it | No; independently Reactant.jl #3573, sped up by Enzyme-JAX #3662/#3663/#3733 | None since 2026-11-23: re-enabled on the pin, 21.8 against 21.3 min, same results (1164261) |
+| 4 | Enzyme-JAX pattern `cse_reduce_transposed` (new in 0.2.303) | Quadratic candidate search; never fires on our modules | 2-step compile 53 → 100 min | Yes: Enzyme-JAX #3966, fixed by #3970 (in Reactant 0.2.309, unregistered) | None since 2026-11-23: re-enabled on the pin, 21.4 against 21.3 min, same results (1164262) |
 | 5 | Reactant `WHILE_UNROLL_THRESHOLD` / `enzyme_hlo_unroll` | Unrolls after differentiation, not before | One rewrite application ran > 4 h 47 min | No; Enzyme-JAX #3734 now measures nested regions | Unroll at trace time instead |
 | 6 | Reactant on aarch64 (LLVM) | `fixup value out of range` on the first call of a large compiled thunk | Gradients could not run on Vista GH200; resolved with the checkpointed per-step thunks (Vista 1144920) | Comment on Reactant.jl #3511 | none needed now |
 | 7 | Reactant thunk call path | First call of compiled thunks costs 13–40 min of host time | Fixed overhead per job; gone with 0.2.309 (Vista 1150765: 3095 s → 19.1 s) | No | Reactant 0.2.309 |
@@ -88,7 +90,9 @@ Versions, unless stated otherwise: Julia 1.12.7, Reactant.jl 0.2.303, Reactant_j
 - Compile time without it: 122 → 34 min at 1 step (jobs 3512868 → 3516091/3516163). The coupled-versus-ocean
   2× gap in the MLIR stage was this pattern scaling worse on the coupled module.
 - Tools: `pass_bisect.jl`, `compile_attribution.jl`, `mlir_diagnostics.jl` (this directory).
-- Workaround: `CompileOptions(excluded_passes = ["while_deadresult", …])` in `adjoint_compile_options`.
+- Workaround: `CompileOptions(excluded_passes = ["while_deadresult", …])` in `adjoint_compile_options`, until
+  2026-11-23: on Reactant 0.2.309 the 8-step checkpointed gradient compiles in 21.8 min with the pattern and
+  21.3 min without, with the same results (Vista 1164261 against 1164260), so it is no longer excluded.
 
 ## 4. `cse_reduce_transposed` is quadratic and never fires (new in 0.2.303)
 
@@ -106,7 +110,9 @@ Versions, unless stated otherwise: Julia 1.12.7, Reactant.jl 0.2.303, Reactant_j
   number of reduces times the size of their computations, paid on every application and every driver
   iteration even when nothing matches. The unrolled 2-step reverse pass has ~520–580 reduces over large fused
   stencil computations.
-- **Workaround.** Excluded by default (`fb295782`); confirmed by job 3559769 (47.3 min).
+- **Workaround.** Excluded by default (`fb295782`); confirmed by job 3559769 (47.3 min). Fixed by Enzyme-JAX #3970;
+  on Reactant 0.2.309 the 8-step checkpointed gradient compiles in 21.4 min with the pattern and 21.3 min without,
+  with the same results (Vista 1164262 against 1164260), so it is no longer excluded (2026-11-23).
 
 ## 5. `WHILE_UNROLL_THRESHOLD` unrolls after differentiation
 

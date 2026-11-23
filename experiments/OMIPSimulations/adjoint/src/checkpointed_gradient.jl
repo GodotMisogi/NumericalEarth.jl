@@ -179,6 +179,7 @@ function checkpointed_gradient(thunks, model, state, obj; n_steps, Δt, checkpoi
     arrays = device_arrays(model)
 
     function evaluate!()
+        GC.gc()   # frees discarded shadows of earlier calls: the GC does not see device memory, which they exhaust
         dmodel = make_zero(model)
         restore_state!(model, state)
         start = memory_snapshot(model, arrays)     # the refresh's reverse pass runs from here

@@ -1,0 +1,31 @@
+{
+  "_comment": "Calibration gradient check, 90 days, CATKE diffusivities differentiated (buoyancy gradients still frozen): the fully frozen run (1164314) gave adjoint / central difference ratios of 0.31 (κ_skew) and 0.76 (κ_symmetric) in log κ at κ = 600, 600.",
+  "forcing": "ecco4",
+  "n_months": 5,
+  "Nz": 20,
+  "steps": 1080,
+  "dt": 7200.0,
+  "substeps": 50,
+  "backend": "gpu",
+  "roll_barotropic_substeps": true,
+  "frozen_mixing": false,
+  "frozen_buoyancy_gradients": true,
+  "advection": "upwind3",
+  "checkpoints": 40,
+  "average_days": 30,
+  "truth": [
+    1000.0,
+    1000.0
+  ],
+  "initial": [
+    600.0,
+    600.0
+  ],
+  "observed_levels": 20,
+  "observation_stride": 1,
+  "sigma_T": 0.1,
+  "sigma_S": 0.01,
+  "stages": "check",
+  "check_h": 0.05,
+  "output": "results/calibration_twin_ecco4_nz20_90day_check_unfrozen_mixing.jld2"
+}

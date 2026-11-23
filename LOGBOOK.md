@@ -296,6 +296,17 @@ Reference numbers (LS6 A100, Nz = 20):
    16 cells (1162370's κ census). `regularize_fold_metrics!` (`d5421ded`) gives the singular points their eastern
    neighbor's metrics: on the CPU the 2° model is bit-identical after 3 steps and the interior NaN is gone. The
    southern halo rows (j ≤ 0) have zero metrics too (w is NaN there) but no shadow is NaN there.
+22. **The frozen adjoint underestimates ∂J/∂κ over 90 days (11-23).** Twin calibration on the 2° 90-day upwind3
+   window (1164314, frozen mixing and buoyancy gradients; misfit of the last-30-day mean T, S at all 112,082 wet
+   cells, σ 0.1 K and 0.01 g kg⁻¹, truth κ = 1000, 1000): at κ = 600, 600 the adjoint ∂J/∂log κ is 0.31
+   (κ_skew) and 0.76 (κ_symmetric) times the central difference (h = 0.05). The central difference is right:
+   BFGS's first step lowered J by 4.7e4, more than the adjoint's linear prediction (2.1e4), which a J convex
+   along the step forbids; the central difference predicts 6.8e4. Both switches only drop derivatives
+   (`ignore_derivatives`), so the forward run is exact and the adjoint misses how κ's change of T and S feeds
+   back through the isopycnal slopes and CATKE. In a twin both gradients vanish at the truth, so BFGS still
+   recovers κ: 1000.5, 999.7 after 9 iterations (J 7.1e4 → 2.1). With real observations the zero of the frozen
+   gradient is not the minimum. The 8-step Kap8 κ Taylor check (1164313) cannot test this: 8-step AMOC moves
+   by ≤ 5e-4 Sv for Δκ ≤ 64 m² s⁻¹ and its differences change sign with h. The κ shadows themselves are finite.
 ## Tooling added
 
 | File | Purpose |
@@ -402,6 +413,10 @@ Reference numbers (LS6 A100, Nz = 20):
 | Vista 1162370 | Kap8 rerun with the κ census | κ shadow NaN at i = 1, 90, 91, 180, j = 60, k = 0, 1, 20, 21: interior; finding 21; rerun with the fold fix as 1164017 |
 | Vista 1162458–1162461 | 2° 90 days traced, frozen mixing and gradients, upwind3, from 1993-01, 04, 07, 10 | all bounded, ≤ 2.5e4, max\|g\| 3.9–4.6; compile 12.2–12.6 min, gradient 159–165 s; finding 20 |
 | Vista 1161912 | MPI probe, 2 nodes, MPICH_jll with `srun --mpi=pmi2` | cross-node Allreduce and bcast correct; PMIx unsupported |
+| Vista 1164017 | Kap8 with the fold fix | census 0 of 13 NaN; ∂J/∂κ_skew −3.24e-7, ∂J/∂κ_symmetric −7.03e-7 Sv per m² s⁻¹; stopped at the known 8-step forcing Taylor mismatch (4.255e-3, as 1153870) |
+| Vista 1164313 | Kap8, κ Taylor checks only | κ shadows finite and equal to ∂J/∂κ; both checks MISMATCH: 8-step AMOC differences are noise in κ (finding 22) |
+| Vista 1164260–1164263 | 8-step gradient with both patterns excluded, `while_deadresult` re-enabled, `cse_reduce_transposed` re-enabled, all patterns | compile 21.3, 21.8, 21.4, 21.4 min; identical J, gradient and Taylor table: both exclusions dropped |
+| Vista 1164314 | Calibration phase 1: twin, 2° 90 days from 1993-01, upwind3, frozen | compile 12.8 min, window 16 s, gradient ~130 s; check ratios 0.31, 0.76 (finding 22); BFGS 600, 600 → 1000.5, 999.7 in 9 iterations, then out of GPU memory (discarded shadow models; `GC.gc()` before each evaluation) |
 
 ## Open
 
@@ -416,11 +431,13 @@ Reference numbers (LS6 A100, Nz = 20):
 - JAMES manuscript draft `adjoint/papers/differentiable_ocean_manuscript.tex`: placeholders in red.
 - Julia 1.13 compile stall with 0.2.309: rerun with the SIGUSR1 profile for an upstream report.
 - Upstream reports still open: Enzyme-JAX #3965 (batch fission); Oceananigans #6529, #6530, PR #6531 (posted
-  from ReactOcean); `while_deadresult`'s cost.
+  from ReactOcean).
+- Calibration: the frozen adjoint's κ gradient is biased over 90 days (finding 22); the 14-day checks say
+  whether short windows with differentiated slopes give the exact gradient.
 - Resolved since 11-06: finding 4 (`4cc69c3e`); `cse_reduce_transposed` excluded (`fb295782`) and fixed upstream
   (Enzyme-JAX #3970); zero shadow carries (#3971) and `uitofp` (#3969) fixed upstream, in Reactant 0.2.309;
   the Vista first-call failure (gone with per-step thunks); `atlantic_ocean_basin` avoided by the staircase
-  section; `oc117` on Reactant 0.2.309 (11-19).
+  section; `oc117` on Reactant 0.2.309 (11-19); `while_deadresult` and `cse_reduce_transposed` run again (11-23).
 
 ## Entries
 
@@ -881,3 +898,14 @@ not attributed yet. Container: `$WORK/containers/julia_1.12_ls6.sif` links to a 
   `calibrate_mpi.slurm`, `sharding_probe.jl`). Phase 0: Kap8 (1161897) gave a NaN ∂J/∂κ; windows from
   April, July and October burst with WENO (finding 20), so the windows are repeated with upwind3. Sharding
   probe on LS6 (3605904, two A100s, partition 2 × 1).
+
+### 2026-11-23
+
+- Fold metrics regularized (finding 21): Kap8 census clean, ∂J/∂κ finite (1164017, 1164313).
+- `while_deadresult` and `cse_reduce_transposed` are no longer excluded: same compile time and results on the
+  pin (1164260–1164263, `REACTANT_ENZYME_ISSUES.md`).
+- Calibration phase 1 (1164314): BFGS recovers κ to 0.05 % in 9 iterations, but the frozen adjoint is 0.31 and
+  0.76 of the true ∂J/∂log κ (finding 22). It then ran out of GPU memory: each evaluation's discarded shadow
+  model stayed on the device; `evaluate!` now collects garbage first. Gradient checks to attribute the
+  shortfall: 90 days with CATKE differentiated, and 14 days frozen, with slopes differentiated, and with
+  nothing frozen.
