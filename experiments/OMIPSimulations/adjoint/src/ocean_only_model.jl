@@ -1,0 +1,259 @@
+#####
+##### Ocean-only OMIP model for differentiation
+#####
+# The OMIP ocean physics (tripolar grid, ETOPO bathymetry, WOA initial state, CATKE + GM/Redi +
+# biharmonic closures, TEOS-10, split-explicit free surface, SplitRK3) coupled to the prescribed JRA55
+# atmosphere and radiation through `OceanOnlyModel`. The same construction runs on `CPU()` and on
+# `ReactantState()`: the forcing window is loaded into memory up front and nothing reads from disk
+# during a time step.
+
+# The 2° regridded bathymetry leaves a wet path through Panama; land the isthmus so the Atlantic and
+# Pacific are separate basins.
+function close_central_american_isthmus!(bottom_height)
+    grid = bottom_height.grid
+    for j in 1:size(grid, 2), i in 1:size(grid, 1)
+        λ = λnode(i, j, 1, grid, Center(), Center(), Center())
+        φ = φnode(i, j, 1, grid, Center(), Center(), Center())
+        (276 <= λ <= 284 && 7 <= φ <= 12) && (bottom_height[i, j, 1] = 0)
+    end
+    return bottom_height
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+The 2° tripolar OMIP grid with ETOPO bathymetry, returned as `(; grid, cpu_grid)`: the grid on `arch`
+and its `CPU()` twin. The bathymetry is regridded on the CPU (host work) and copied onto `arch`.
+"""
+function omip_adjoint_grid(arch; Nx = 180, Ny = 60, Nz = 20, depth = 5500)
+    z = ExponentialDiscretization(Nz, -depth, 0; scale = exponential_scale(Nz, depth, nothing))
+    size, halo = (Nx, Ny, Nz), (8, 8, 8)
+
+    cpu_underlying = TripolarGrid(CPU(); size, z, halo)
+    cpu_bottom = regrid_bathymetry(cpu_underlying; minimum_depth = 20, major_basins = 1, interpolation_passes = 25)
+    close_central_american_isthmus!(cpu_bottom)
+    regularize_fold_metrics!(cpu_underlying)
+    cpu_grid = ImmersedBoundaryGrid(cpu_underlying, GridFittedBottom(cpu_bottom))
+    arch isa CPU && return (; grid = cpu_grid, cpu_grid)
+
+    underlying = regularize_fold_metrics!(TripolarGrid(arch; size, z, halo))
+    bottom = Field{Center, Center, Nothing}(underlying)
+    parent(bottom) .= Array(parent(cpu_bottom))
+    return (; grid = ImmersedBoundaryGrid(underlying, GridFittedBottom(bottom)), cpu_grid)
+end
+
+# TODO: Oceananigans' `TripolarGrid` sets Δxᶠᶜᵃ, Δyᶠᶜᵃ and Azᶠᶜᵃ to zero at the fold's singular u-points (i = 1 and
+# Nx ÷ 2 + 1, j = Ny), so their inverses are Inf. The cells there are land and the forward model masks the 0/0, but
+# reverse mode multiplies zero adjoints by the masked NaN, which pollutes the shadows beside the fold, the GM/Redi
+# diffusivity fields' included. Giving those points their eastern neighbor's metrics leaves the forward model
+# bit-identical (2°, CPU) and the shadows finite; Oceananigans should give them finite metrics.
+function regularize_fold_metrics!(grid)
+    j = grid.Ny + grid.Hy   # the fold row in the parent arrays
+    for (metric, inverse) in ((:Δxᶠᶜᵃ, :Δx⁻¹ᶠᶜᵃ), (:Δyᶠᶜᵃ, :Δy⁻¹ᶠᶜᵃ), (:Azᶠᶜᵃ, :Az⁻¹ᶠᶜᵃ))
+        a, a⁻¹ = Array(parent(getproperty(grid, metric))), Array(parent(getproperty(grid, inverse)))
+        for i in findall(iszero, view(a, :, j))
+            a[i + 1, j] > 0 || error("$metric is zero at both ($i, $j) and its eastern neighbor in the parent array")
+            a[i, j] = a[i + 1, j]
+            a⁻¹[i, j] = 1 / a[i, j]
+        end
+        copyto!(parent(getproperty(grid, metric)), a)
+        copyto!(parent(getproperty(grid, inverse)), a⁻¹)
+    end
+    return grid
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+The OMIP ocean simulation on `grid`: `omip_closure` (CATKE by default, GM/Redi when `κ_skew` and
+`κ_symmetric` are given, biharmonic viscosity from `biharmonic_timescale`, Laplacian horizontal tracer diffusion of
+`horizontal_diffusivity` (m² s⁻¹) when given, biharmonic tracer diffusion Az² / `biharmonic_tracer_timescale` (s)
+when given, implicit convective adjustment of tracers with diffusivity `convective_adjustment` (m² s⁻¹) where
+N² < 0, when given, and Laplacian horizontal viscosity `laplacian_viscosity` (m² s⁻¹) when given), advection by
+`advection`
+(`:weno`, split WENO, or `:upwind3`, linear third-order upwind; both explicit in the vertical), buoyancy gradients
+stored in fields when `materialize_buoyancy_gradients` (see [`freeze_buoyancy_gradients!`](@ref)), GM/Redi
+diffusivities held in uniform center fields instead of numbers when `eddy_diffusivity_fields` (so that they are
+device arrays with a gradient, see [`eddy_diffusivity_gradient`](@ref)),
+enstrophy-conserving Coriolis, `substeps` split-explicit
+barotropic substeps and SplitRK3 time stepping. The initial state is the WOA annual climatology
+converted to TEOS-10 variables on `cpu_grid` and copied onto `grid`, or ECCO4's monthly mean for
+`initial_date` when one is given.
+"""
+function omip_adjoint_ocean(grid, cpu_grid; Δt, substeps = 50, vertical_closure = :catke,
+                            κ_skew = 800, κ_symmetric = 800, biharmonic_timescale = 50days, initial_date = nothing,
+                            advection = :weno, horizontal_diffusivity = nothing, biharmonic_tracer_timescale = nothing,
+                            convective_adjustment = nothing, laplacian_viscosity = nothing,
+                            materialize_buoyancy_gradients = false, eddy_diffusivity_fields = false)
+
+    if eddy_diffusivity_fields && !isnothing(κ_skew)
+        κ_skew, κ_symmetric = uniform_center_field(grid, κ_skew), uniform_center_field(grid, κ_symmetric)
+    end
+    closure = omip_closure(vertical_closure; grid, κ_skew, κ_symmetric, biharmonic_timescale, laplacian_viscosity,
+                           background_vertical_diffusivity = :henyey)
+    isnothing(horizontal_diffusivity) ||
+        (closure = (closure..., HorizontalScalarDiffusivity(κ = horizontal_diffusivity)))
+    # The same Az² / λ coefficient as the biharmonic viscosity: a two-cell oscillation decays in λ/64 to λ/16.
+    isnothing(biharmonic_tracer_timescale) ||
+        (closure = (closure..., HorizontalScalarBiharmonicDiffusivity(κ = νhb, discrete_form = true,
+                                                                      parameters = biharmonic_tracer_timescale)))
+    # Removes the statically unstable columns CATKE leaves at this resolution; its diffusivity is piecewise constant
+    # in the state, so the adjoint sees it as fixed.
+    isnothing(convective_adjustment) ||
+        (closure = (closure..., ConvectiveAdjustmentVerticalDiffusivity(convective_κz = convective_adjustment)))
+
+    # Vertical advection is explicit: the adaptive implicit discretization keeps host state. Third-order upwind
+    # is linear in the advected field, so its adjoint has none of the WENO weights' derivatives.
+    momentum_advection, tracer_scheme = if advection === :weno
+        (split_momentum_advection(:weno, 5, ExplicitTimeDiscretization()),
+         split_tracer_advection(7, ExplicitTimeDiscretization(), 3))   # OMIPSimulations' default buffer order
+    elseif advection === :upwind3
+        upwind = UpwindBiased(order = 3)
+        (VectorInvariant(vorticity_scheme = upwind, vertical_advection_scheme = upwind,
+                         divergence_scheme = upwind, kinetic_energy_gradient_scheme = upwind),
+         upwind)
+    else
+        throw(ArgumentError("advection must be :weno or :upwind3, got $advection"))
+    end
+
+    ocean = ocean_simulation(grid;
+                             Δt,
+                             timestepper = :SplitRungeKutta3,
+                             free_surface = SplitExplicitFreeSurface(; substeps),
+                             coriolis = HydrostaticSphericalCoriolis(scheme = EnstrophyConserving()),
+                             closure,
+                             momentum_advection,
+                             tracer_advection = (T = tracer_scheme, S = tracer_scheme),
+                             radiative_forcing = nothing,
+                             implicit_bottom_drag = true,
+                             materialize_buoyancy_gradients,
+                             warn = false)
+
+    T_init = CenterField(cpu_grid)
+    S_init = CenterField(cpu_grid)
+    if isnothing(initial_date)
+        set!(T_init, Metadatum(:temperature; dataset = WOAAnnual()))
+        set!(S_init, Metadatum(:salinity;    dataset = WOAAnnual()))
+        woa_to_teos10!(T_init, S_init)
+    else
+        set!(T_init, Metadatum(:temperature; dataset = ECCO4Monthly(), date = initial_date))
+        set!(S_init, Metadatum(:salinity;    dataset = ECCO4Monthly(), date = initial_date))
+        ecco_to_teos10!(T_init, S_init)
+    end
+    parent(ocean.model.tracers.T) .= Array(parent(T_init))
+    parent(ocean.model.tracers.S) .= Array(parent(S_init))
+
+    return ocean
+end
+
+# TODO: Oceananigans has `νᶜᶜᶜ` for array viscosities at cell centers but not `κᶜᶜᶜ`, which the Redi term ϵκR₃₃
+# reads; add this method there.
+@inline TurbulenceClosures.κᶜᶜᶜ(i, j, k, grid, ::Tuple{Center, Center, Center}, κ::AbstractArray, clock, fields) =
+    @inbounds κ[i, j, k]
+
+# A center field equal to `value` in every cell, halos included.
+uniform_center_field(grid, value) = fill_everywhere!(CenterField(grid), value)
+
+function fill_everywhere!(field, value)
+    copyto!(parent(field), fill(convert(eltype(field), value), size(parent(field))))
+    return field
+end
+
+# Apply `op!(dst, src)` to every forcing slice, pairing the destination atmosphere / radiation with the source set.
+function map_forcing_slices!(op!, times, dst_atmos, dst_rad, src_atmos, src_rad)
+    for n in eachindex(times)
+        op!(dst_atmos.velocities.u[n],            src_atmos.velocities.u[n])
+        op!(dst_atmos.velocities.v[n],            src_atmos.velocities.v[n])
+        op!(dst_atmos.temperature[n],             src_atmos.temperature[n])
+        op!(dst_atmos.specific_humidity[n],       src_atmos.specific_humidity[n])
+        op!(dst_atmos.pressure[n],                src_atmos.pressure[n])
+        op!(dst_atmos.precipitation_flux.rain[n], src_atmos.precipitation_flux.rain[n])
+        op!(dst_atmos.precipitation_flux.snow[n], src_atmos.precipitation_flux.snow[n])
+        op!(dst_rad.downwelling_shortwave[n],     src_rad.downwelling_shortwave[n])
+        op!(dst_rad.downwelling_longwave[n],      src_rad.downwelling_longwave[n])
+    end
+    return nothing
+end
+
+copy_slice!(dst, src) = (parent(dst) .= Array(parent(src)); nothing)
+
+const ocean_surface_radiation = SurfaceRadiationProperties(0.06, 1.0)
+
+"""
+$(TYPEDSIGNATURES)
+
+JRA55 repeat-year atmosphere and downwelling radiation for `n_slices` three-hourly slices from
+`start_date`, loaded on the CPU, interpolated onto a regular latitude-longitude grid of the same size
+and copied slice by slice into in-memory `PrescribedAtmosphere` and `PrescribedRadiation` objects on
+`arch`, so that the coupled time step does no file I/O and no search over Gaussian latitudes.
+"""
+function omip_adjoint_forcing(arch; start_date = DateTime(1990, 1, 1), n_slices = 16)
+    dataset  = RepeatYearJRA55()
+    end_date = start_date + Hour(3 * (n_slices - 1))
+    kw = (; dataset, start_date, end_date, time_indices_in_memory = n_slices)
+
+    jra55_atmosphere = JRA55PrescribedAtmosphere(CPU(); kw..., prefetch = false)
+    jra55_radiation  = JRA55PrescribedRadiation(CPU(); kw..., ocean_surface = ocean_surface_radiation,
+                                                sea_ice_surface = nothing)
+
+    times = jra55_atmosphere.velocities.u.times
+    jra55_grid = jra55_atmosphere.velocities.u.grid
+    Nx, Ny, _ = size(jra55_grid)
+    # Float64, not JRA55's Float32: with a traced clock, Oceananigans' time interpolation
+    # `ifelse(n₁ == n₂, ψ₁, ψ̃)` would mix the Float32 slice with the Float64-weighted blend, and Reactant
+    # cannot raise the resulting union. TODO: convert ψ₁ to eltype(ψ̃) in Oceananigans' `interpolate`.
+    cpu_grid = LatitudeLongitudeGrid(CPU(), Float64; size = (Nx, Ny), longitude = (0, 360),
+                                     latitude = (-90, 90), topology = (Periodic, Bounded, Flat))
+
+    atmosphere_kw = (; surface_layer_height = jra55_atmosphere.surface_layer_height,
+                       boundary_layer_height = jra55_atmosphere.boundary_layer_height)
+    radiation_kw  = (; ocean_surface = ocean_surface_radiation, sea_ice_surface = nothing)
+
+    cpu_atmosphere = PrescribedAtmosphere(cpu_grid, times; atmosphere_kw...)
+    cpu_radiation  = PrescribedRadiation(cpu_grid, times; radiation_kw...)
+    map_forcing_slices!(interpolate!, times, cpu_atmosphere, cpu_radiation, jra55_atmosphere, jra55_radiation)
+
+    # `Clock(grid)` keeps time on the device under ReactantState; the default host Float64 clock would be
+    # read as a constant, and ticked, at trace time.
+    grid = on_architecture(arch, cpu_grid)
+    atmosphere = PrescribedAtmosphere(grid, times; clock = Clock(grid), atmosphere_kw...)
+    radiation  = PrescribedRadiation(grid, times; clock = Clock(grid), radiation_kw...)
+    map_forcing_slices!(copy_slice!, times, atmosphere, radiation, cpu_atmosphere, cpu_radiation)
+    update_state!(atmosphere)
+    update_state!(radiation)
+
+    return (; atmosphere, radiation, times)
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+Build the ocean-only OMIP model on `arch` and return `(; model, cpu_grid, Δt, times)`: the
+`OceanOnlyModel`, the `CPU()` twin of its grid (for host-side geometry), the time step and the forcing
+times. `arch` is `CPU()` or `ReactantState()`; keyword arguments go to [`omip_adjoint_grid`](@ref),
+[`omip_adjoint_ocean`](@ref) and [`omip_adjoint_forcing`](@ref).
+"""
+function omip_adjoint_setup(arch; Nx = 180, Ny = 60, Nz = 20, depth = 5500, Δt = 7200.0, substeps = 50,
+                            vertical_closure = :catke, κ_skew = 800, κ_symmetric = 800,
+                            biharmonic_timescale = 50days, advection = :weno, horizontal_diffusivity = nothing,
+                            biharmonic_tracer_timescale = nothing, convective_adjustment = nothing,
+                            laplacian_viscosity = nothing, materialize_buoyancy_gradients = false,
+                            start_date = DateTime(1990, 1, 1), n_atmosphere_slices = 16)
+
+    grid, cpu_grid = omip_adjoint_grid(arch; Nx, Ny, Nz, depth)
+    ocean = omip_adjoint_ocean(grid, cpu_grid; Δt, substeps, vertical_closure, κ_skew, κ_symmetric,
+                               biharmonic_timescale, advection, horizontal_diffusivity, biharmonic_tracer_timescale,
+                               convective_adjustment, laplacian_viscosity, materialize_buoyancy_gradients)
+    forcing  = omip_adjoint_forcing(arch; start_date, n_slices = n_atmosphere_slices)
+
+    # OMIP-2 Large & Yeager coefficients with a fixed iteration count, so the flux solver traces.
+    interfaces = ComponentInterfaces(forcing.atmosphere, ocean, default_sea_ice();
+                                     radiation = forcing.radiation,
+                                     atmosphere_ocean_fluxes = ncar_atmosphere_ocean_fluxes(Float64))
+
+    # The coupled clock times the atmosphere and radiation interpolation; on the device for the same reason.
+    model = OceanOnlyModel(ocean; atmosphere = forcing.atmosphere, radiation = forcing.radiation, interfaces,
+                           clock = Clock(grid))
+
+    return (; model, cpu_grid, Δt, times = forcing.times)
+end
