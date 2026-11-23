@@ -284,7 +284,10 @@ Reference numbers (LS6 A100, Nz = 20):
    tendencies Gⁿ.u, Gⁿ.v, not in tracers: April to 3.3e8 on day 79 (32–34°E, 27–30°S, level 12), October to
    1.5e9 on day 43 (32°E 36°S, level 13), both decaying within two days to ≤ 1e5 (max|∂J/∂τx| 4.5 and 4.4);
    July to 8.5e14 on day 74 at 73°W 32°N at the surface, staying near 1e10 to day 0 (max|∂J/∂τx| 2.8e7). The
-   1° mechanism (finding 18) therefore exists at 2° too, intermittently. Upwind3 repeats in 1162458–1162461.
+   1° mechanism (finding 18) therefore exists at 2° too, intermittently. With upwind3 (1162458–1162461) all four
+   start months are bounded: adjoint ≤ 2.5e4 over the whole sweep (the seed's peak on day 88 and 1.8e4 on day 58,
+   the same cells in every month), max|∂J/∂τx| 3.9–4.6, J 15.09, 14.75, 15.79, 19.96 Sv. Calibration windows use
+   upwind3.
 ## Tooling added
 
 | File | Purpose |
@@ -388,6 +391,7 @@ Reference numbers (LS6 A100, Nz = 20):
 | Vista 1161433 | 1° 90 days traced, frozen mixing and gradients, upwind3 | bounded: adjoint ≤ 7.2e2, max\|g\| 1.198, J 14.5108 Sv; finding 19 |
 | Vista 1161897 | 2° 8 steps, κ as fields, Taylor check in κ | J and forcing gradients equal 1153870's; ∂J/∂κ NaN (sum over the parent array includes the fold's NaN shadow); rerun with the κ census as 1162370 |
 | Vista 1161899–1161901 | 2° 90 days traced, frozen mixing and gradients, from 1993-04, 07, 10 | momentum bursts: 3.3e8 and 1.5e9 (recovering), July 8.5e14 (max\|g\| 2.8e7); finding 20 |
+| Vista 1162458–1162461 | 2° 90 days traced, frozen mixing and gradients, upwind3, from 1993-01, 04, 07, 10 | all bounded, ≤ 2.5e4, max\|g\| 3.9–4.6; compile 12.2–12.6 min, gradient 159–165 s; finding 20 |
 | Vista 1161912 | MPI probe, 2 nodes, MPICH_jll with `srun --mpi=pmi2` | cross-node Allreduce and bcast correct; PMIx unsupported |
 
 ## Open
