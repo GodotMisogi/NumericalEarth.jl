@@ -279,6 +279,12 @@ Reference numbers (LS6 A100, Nz = 20):
    North Atlantic (343°E 26°N level 8–9; 282–287°E 26–35°N near the surface; 341°E 11°N). Only u, v and S at the
    fold row (j = 181) are NaN, as in every run. So at 1° WENO's weights are the remaining linearization
    instability; why they are benign at 2° is open.
+20. **At 2° WENO is not benign in every month (11-22).** The January frozen-gradient window (1157589) repeated
+   from 1993-04, 07 and 10 (1161899–1161901; J 17.61, 18.72, 23.05 Sv). All three burst in the momentum
+   tendencies Gⁿ.u, Gⁿ.v, not in tracers: April to 3.3e8 on day 79 (32–34°E, 27–30°S, level 12), October to
+   1.5e9 on day 43 (32°E 36°S, level 13), both decaying within two days to ≤ 1e5 (max|∂J/∂τx| 4.5 and 4.4);
+   July to 8.5e14 on day 74 at 73°W 32°N at the surface, staying near 1e10 to day 0 (max|∂J/∂τx| 2.8e7). The
+   1° mechanism (finding 18) therefore exists at 2° too, intermittently. Upwind3 repeats in 1162458–1162461.
 ## Tooling added
 
 | File | Purpose |
@@ -380,6 +386,9 @@ Reference numbers (LS6 A100, Nz = 20):
 | Vista 1161247 | 1° `step_jacobian` at 1002, 1026, frozen mixing and gradients, upwind3 | 0.99 per step at both, diffuse mode; finding 18 |
 | Vista 1161248 | 1° `step_jacobian` at 2004, 2052, frozen mixing and gradients, Δt = 1 h | 2.91 and 4.66 per step; finding 18 |
 | Vista 1161433 | 1° 90 days traced, frozen mixing and gradients, upwind3 | bounded: adjoint ≤ 7.2e2, max\|g\| 1.198, J 14.5108 Sv; finding 19 |
+| Vista 1161897 | 2° 8 steps, κ as fields, Taylor check in κ | J and forcing gradients equal 1153870's; ∂J/∂κ NaN (sum over the parent array includes the fold's NaN shadow); rerun with the κ census as 1162370 |
+| Vista 1161899–1161901 | 2° 90 days traced, frozen mixing and gradients, from 1993-04, 07, 10 | momentum bursts: 3.3e8 and 1.5e9 (recovering), July 8.5e14 (max\|g\| 2.8e7); finding 20 |
+| Vista 1161912 | MPI probe, 2 nodes, MPICH_jll with `srun --mpi=pmi2` | cross-node Allreduce and bcast correct; PMIx unsupported |
 
 ## Open
 
@@ -855,3 +864,7 @@ not attributed yet. Container: `$WORK/containers/julia_1.12_ls6.sif` links to a 
   (per-area ≈ −0.4e-10 Sv N⁻¹). Ours (`uniform_response.jl`, last two slices together, 25–28°N, 80.5–13.5°W):
   −0.53 Sv at 2° (WENO), −0.78 Sv at 1° (upwind3); earlier slices +0.02 to +0.07 Sv, as their positive 3-month
   band.
+- Calibration prototype (GM/Redi κ, twin experiment, one MPI rank per window; `calibration.jl`, `calibrate.jl`,
+  `calibrate_mpi.slurm`, `sharding_probe.jl`). Phase 0: Kap8 (1161897) gave a NaN ∂J/∂κ; windows from
+  April, July and October burst with WENO (finding 20), so the windows are repeated with upwind3. Sharding
+  probe on LS6 (3605904, two A100s, partition 2 × 1).
