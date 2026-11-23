@@ -284,7 +284,8 @@ forcing_shadows(dmodel) = (("atmosphere.u", dmodel.atmosphere.velocities.u), ("a
 $(TYPEDSIGNATURES)
 
 Per-field census of the Enzyme shadows in `dmodel`: ocean velocities, tracers and free-surface
-displacement, and the forcing slices (atmosphere and radiation, or prescribed fluxes). Each entry holds
+displacement, the GM/Redi diffusivity fields when present, and the forcing slices (atmosphere and radiation, or
+prescribed fluxes). Each entry holds
 the counts of NaN, Inf and non-zero finite entries, the vertical levels and `(i, j)` columns holding NaN
 (3-D fields, interior indices; out-of-range ones are halo) and, for ocean surface fields with `cpu_grid`
 given, the wet/dry split of the NaN cells.
@@ -299,6 +300,11 @@ function shadow_census(dmodel; cpu_grid = nothing)
         end
     end
     push!(out, field_census("free_surface.η", om.free_surface.displacement, wet))
+    closure = eddy_closure(dmodel)
+    if !isnothing(closure) && closure.κ_skew isa Field
+        push!(out, field_census("closure.κ_skew", closure.κ_skew, wet))
+        push!(out, field_census("closure.κ_symmetric", closure.κ_symmetric, wet))
+    end
     for (name, f) in forcing_shadows(dmodel)
         push!(out, field_census(name, f, nothing))
     end
