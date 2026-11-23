@@ -244,7 +244,11 @@ if :gradient in stages
         rel < 1e-8 || @warn "gradient's objective differs from the primal window's" rel
     end
     haskey(g, :κ_skew) && stamp(@sprintf("∂J/∂κ_skew %+.6e, ∂J/∂κ_symmetric %+.6e Sv per m² s⁻¹", g.κ_skew, g.κ_symmetric))
-    haskey(g, :κ_skew) && stamp(@sprintf("interior sums of the κ shadows: κ_skew %+.6e, κ_symmetric %+.6e", (sum(Array(interior(getproperty(OMIPAdjoint.eddy_closure(dmodel), name)))) for name in (:κ_skew, :κ_symmetric))...))
+    if haskey(g, :κ_skew)
+        dclosure = OMIPAdjoint.eddy_closure(dmodel)
+        stamp(@sprintf("interior sums of the κ shadows: κ_skew %+.6e, κ_symmetric %+.6e",
+                       sum(Array(interior(dclosure.κ_skew))), sum(Array(interior(dclosure.κ_symmetric)))))
+    end
     census = shadow_census(dmodel; cpu_grid = setup.cpu_grid)
     print_shadow_census(census); flush(stdout)
 
