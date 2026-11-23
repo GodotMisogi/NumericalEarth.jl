@@ -1,5 +1,5 @@
 {
-  "_comment": "ecco4_nz20_8step_checkpointed_r309 with the GM/Redi diffusivities held in uniform fields: J and the stress gradient must match 1153870 to rounding, and ∂J/∂κ_skew, ∂J/∂κ_symmetric must pass the Taylor check (exact adjoint, nothing frozen).",
+  "_comment": "ecco4_nz20_8step_checkpointed_r309 with the GM/Redi diffusivities held in uniform fields: J and the stress gradient must match 1153870 to rounding (1164017: identical, and no NaN shadow after the fold-metric fix), and ∂J/∂κ_skew, ∂J/∂κ_symmetric must pass the Taylor check (exact adjoint, nothing frozen). No forcing Taylor check: at 8 steps it reports the same MISMATCH as 1153870 and 3577970 (rel_err 4.3e-3), and its failing test stopped 1164017 before the κ checks.",
   "forcing": "ecco4",
   "n_months": 2,
   "Nz": 20,
@@ -10,8 +10,6 @@
   "stages": "gradient",
   "roll_barotropic_substeps": true,
   "checkpoints": 3,
-  "taylor_h0": 0.1,
-  "taylor_nh": 6,
   "output": "results/ecco4_adjoint_nz20_8step_eddy_fields.jld2",
   "eddy_diffusivity_fields": true,
   "eddy_taylor_h0": 64.0,
