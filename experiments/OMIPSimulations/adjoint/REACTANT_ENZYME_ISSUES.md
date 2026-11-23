@@ -13,6 +13,17 @@ GodotMisogi) and fixed in Enzyme-JAX within a day: #3969 (`uitofp` raising), #39
 still not usable. `ajs/omip-adjoint-oc117` moved to 0.2.309 on 2026-11-19 (`8cfba671`; Vista 1153869/1153870
 reproduce the 0.2.303 results), still with the `cse_reduce_transposed` exclusion.
 
+**Upstream status (2026-11-23).** All four reported issues are closed, and every fix is in the pinned Reactant
+(git `2bb32e28`, Enzyme-JAX `a31fd083`): Reactant.jl #3636 and #3803, Enzyme-JAX #3966 and #3967 (fixed by #3969,
+#3970, #3971, merged 2026-11-16). Reactant is still registered only to 0.2.308; main is 0.2.309 with Reactant_jll
+0.0.446, 11 commits past the pin (#3826 enables mincut in `@trace` loops, #3472 a kernel AD pipeline, #3685
+parallel compilation). Issue 3 was reported independently as Reactant.jl #3573 (closed 2026-11-04); Enzyme-JAX
+#3662, #3663, #3733 and #3734 (2026-10-20 to 10-30, all in the pin) sped up `WhileDeadResults` and
+`WhileLoopInfo`, and #3734 makes the unroller measure nested regions (issue 5). Both excluded patterns are being
+retested on the pin (Vista 1164260–1164263: both excluded, each re-enabled, both re-enabled). Issue 6's
+upstream thread, Reactant.jl #3511, is open; Julia #64681 (thunk LLVM compile) is merged and queued for 1.12.8
+(#63196) and 1.13.5 (#64974), and Reactant.jl #3710 is open. Julia 1.13.4 is out; 1.13 waits for 1.13.5.
+
 Versions, unless stated otherwise: Julia 1.12.7, Reactant.jl 0.2.303, Reactant_jll 0.0.436, Enzyme_jll
 0.0.303+1, Oceananigans `ss/for-omip` (0.113.5). Hardware: TACC Lonestar6 A100 (x86_64) and Vista GH200
 (aarch64). Job numbers are Slurm jobs; the detailed record is `PROGRESS.md` and the repository-root
@@ -21,10 +32,10 @@ Versions, unless stated otherwise: Julia 1.12.7, Reactant.jl 0.2.303, Reactant_j
 | # | Component | Issue | Effect | Reported | Workaround here |
 |---|---|---|---|---|---|
 | 1 | Reactant_jll raise + Enzyme-JAX | Empty kernel raised to an operand-free `enzymexla.jit_call` that Enzyme cannot differentiate | Gradient fails to compile | Yes: EnzymeAD/Reactant.jl#3636 | `cd417288` (Oceananigans fix #6396 is in v0.117.1+) |
-| 2 | Enzyme-JAX (Enzyme-MLIR) | Zero-in/zero-out loop-carried shadows in reverse `while` loops | 72.9 GiB of loop state; rolled time loop does not fit on a GPU | Yes: Enzyme-JAX #3967, fixed by #3971 (in Reactant 0.2.309, unregistered) | Revolve checkpointing |
-| 3 | Enzyme-JAX pattern `while_deadresult` | 25 of 26 min of one rewrite application, removing 250 of 430k ops | Gradient compile 122 → 34 min without it | No | Excluded by default |
-| 4 | Enzyme-JAX pattern `cse_reduce_transposed` (new in 0.2.303) | Quadratic candidate search; never fires on our modules | 2-step compile 53 → 100 min | Yes: Enzyme-JAX #3966, fixed by #3970 (in Reactant 0.2.309, unregistered) | Excluded by default |
-| 5 | Reactant `WHILE_UNROLL_THRESHOLD` / `enzyme_hlo_unroll` | Unrolls after differentiation, not before | One rewrite application ran > 4 h 47 min | No | Unroll at trace time instead |
+| 2 | Enzyme-JAX (Enzyme-MLIR) | Zero-in/zero-out loop-carried shadows in reverse `while` loops | 72.9 GiB of loop state; rolled time loop does not fit on a GPU | Yes: Enzyme-JAX #3967, fixed by #3971 (in Reactant 0.2.309, unregistered) | Revolve checkpointing (rolled loop not retested) |
+| 3 | Enzyme-JAX pattern `while_deadresult` | 25 of 26 min of one rewrite application, removing 250 of 430k ops | Gradient compile 122 → 34 min without it | No; independently Reactant.jl #3573, sped up by Enzyme-JAX #3662/#3663/#3733 | Excluded by default; retest 1164261 |
+| 4 | Enzyme-JAX pattern `cse_reduce_transposed` (new in 0.2.303) | Quadratic candidate search; never fires on our modules | 2-step compile 53 → 100 min | Yes: Enzyme-JAX #3966, fixed by #3970 (in Reactant 0.2.309, unregistered) | Excluded by default; retest 1164262 |
+| 5 | Reactant `WHILE_UNROLL_THRESHOLD` / `enzyme_hlo_unroll` | Unrolls after differentiation, not before | One rewrite application ran > 4 h 47 min | No; Enzyme-JAX #3734 now measures nested regions | Unroll at trace time instead |
 | 6 | Reactant on aarch64 (LLVM) | `fixup value out of range` on the first call of a large compiled thunk | Gradients could not run on Vista GH200; resolved with the checkpointed per-step thunks (Vista 1144920) | Comment on Reactant.jl #3511 | none needed now |
 | 7 | Reactant thunk call path | First call of compiled thunks costs 13–40 min of host time | Fixed overhead per job; gone with 0.2.309 (Vista 1150765: 3095 s → 19.1 s) | No | Reactant 0.2.309 |
 | 8 | Reactant 0.2.303 XLA export under Julia 1.13 | `arith.uitofp` left in the module: "unsupported op for export to XLA" | Nothing compiles under Julia 1.13.3 (Vista; LS6 not yet tried) | Yes: Reactant.jl #3803, fixed by Enzyme-JAX #3969 (in Reactant 0.2.309, unregistered) | Stay on Julia 1.12.7 |
@@ -169,4 +180,6 @@ These were fixed or worked around in model code. They are not Reactant or Enzyme
 - Oceananigans' generic `find_time_index` reads `times[n]` at a traced index for unevenly spaced (vector)
   times, which hits the scalar-indexing guard. Fixed with `@allowscalar` in OMIPAdjoint (`48db0af3`); belongs
   in OceananigansReactantExt.
-- NaN adjoint entries on a few tripolar fold-seam columns. They do not reach the controls; not yet attributed.
+- NaN adjoint entries on a few tripolar fold-seam columns. Attributed 2026-11-23 (LOGBOOK finding 21): Oceananigans'
+  `TripolarGrid` has zero Δx, Δy, Az at the fold's singular u-points, so masked 0/0 values in the forward
+  model meet zero adjoints (0 × NaN). Fixed in OMIPAdjoint by `regularize_fold_metrics!` (`d5421ded`).
