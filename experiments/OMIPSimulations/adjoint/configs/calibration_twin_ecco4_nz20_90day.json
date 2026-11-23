@@ -1,0 +1,33 @@
+{
+  "_comment": "Calibration phase 1: twin experiment on the 2° 90-day window from 1993-01 (frozen mixing and buoyancy gradients, upwind3 advection: bounded adjoint in all four start months, 1162458-1162461, while WENO bursts in April, July and October, LOGBOOK finding 20). Observations: the last-30-day mean T and S at every wet cell, made with κ_skew = κ_symmetric = 1000 m² s⁻¹; BFGS in log κ from 600, 600.",
+  "forcing": "ecco4",
+  "n_months": 5,
+  "Nz": 20,
+  "steps": 1080,
+  "dt": 7200.0,
+  "substeps": 50,
+  "backend": "gpu",
+  "roll_barotropic_substeps": true,
+  "frozen_mixing": true,
+  "frozen_buoyancy_gradients": true,
+  "advection": "upwind3",
+  "checkpoints": 40,
+  "average_days": 30,
+  "truth": [
+    1000.0,
+    1000.0
+  ],
+  "initial": [
+    600.0,
+    600.0
+  ],
+  "observed_levels": 20,
+  "observation_stride": 1,
+  "sigma_T": 0.1,
+  "sigma_S": 0.01,
+  "stages": "check,calibrate",
+  "check_h": 0.05,
+  "iterations": 12,
+  "initial_step": 0.3,
+  "output": "results/calibration_twin_ecco4_nz20_90day.jld2"
+}

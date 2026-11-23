@@ -8,7 +8,8 @@ export omip_adjoint_setup, ecco_adjoint_setup, PrescribedFluxOcean,
        wind_gradient, forcing_gradient, surface_geometry, shadow_census, print_shadow_census,
        taylor_remainder_check, finite_difference_scan,
        eddy_diffusivity_gradient, eddy_diffusivity, set_eddy_diffusivity!, eddy_diffusivity_taylor_check,
-       compile_checkpointed_thunks, checkpointed_gradient
+       compile_checkpointed_thunks, checkpointed_gradient,
+       TracerWeights, TracerMisfit, observed_cells, misfit, build_eddy_calibration, bfgs_minimize
 
 using Oceananigans
 using Oceananigans: prognostic_state, restore_prognostic_state!
@@ -69,5 +70,6 @@ include("adjoint_damping.jl")
 include("adjoint_trace.jl")
 include("checkpointed_gradient.jl")
 include("step_jacobian.jl")
+include("calibration.jl")
 
 end # module OMIPAdjoint

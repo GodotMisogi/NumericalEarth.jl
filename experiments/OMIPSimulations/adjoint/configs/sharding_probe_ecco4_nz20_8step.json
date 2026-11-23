@@ -1,0 +1,17 @@
+{
+  "_comment": "Calibration phase 3 probe: the 8-step ECCO4 2° checkpointed gradient on one A100 and sharded over two (Partition(2, 1), split in longitude), in one process on a Lonestar6 gpu-a100 node; J and the gradients must agree to rounding.",
+  "forcing": "ecco4",
+  "n_months": 2,
+  "Nz": 20,
+  "steps": 8,
+  "dt": 7200.0,
+  "substeps": 50,
+  "backend": "gpu",
+  "roll_barotropic_substeps": true,
+  "checkpoints": 3,
+  "partition": [
+    2,
+    1
+  ],
+  "output": "results/sharding_probe_ecco4_nz20_8step.jld2"
+}
