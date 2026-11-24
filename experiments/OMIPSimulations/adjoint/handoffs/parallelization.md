@@ -96,3 +96,9 @@ long-window adjoint growth.
   allocation, the wait in the reduction, the callback's GC), plus host/threads/affinity per rank; 4 windows, 3
   iterations (`calibration_twin_ecco4_nz20_90day_4windows_timing.json`). Probe: sharded case first, so a 2 h
   dev job shows how far sharding gets even if the single-device half runs out of time.
+- `94351713`: per-rank timing; probe sharded-first. Submitted Vista 1168099 `ParTime4` (4 nodes, `gh-dev`, 3
+  iterations) and LS6 3612502 `ParShard2` (`gpu-a100-dev`, 2 h, `CUDA_VISIBLE_DEVICES=0,1`); cancelled 3605904.
+- `92723ace`: config key `xla_kernel_cache` (XLA's `xla_gpu_kernel_cache_file`, with
+  `xla_gpu_enable_llvm_module_compilation_parallelism` as Reactant's own preference sets it), passed through
+  `adjoint_compile_options(; xla_debug_options)`. Vista 1168110 `ParKc1`: 1 window, 1 iteration, cold cache;
+  a warm rerun follows. Both must reproduce 1166514's iteration 0 (J 7.138303e+04, |∂J/∂log κ| 7.147e+04).
