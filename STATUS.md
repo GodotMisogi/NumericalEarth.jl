@@ -89,6 +89,13 @@ before the end of the window, near coasts and fronts. What is known:
    (1161433, finding 19). Open: why WENO is benign at 2°; frozen WENO weights. JAMES manuscript draft in
    `adjoint/papers/`.
 5. Optional: Julia 1.13 + 0.2.309 rerun with the SIGUSR1 profile, for an upstream report.
+6. Calibration (11-23 to 11-24): twin recovery works with 1 window (1166514) and 4 windows over MPI (1166675).
+   Open question: is the frozen κ gradient's bias (finding 22) worth a J(κ) roughness scan on the 14-day window,
+   or should the slope derivative be tapered in the adjoint?
+7. Handed off on 11-24 (`experiments/OMIPSimulations/adjoint/handoffs/`): the grid-scale noise in the flux
+   sensitivities (finding 23; `checkerboard.md`) and parallel calibration (4-window iterations run 3× slower than
+   one window; sharding untested, LS6 3605904 still pending; `parallelization.md`). Shared rules in
+   `coordination.md`; each agent logs in its own file, merged into LOGBOOK and STATUS afterwards.
 
 ## Constraints to remember
 

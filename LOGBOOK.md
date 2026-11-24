@@ -444,7 +444,7 @@ Reference numbers (LS6 A100, Nz = 20):
 | Vista 1165330 | Calibration phase 2: 4 windows (1993-01, 04, 07, 10), 4 nodes, MPI, frozen | compile 12.5 min; κ 600, 600 → 1000.0, 1000.0 at iteration 8 (J 3.2e5 → 6.1 at iteration 10); then out of GPU memory after 11 gradients despite `GC.gc()` in `evaluate!`, other ranks hung to the 3 h limit; memory traced in 1166395 |
 | Vista 1166395 | Phase 1 rerun logging device memory per BFGS iteration | 1.0–1.1 GiB in use after every iteration, 0.15 GiB after GC: no held buffers; still out of memory in the forward window of iteration 10 (XLA's pool is ~72 GB). Garbage of the forward window's steps outran the host-triggered GC; stepping loops now collect when the pool is half full |
 | Vista 1166514 | 1166395 with the half-pool collection (`2aa9e25b`) | peak 35.9 of 71.3 GiB, iterations unchanged (~2.2 min); κ 1000.5, 999.7 after 9 iterations; iteration 10's line search found no decrease (J 2.1, the frozen gradient at the misfit's roughness) and BFGS stopped |
-| Vista 1166675 | Calibration phase 2 rerun with the half-pool collection: 4 windows, 4 nodes | κ 600, 600 → 1000.0, 1000.0 at iteration 8, J 3.2e5 → 6.1 at iteration 10; device memory peak 35.9 of 71.3 GiB, 0.15 GiB after GC every iteration; 1 h 39 min |
+| Vista 1166675 | Calibration phase 2 rerun with the half-pool collection: 4 windows, 4 nodes | κ 600, 600 → 1000.0, 1000.0 at iteration 8, J 3.2e5 → 6.1 at iteration 10; device memory peak 35.9 of 71.3 GiB, 0.15 GiB after GC every iteration; 1 h 39 min. ~7 min per iteration against ~2.2 min with one window (1166514), and rank 0's GPU at 0 % in 17 of 20 five-minute samples: the ranks wait (`adjoint/handoffs/parallelization.md`) |
 | Vista 1167067–1167069 | 2° 14 days traced from 1993-01, upwind3: nothing frozen, CATKE frozen, CATKE and slopes frozen | compile 17.2, 16.9, 12.4 min; gradient 48–52 s; J 15.5628 Sv; max\|g\| 5.74, 4.56, 4.56; heat and freshwater flux sensitivities grid-scale in all three (finding 23) |
 | Vista 1167070 | forward_health, 2° 14 days from 1993-01, upwind3 | 1947–2389 unstable interfaces; surface T grid-scale residual 0.26 → 0.35 K rms; daily maps for finding 23 |
 | Vista 1164314 | Calibration phase 1: twin, 2° 90 days from 1993-01, upwind3, frozen | compile 12.8 min, window 16 s, gradient ~130 s; check ratios 0.31, 0.76 (finding 22); BFGS 600, 600 → 1000.5, 999.7 in 9 iterations, then out of GPU memory (discarded shadow models; `GC.gc()` before each evaluation) |
@@ -465,6 +465,7 @@ Reference numbers (LS6 A100, Nz = 20):
   from ReactOcean).
 - Calibration: the frozen adjoint's κ gradient is biased over 90 days, and the 14-day misfit is rough in κ
   (finding 22). Twin recovery works with 1 and 4 windows (1166514, 1166675).
+- Handed off on 11-24 to two agents, `adjoint/handoffs/` (checkerboard, parallelization, coordination).
 - Grid-scale noise in the buoyancy-flux sensitivities is in the exact adjoint (finding 23). Next tests: biharmonic
   tracer diffusion (`biharmonic_tracer_timescale`, config only) and a vertical closure other than CATKE (the
   gradient script does not pass `vertical_closure` yet).
