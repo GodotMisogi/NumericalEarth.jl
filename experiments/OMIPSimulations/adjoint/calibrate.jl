@@ -9,8 +9,9 @@
 #   CONFIG=adjoint/configs/<config>.json sbatch -N <length(windows)> adjoint/calibrate_mpi.slurm
 #
 # Config keys: n_months, Nx, Ny (default 180, 60), Nz, steps, dt, substeps, backend, roll_barotropic_substeps,
-# checkpoints, average_days, output; optional frozen_mixing, frozen_buoyancy_gradients, advection, and windows (ISO
-# start dates, one per MPI rank; default ["1993-01-01"]).
+# checkpoints, average_days, output; optional frozen_mixing, frozen_buoyancy_gradients, advection, windows (ISO
+# start dates, one per MPI rank; default ["1993-01-01"]), and xla_kernel_cache (a file under adjoint/ for XLA's
+# cache of compiled GPU kernels, which later compiles of the same program reuse).
 # truth, initial: [κ_skew, κ_symmetric] (m² s⁻¹). observed_levels (default Nz), observation_stride (default 1),
 # sigma_T (K), sigma_S (g kg⁻¹): the observations. stages: "check" (central differences of the misfit in log κ,
 # step check_h, a number or a list, against the adjoint) and/or "calibrate" (iterations, initial_step, gtol).
@@ -96,8 +97,12 @@ stamp(@sprintf("window from %s built in %.1f s; %d observed cells", windows[rank
 Nx, Ny, Nz = size(observed)
 observations = TracerMisfit(observed, zeros(Nx, Ny, Nz), zeros(Nx, Ny, Nz), Float64(P["sigma_T"]), Float64(P["sigma_S"]))
 t0 = time()
+kernel_cache = haskey(P, "xla_kernel_cache") ?
+    (; xla_gpu_kernel_cache_file = joinpath(@__DIR__, P["xla_kernel_cache"]),
+       xla_gpu_enable_llvm_module_compilation_parallelism = true) : (;)
 calibration = build_eddy_calibration(model, state, observations; Δt, n_steps, average_steps,
-                                     checkpoints = P["checkpoints"])
+                                     checkpoints = P["checkpoints"],
+                                     compile_options = adjoint_compile_options(; xla_debug_options = kernel_cache))
 results["compile_seconds"] = time() - t0
 stamp(@sprintf("compiled in %.1f min", results["compile_seconds"] / 60))
 
