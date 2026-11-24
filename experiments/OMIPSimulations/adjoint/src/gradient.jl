@@ -114,6 +114,9 @@ end
 # The wind controls: the 10-m velocity slices of the in-memory atmosphere (the stress of a `PrescribedFluxOcean`).
 wind_fields(model) = (u = model.atmosphere.velocities.u, v = model.atmosphere.velocities.v)
 
+# The forcing controls by name.
+forcing_fields(model) = wind_fields(model)
+
 # Interior parent index ranges of a surface field time series.
 function interior_ranges(fts)
     Nx, Ny, _ = size(fts.grid)
@@ -142,7 +145,7 @@ Gradient of the objective with respect to the forcing controls of `dmodel`'s mod
 `(Nx, Ny, 1, Nt)`: `u` and `v` from [`wind_gradient`](@ref), plus the heat and freshwater flux for a
 [`PrescribedFluxOcean`](@ref).
 """
-forcing_gradient(dmodel) = wind_gradient(dmodel)
+forcing_gradient(dmodel) = map(interior_slices, forcing_fields(dmodel))
 
 # The GM/Redi closure of the ocean model, or nothing.
 function eddy_closure(model)
@@ -327,12 +330,12 @@ print_shadow_census(census) = print_shadow_census(stdout, census)
 ##### Finite-difference verification of the compiled gradient
 #####
 
-# The control vector: interior wind entries of every forcing slice, u then v.
-wind_control(model) = mapreduce(f -> vec(interior_slices(f)), vcat, wind_fields(model))
+# The control vector: interior entries of every slice of each forcing series in `fields`, in order.
+control_vector(fields) = mapreduce(f -> vec(interior_slices(f)), vcat, fields)
 
-function set_wind_control!(model, x)
+function set_control!(fields, x)
     offset = 0
-    for f in wind_fields(model)
+    for f in fields
         ix, iy = interior_ranges(f)
         a = Array(parent(f))
         n = length(ix) * length(iy) * size(a, 3) * size(a, 4)
@@ -354,18 +357,19 @@ Returns the rows and the verdict.
 """
 function taylor_remainder_check(model, evaluate!; h0 = 1.0, nh = 6, tolerance = 1e-3)
     nh >= 3 || throw(ArgumentError("the quadratic fit needs nh ≥ 3 step sizes, got nh = $nh"))
-    x0 = wind_control(model)
-    set_wind_control!(model, x0)
+    winds = wind_fields(model)
+    x0 = control_vector(winds)
+    set_control!(winds, x0)
     f0, g, _ = evaluate!()
     gvec = vcat(vec(g.u), vec(g.v))
     d = gvec ./ max(sqrt(sum(abs2, gvec)), eps())
     gd = sum(gvec .* d)
     println("taylor_remainder_check (h0 = $h0, nh = $nh):")
     result = taylor_remainder(f0, gd; h0, nh, tolerance) do h
-        set_wind_control!(model, x0 .+ h .* d)
+        set_control!(winds, x0 .+ h .* d)
         first(evaluate!())
     end
-    set_wind_control!(model, x0)
+    set_control!(winds, x0)
     return result
 end
 
@@ -420,22 +424,26 @@ end
 """
 $(TYPEDSIGNATURES)
 
-Finite differences of the objective `objective!()` (e.g. a compiled primal window) along the wind gradient
-`g = (u, v)` (as returned by [`wind_gradient`](@ref)) for `h = h0 / 2ⁱ`, `i = 0:nh-1`: the forward slope
-`(f(x₀ + h d) − f(x₀)) / h` and the central slope `(f(x₀ + h d) − f(x₀ − h d)) / 2h`, each relative to
-`gᵀd`, with `d = g / |g|`. Unlike [`taylor_remainder_check`](@ref) it needs no gradient evaluations, so `h`
-can span many octaves; it shows where the objective stops being smooth along `d`. Returns `f0`, `gᵀd` and
-the rows.
+Finite differences of the objective `objective!()` (e.g. a compiled primal window) along `direction` for
+`h = h0 / 2ⁱ`, `i = 0:nh-1`: the forward slope `(f(x₀ + h d) − f(x₀)) / h` and the central slope
+`(f(x₀ + h d) − f(x₀ − h d)) / 2h`, each relative to `gᵀd`, with `d = direction / |direction|`. `g` and
+`direction` are named tuples of `(Nx, Ny, 1, Nt)` arrays over the same forcing controls (`u`, `v`,
+`heat_flux`, `freshwater_flux`, as from [`forcing_gradient`](@ref)). Unlike [`taylor_remainder_check`](@ref) it
+needs no gradient evaluations, so `h` can span many octaves; it shows where the objective stops being smooth
+along `d`. Returns `f0`, `gᵀd` and the rows.
 """
-function finite_difference_scan(model, objective!, g; h0 = 1.0, nh = 25)
-    x0 = wind_control(model)
-    gvec = vcat(vec(g.u), vec(g.v))
+function finite_difference_scan(model, objective!, g; direction = g, h0 = 1.0, nh = 25)
+    fields = forcing_fields(model)[keys(g)]
+    x0 = control_vector(fields)
+    gvec = mapreduce(vec, vcat, g)
+    dvec = mapreduce(vec, vcat, direction)
     length(gvec) == length(x0) ||
-        throw(DimensionMismatch("gradient has $(length(gvec)) entries, the wind control $(length(x0))"))
-    gd = sqrt(sum(abs2, gvec))
-    gd > 0 || throw(ArgumentError("the gradient is zero, so it gives no direction to scan"))
-    d = gvec ./ gd
-    set_wind_control!(model, x0)
+        throw(DimensionMismatch("gradient has $(length(gvec)) entries, the control $(length(x0))"))
+    magnitude = sqrt(sum(abs2, dvec))
+    magnitude > 0 || throw(ArgumentError("the direction is zero"))
+    d = dvec ./ magnitude
+    gd = sum(gvec .* d)
+    set_control!(fields, x0)
     f0 = objective!()
     println("finite_difference_scan (h0 = $h0, nh = $nh):")
     @printf("  f0 = %.12e   gᵀd = %+.8e\n", f0, gd)
@@ -443,13 +451,13 @@ function finite_difference_scan(model, objective!, g; h0 = 1.0, nh = 25)
     rows = NamedTuple[]
     for i in 0:(nh - 1)
         h = h0 / 2.0^i
-        set_wind_control!(model, x0 .+ h .* d); Δplus = objective!() - f0
-        set_wind_control!(model, x0 .- h .* d); Δminus = objective!() - f0
+        set_control!(fields, x0 .+ h .* d); Δplus = objective!() - f0
+        set_control!(fields, x0 .- h .* d); Δminus = objective!() - f0
         forward = Δplus / h / gd - 1
         central = (Δplus - Δminus) / 2h / gd - 1
         @printf("  %12.4e  %+16.8e  %+16.8e  %+12.4e  %+12.4e\n", h, Δplus, Δminus, forward, central)
         push!(rows, (; h, Δplus, Δminus, forward, central))
     end
-    set_wind_control!(model, x0)
+    set_control!(fields, x0)
     return (; f0, gd, rows)
 end

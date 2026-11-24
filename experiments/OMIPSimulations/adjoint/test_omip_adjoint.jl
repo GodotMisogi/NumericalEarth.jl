@@ -15,7 +15,11 @@
 #   gradient  compile the gradient, evaluate twice, shadow census, Taylor remainder check (when the config
 #             gives `taylor_h0` and `taylor_nh`)
 #   fd_scan   finite differences of the primal window along a saved gradient (`fd_gradient`, a results file
-#             of the same configuration) for `fd_nh` step sizes halving from `fd_h0`; needs `primal`
+#             of the same configuration) for `fd_nh` step sizes halving from `fd_h0`; needs `primal`, or with
+#             `average_days` the window average from the checkpointed steps. Optional `fd_controls` (default
+#             ["u", "v"]) names the forcing controls perturbed; optional `fd_directions` ({label: results file})
+#             scans along each file's `gradient_<control>` instead of the gradient's own direction, and `fd_h0`
+#             may then be {label: h0}
 #   step_jacobian  leading growth of one step's adjoint at the states `jacobian_steps` (step indices) by
 #             `jacobian_iterations` of power iteration (`step_adjoint_growth`)
 # Optional `excluded_passes`: pattern names left out of Reactant's rewrite lists (default none).
@@ -52,8 +56,7 @@
 # this many steps of the reverse sweep (`AdjointTrace`), saved as `adjoint_trace`.
 # Optional `repeat_evaluation` (default true): evaluate the gradient a second time and require the same result.
 # Optional `average_days` (needs `checkpoints`): the objective is averaged over the window's last
-# `average_days` instead of taken at its end; the primal and fd_scan stages evaluate the end value, so they
-# do not apply.
+# `average_days` instead of taken at its end; the primal stage evaluates the end value, so it does not apply.
 # ==============================================================================
 
 using OMIPAdjoint
@@ -122,8 +125,7 @@ adjoint_trace = haskey(P, "adjoint_trace_every") ? AdjointTrace(P["adjoint_trace
 average_steps = haskey(P, "average_days") ? round(Int, P["average_days"] * 86400 / Δt) : 1
 if average_steps > 1
     haskey(P, "checkpoints") || error("average_days needs the checkpointed gradient (config `checkpoints`)")
-    any(in(stages), (:primal, :fd_scan)) &&
-        error("the primal and fd_scan stages evaluate the window's end, not the average over average_days")
+    :primal in stages && error("the primal stage evaluates the window's end, not the average over average_days")
 end
 
 stamp(msg...) = (println("[", format(now(), "HH:MM:SS"), "] ", msg...); flush(stdout))
@@ -165,7 +167,7 @@ end
 # %%
 ##### Reactant model
 
-reactant_stages = (:primal, :gradient, :step_jacobian)
+reactant_stages = (:primal, :fd_scan, :gradient, :step_jacobian)
 if any(in(stages), reactant_stages)
     :NVPTX in Reactant.LLVM.backends() ||
         error("Reactant lowers Oceananigans kernels through NVPTX; this Julia's LLVM lacks it (macOS). Run on the GPU cluster.")
@@ -211,14 +213,31 @@ if :primal in stages
 end
 
 if :fd_scan in stages
-    :primal in stages || error("the fd_scan stage evaluates the compiled primal window; add \"primal\" to stages")
-    saved = jldopen(f -> (u = f["gradient_u"], v = f["gradient_v"], J = f["J"]), joinpath(@__DIR__, P["fd_gradient"]))
-    t0 = time()
-    scan = finite_difference_scan(model, primal!, saved; h0 = P["fd_h0"], nh = P["fd_nh"])
-    stamp(@sprintf("finite-difference scan in %s; f0 vs the saved gradient's J: relative difference %.2e",
-                   elapsed(t0), abs(scan.f0 - saved.J) / abs(saved.J)))
-    results["fd_scan"] = scan
-    save_results()
+    if average_steps > 1
+        t0 = time()
+        thunks = compile_checkpointed_thunks(model, obj; Δt, compile_options = options, while_unroll_threshold)
+        stamp("checkpointed steps compiled in ", elapsed(t0))
+        objective! = () -> window_average_objective!(thunks, model, state, obj; n_steps, Δt, average_steps)
+    else
+        :primal in stages || error("the fd_scan stage evaluates the compiled primal window; add \"primal\" to stages")
+        objective! = primal!
+    end
+    controls = Tuple(Symbol.(get(P, "fd_controls", ["u", "v"])))
+    read_controls(path) = jldopen(joinpath(@__DIR__, path)) do f
+        NamedTuple{controls}(map(c -> f["gradient_$c"], controls))
+    end
+    g = read_controls(P["fd_gradient"])
+    J_saved = jldopen(f -> f["J"], joinpath(@__DIR__, P["fd_gradient"]))
+    for (label, path) in get(P, "fd_directions", Dict("" => P["fd_gradient"]))
+        t0 = time()
+        h0 = P["fd_h0"] isa AbstractDict ? P["fd_h0"][label] : P["fd_h0"]
+        stamp("finite-difference scan ", label)
+        scan = finite_difference_scan(model, objective!, g; direction = read_controls(path), h0, nh = P["fd_nh"])
+        stamp(@sprintf("finite-difference scan in %s; f0 vs the saved gradient's J: relative difference %.2e",
+                       elapsed(t0), abs(scan.f0 - J_saved) / abs(J_saved)))
+        results[isempty(label) ? "fd_scan" : "fd_scan/$label"] = scan
+        save_results()
+    end
 end
 
 if :gradient in stages

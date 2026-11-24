@@ -106,3 +106,15 @@ The long-window adjoint growth (STATUS "The long-window adjoint growth"), the da
   - Directions built on the Mac from 1167067's `gradient_heat_flux` (and freshwater): the alternating part of
     non-overlapping 2×2 blocks of wet cells (an orthogonal projection P, so gᵀd = |Pg|) and the rest (I − P)g,
     saved as results-like files (`gradient_heat_flux`, `J`) that the `fd_scan` stage reads as `fd_direction`.
+- Experiment 1 code: `finite_difference_scan(...; direction)`, `forcing_fields`, `control_vector`/`set_control!`
+  (were `wind_control`/`set_wind_control!`), `window_average_objective!`; `fd_scan` stage takes `fd_controls`,
+  `fd_directions` ({label: file}) and per-label `fd_h0`, and with `average_days` scans the 7-day-mean AMOC through
+  the checkpointed thunks. Directions: `adjoint/grid_scale_directions.jl` +
+  `configs/grid_scale_directions_14day_upwind3_unfrozen.json` → `results/directions_14day_upwind3_unfrozen_*.jld2`
+  (copied to the Vista worktree with 1167067's results). Parts of 1167067's gradient, |part|² / |g|²: heat flux
+  alternating 0.806, smooth 0.194, alternating in never-convecting blocks (1167070) 0.200; freshwater 0.764,
+  0.236, 0.140. The unit directions are concentrated: the heat-flux alternating one has max entry 0.57 and 25
+  cells above a tenth of it, led by 320°E 24.6°N (i, j = 127, 38, the row just south of the 26.5°N section),
+  340°E 19.4°N and 329°E 25°N; the never-convecting one is led by 340°E 19.4°N (0.78). Scan config
+  `ecco4_nz20_14day_upwind3_unfrozen_fd.json`: h0 100 (heat, W m⁻² per unit d; max perturbation 57 W m⁻²) and
+  2e-4 (freshwater, kg m⁻² s⁻¹), 13 halvings.
