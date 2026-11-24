@@ -86,3 +86,23 @@ title still says "1-year window"; fix the title if you use it).
 
 The long-window adjoint growth (STATUS "The long-window adjoint growth"), the day-204 Jacobian and the
 0.113.5/0.117.2 closure diff (need the user's approval), calibration of κ, parallelization.
+
+## Log
+
+### 2026-11-24
+
+- Branch `ajs/omip-adjoint-checkerboard` from `caf55b76`; worktrees `NumericalEarth-checkerboard` (Mac, Vista).
+- Experiment 2 configs: `ecco4_nz20_14day_upwind3_unfrozen_bh50.json` (gradient) and
+  `health_ecco4_nz20_14day_upwind3_bh50.json` (`forward_health.jl`), the 1167067/1167070 setups with
+  `biharmonic_tracer_timescale` 50 days (2Δ checker e-folds in ~0.13 day).
+- Plan for experiment 1 (code):
+  - `finite_difference_scan(model, objective!, g; direction = g, ...)`: scans along `direction / |direction|` and
+    compares with `gᵀd`; `g` and `direction` are named tuples over any of the forcing controls (`u`, `v`,
+    `heat_flux`, `freshwater_flux`), set through one `forcing_fields(model)` (which also gives
+    `forcing_gradient`).
+  - The 14-day gradients average the AMOC over the last 7 days, so the scan's objective is that average:
+    `window_average_objective!` runs the checkpointed thunks forward (refresh, steps, objective), the forward half
+    of `checkpointed_gradient`.
+  - Directions built on the Mac from 1167067's `gradient_heat_flux` (and freshwater): the alternating part of
+    non-overlapping 2×2 blocks of wet cells (an orthogonal projection P, so gᵀd = |Pg|) and the rest (I − P)g,
+    saved as results-like files (`gradient_heat_flux`, `J`) that the `fd_scan` stage reads as `fd_direction`.
