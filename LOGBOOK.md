@@ -307,6 +307,16 @@ Reference numbers (LS6 A100, Nz = 20):
    recovers κ: 1000.5, 999.7 after 9 iterations (J 7.1e4 → 2.1). With real observations the zero of the frozen
    gradient is not the minimum. The 8-step Kap8 κ Taylor check (1164313) cannot test this: 8-step AMOC moves
    by ≤ 5e-4 Sv for Δκ ≤ 64 m² s⁻¹ and its differences change sign with h. The κ shadows themselves are finite.
+   Attribution (11-24, ratio adjoint / central difference at h = 0.05, κ_skew and κ_symmetric): 90 days with
+   CATKE differentiated, adjoint NaN (1165326); 14 days frozen 0.38 and −0.39 (1165327), slopes differentiated
+   0.45 and −0.12 (1165328), nothing frozen 1.22 and 1.60 (1165329). So the freeze bias appears within 14 days
+   (freezing changes GM's own response to T and S, and gets ∂J/∂κ_symmetric's sign wrong), and CATKE cannot be
+   differentiated over 90 days. With nothing frozen the central differences do not converge (1166153): for κ_skew
+   −8.8e3, −1.59e4, −1.54e4, −1.39e4, −1.24e4, −1.00e4 at h = 0.8 to 7.8e-4 (÷4 each), drifting away from the
+   adjoint's −1.87e4; for κ_symmetric 475, 140, 154, 152, 165, 414 against 247. The 14-day misfit is rough in κ
+   below h ≈ 0.2 (the forward map's steep switches, finding 9), so no single derivative exists to verify; the
+   unfrozen adjoint is within 18 % of the h = 0.2 secant for κ_skew, the frozen ones are 1.4–2.7× smaller than
+   the secants at h ≤ 0.2. κ_symmetric's gradient is 1 % of κ_skew's and is at the roughness level.
 ## Tooling added
 
 | File | Purpose |
@@ -416,6 +426,9 @@ Reference numbers (LS6 A100, Nz = 20):
 | Vista 1164017 | Kap8 with the fold fix | census 0 of 13 NaN; ∂J/∂κ_skew −3.24e-7, ∂J/∂κ_symmetric −7.03e-7 Sv per m² s⁻¹; stopped at the known 8-step forcing Taylor mismatch (4.255e-3, as 1153870) |
 | Vista 1164313 | Kap8, κ Taylor checks only | κ shadows finite and equal to ∂J/∂κ; both checks MISMATCH: 8-step AMOC differences are noise in κ (finding 22) |
 | Vista 1164260–1164263 | 8-step gradient with both patterns excluded, `while_deadresult` re-enabled, `cse_reduce_transposed` re-enabled, all patterns | compile 21.3, 21.8, 21.4, 21.4 min; identical J, gradient and Taylor table: both exclusions dropped |
+| Vista 1165326–1165329 | Calibration gradient checks: 90 days CATKE differentiated; 14 days frozen, slopes differentiated, nothing frozen | NaN; 0.38/−0.39; 0.45/−0.12; 1.22/1.60 (finding 22) |
+| Vista 1166153 | 14-day check, nothing frozen, h = 0.8 to 7.8e-4 | central differences do not converge: rough misfit (finding 22) |
+| Vista 1165330 | Calibration phase 2: 4 windows (1993-01, 04, 07, 10), 4 nodes, MPI, frozen | compile 12.5 min; κ 600, 600 → 1000.0, 1000.0 at iteration 8 (J 3.2e5 → 6.1 at iteration 10); then out of GPU memory after 11 gradients despite `GC.gc()` in `evaluate!`, other ranks hung to the 3 h limit; memory traced in 1166395 |
 | Vista 1164314 | Calibration phase 1: twin, 2° 90 days from 1993-01, upwind3, frozen | compile 12.8 min, window 16 s, gradient ~130 s; check ratios 0.31, 0.76 (finding 22); BFGS 600, 600 → 1000.5, 999.7 in 9 iterations, then out of GPU memory (discarded shadow models; `GC.gc()` before each evaluation) |
 
 ## Open
