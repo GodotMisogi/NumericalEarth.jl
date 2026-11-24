@@ -46,6 +46,17 @@ series (the prescribed forcing).
 """
 device_arrays(model) = collect_device_arrays!(Reactant.AbstractConcreteArray[], Base.IdSet{Any}(), model)
 
+# Each compiled step returns new device buffers. The ones it replaces are freed by finalizers, which run only when the
+# host heap triggers a collection, and a loop of steps allocates almost nothing on the host: collect once the device
+# pool is half full. The CPU client keeps no pool statistics.
+function collect_device_garbage()
+    backend = Reactant.XLA.default_backend()
+    Reactant.XLA.platform_name(backend) == "cpu" && return nothing
+    stats = Reactant.XLA.allocatorstats()
+    stats.bytes_limit === nothing || 2 * stats.bytes_in_use < stats.bytes_limit || GC.gc()
+    return nothing
+end
+
 memory_snapshot(model, arrays) = (arrays = map(Array, arrays), clocks = map(clock_snapshot, component_clocks(model)))
 
 function restore_memory!(model, arrays, snapshot)
@@ -97,6 +108,7 @@ function revolve_sweep!(model, dmodel, arrays, thunks, obj, n_steps, Δt, checkp
         elseif flag == Checkpointing.forward
             for _ in action.startiteration:(action.iteration - 1)
                 thunks.step(model, Δt)
+                collect_device_garbage()
             end
         elseif flag == Checkpointing.firstuturn
             # The model holds the last step's input: step to the end, seed the adjoint with the objective's.
@@ -179,7 +191,6 @@ function checkpointed_gradient(thunks, model, state, obj; n_steps, Δt, checkpoi
     arrays = device_arrays(model)
 
     function evaluate!()
-        GC.gc()   # frees discarded shadows of earlier calls: the GC does not see device memory, which they exhaust
         dmodel = make_zero(model)
         restore_state!(model, state)
         start = memory_snapshot(model, arrays)     # the refresh's reverse pass runs from here

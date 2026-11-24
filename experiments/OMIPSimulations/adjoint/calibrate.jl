@@ -134,10 +134,11 @@ if :calibrate in stages
         results["records"] = copy(records)
         save_results()
         # Device memory before and after a full collection: growth that survives it is held, not garbage.
-        in_use = Reactant.XLA.allocatorstats().bytes_in_use / 2^30
+        stats = Reactant.XLA.allocatorstats()
         GC.gc()
-        stamp(@sprintf("device memory in use %.2f GiB, %.2f GiB after GC", in_use,
-                       Reactant.XLA.allocatorstats().bytes_in_use / 2^30))
+        stamp(@sprintf("device memory in use %.2f GiB (peak %.2f, limit %.2f), %.2f GiB after GC",
+                       stats.bytes_in_use / 2^30, stats.peak_bytes_in_use / 2^30,
+                       something(stats.bytes_limit, 0) / 2^30, Reactant.XLA.allocatorstats().bytes_in_use / 2^30))
     end
     bfgs_minimize(gradient!, misfit!, x0; iterations = P["iterations"],
                   initial_step = P["initial_step"], gtol = get(P, "gtol", 0.0), callback)

@@ -86,6 +86,7 @@ function window_tracer_means!(thunks, accumulate, sums, model, state; n_steps, Î
     foreach(a -> copyto!(a, zeros(size(a))), (sums.T, sums.S))
     for n in 1:n_steps
         thunks.step(model, Î”t)
+        collect_device_garbage()
         n > n_steps - average_steps && accumulate(sums, model)
     end
     return Array(sums.T) ./ average_steps, Array(sums.S) ./ average_steps
