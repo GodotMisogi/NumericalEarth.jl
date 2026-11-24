@@ -76,3 +76,23 @@ Calibration of the ECCO4 prescribed-flux ocean at < 1° resolution. Two levels o
 The grid-scale noise in the flux sensitivities (the other agent), the accuracy of the frozen κ gradient
 (finding 22; open question to the user: a J(κ) scan on the 14-day window or tapering the slope derivative),
 long-window adjoint growth.
+
+## Log
+
+### 2026-11-24
+
+- Branch `ajs/omip-adjoint-parallel` from `caf55b76`; worktrees `NumericalEarth-parallel` on the Mac and on
+  TACC (manifest and preferences copied from `NumericalEarth-oc117`).
+- Reading 1166675: the truth (forward-only) windows take 15.5–16.1 s on every rank, as with one window, so the
+  3× is in the gradient (checkpoint copies to the host, host allocation, GC), not the stepping. After each
+  reduction rank 0 prints its post-GC memory line ~2 s later, ranks 1–3 11–23 s later (rank 3 always last),
+  every iteration: the callback's `GC.gc()` looks 5–10× slower on ranks 1–3.
+- Vista Slurm 23.11, `TaskPlugin = (null)`, `select/linear`: no CPU binding, so `--cpus-per-task` should not
+  change a task's affinity. Checked by printing `Cpus_allowed_list` per rank instead of an A/B job.
+- Reactant 0.2.309: the XLA autotune cache is on by default (depot scratchspace
+  `xla_persistent_cache_0_0_445`, shared by all jobs); the kernel cache (`persistent_kernel_cache_enabled`) is
+  off; `@compile serializable = true` exports StableHLO only, no reload of a compiled executable.
+- Plan (deliverable 1): per-rank timing in `calibrate.jl` (evaluation wall time, its GC time and host
+  allocation, the wait in the reduction, the callback's GC), plus host/threads/affinity per rank; 4 windows, 3
+  iterations (`calibration_twin_ecco4_nz20_90day_4windows_timing.json`). Probe: sharded case first, so a 2 h
+  dev job shows how far sharding gets even if the single-device half runs out of time.

@@ -1,7 +1,7 @@
 # %%
 # ==============================================================================
 # Does the ECCO4 prescribed-flux ocean run, and differentiate, on a grid sharded across the GPUs of one process?
-# Builds the model on one device and on `Distributed(ReactantState(); partition)`, then for each: the primal window
+# Builds the model on `Distributed(ReactantState(); partition)` and on one device, then for each: the primal window
 # objective and the checkpointed gradient. Each stage is attempted separately and its failure reported, so one job
 # shows how far sharding gets; where both succeed, J and every forcing gradient are compared.
 #
@@ -69,9 +69,10 @@ function probe(arch, label)
 end
 
 # %%
-single = probe(ReactantState(), "single device")
+# Sharded first: if the job's time runs out, it does so in the single-device reference.
 sharded_arch = attempt(() -> Distributed(ReactantState(); partition = Partition(P["partition"]...)), "sharded architecture")
 sharded = sharded_arch === nothing ? (; label = "sharded") : probe(sharded_arch, "sharded $(P["partition"])")
+single = probe(ReactantState(), "single device")
 
 # %%
 comparison = Dict{String, Any}()

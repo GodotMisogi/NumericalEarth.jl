@@ -43,6 +43,19 @@ stamp(msg...) = (println("[", format(now(), "HH:MM:SS"), "] rank $rank: ", msg..
 stamp₀(msg...) = rank == 0 && stamp(msg...)
 # Sum over the windows, broadcast from rank 0 so that every rank's BFGS sees the same numbers.
 total(v) = MPI.bcast(MPI.Allreduce(v, +, comm), 0, comm)
+# The rank's own evaluation time, with its GC share and host allocation, then its wait in the reduction (the slowest
+# rank's lead).
+function reduced(label, evaluate)
+    timed = @timed evaluate()
+    t0 = time()
+    value = map(total, timed.value)
+    stamp(@sprintf("%s: evaluation %.1f s (GC %.1f s, %.1f GiB allocated), reduction %.1f s", label, timed.time,
+                   timed.gctime, timed.bytes / 2^30, time() - t0))
+    return value
+end
+cpus_allowed = only(filter(startswith("Cpus_allowed_list"), readlines("/proc/self/status")))
+stamp(gethostname(), ": ", Threads.nthreads(), " threads, ", Threads.ngcthreads(), " GC threads, ", Sys.CPU_THREADS,
+      " CPU threads, ", cpus_allowed)
 
 results = Dict{String, Any}("config" => P)
 output_path = joinpath(@__DIR__, P["output"])
@@ -100,8 +113,8 @@ results["forward_seconds"] = time() - t0
 stamp(@sprintf("truth window in %.1f s: observed mean T %.4f, S %.4f", results["forward_seconds"],
                sum(T°[observed]) / count(observed), sum(S°[observed]) / count(observed)))
 x0 = log.(Float64.(P["initial"]))
-misfit!(x) = total(calibration.misfit!(x))
-gradient!(x) = ((J, g) = calibration.gradient!(x); (total(J), total(g)))
+misfit!(x) = reduced("misfit", () -> calibration.misfit!(x))
+gradient!(x) = reduced("gradient", () -> calibration.gradient!(x))
 
 # %%
 ##### Gradient check: central differences of the misfit in log κ
@@ -135,10 +148,11 @@ if :calibrate in stages
         save_results()
         # Device memory before and after a full collection: growth that survives it is held, not garbage.
         stats = Reactant.XLA.allocatorstats()
-        GC.gc()
-        stamp(@sprintf("device memory in use %.2f GiB (peak %.2f, limit %.2f), %.2f GiB after GC",
+        gc_seconds = @elapsed GC.gc()
+        stamp(@sprintf("device memory in use %.2f GiB (peak %.2f, limit %.2f), %.2f GiB after GC (%.1f s)",
                        stats.bytes_in_use / 2^30, stats.peak_bytes_in_use / 2^30,
-                       something(stats.bytes_limit, 0) / 2^30, Reactant.XLA.allocatorstats().bytes_in_use / 2^30))
+                       something(stats.bytes_limit, 0) / 2^30, Reactant.XLA.allocatorstats().bytes_in_use / 2^30,
+                       gc_seconds))
     end
     bfgs_minimize(gradient!, misfit!, x0; iterations = P["iterations"],
                   initial_step = P["initial_step"], gtol = get(P, "gtol", 0.0), callback)
