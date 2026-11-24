@@ -13,7 +13,7 @@
 # start dates, one per MPI rank; default ["1993-01-01"]).
 # truth, initial: [κ_skew, κ_symmetric] (m² s⁻¹). observed_levels (default Nz), observation_stride (default 1),
 # sigma_T (K), sigma_S (g kg⁻¹): the observations. stages: "check" (central differences of the misfit in log κ,
-# step check_h, against the adjoint) and/or "calibrate" (iterations, initial_step, gtol).
+# step check_h, a number or a list, against the adjoint) and/or "calibrate" (iterations, initial_step, gtol).
 # ==============================================================================
 
 using OMIPAdjoint
@@ -107,15 +107,13 @@ gradient!(x) = ((J, g) = calibration.gradient!(x); (total(J), total(g)))
 ##### Gradient check: central differences of the misfit in log κ
 
 if :check in stages
-    h = P["check_h"]
+    h = Float64.(vcat(P["check_h"]))
     J0, g0 = gradient!(x0)
-    fd = map(1:2) do i
-        e = [j == i for j in 1:2] .* h
-        (misfit!(x0 .+ e) - misfit!(x0 .- e)) / 2h
-    end
-    for (i, name) in enumerate(("κ_skew", "κ_symmetric"))
-        stamp₀(@sprintf("∂J/∂log %s: adjoint %+.6e, central difference %+.6e (h = %.3f), ratio %.4f", name, g0[i], fd[i],
-                       h, g0[i] / fd[i]))
+    # fd[k, i]: step h[k] in log κ_i
+    fd = [(misfit!(x0 .+ hₖ .* e) - misfit!(x0 .- hₖ .* e)) / 2hₖ for hₖ in h, e in ([1.0, 0.0], [0.0, 1.0])]
+    for (i, name) in enumerate(("κ_skew", "κ_symmetric")), (k, hₖ) in enumerate(h)
+        stamp₀(@sprintf("∂J/∂log %s: adjoint %+.6e, central difference %+.6e (h = %.4f), ratio %.4f", name, g0[i],
+                       fd[k, i], hₖ, g0[i] / fd[k, i]))
     end
     results["check"] = (; x0, J0, adjoint = g0, central_difference = fd, h)
     save_results()
