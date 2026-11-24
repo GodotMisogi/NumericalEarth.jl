@@ -317,6 +317,19 @@ Reference numbers (LS6 A100, Nz = 20):
    below h ≈ 0.2 (the forward map's steep switches, finding 9), so no single derivative exists to verify; the
    unfrozen adjoint is within 18 % of the h = 0.2 secant for κ_skew, the frozen ones are 1.4–2.7× smaller than
    the secants at h ≤ 0.2. κ_symmetric's gradient is 1 % of κ_skew's and is at the roughness level.
+23. **The heat and freshwater flux sensitivities are grid-scale noise, frozen or not (11-24).** Measure: the
+   energy share of the three alternating components (checker, stripes in i and j) of each 2×2 block, Atlantic
+   260–380°E, by latitude band; white noise gives 0.75, a smooth field near 0. 1° 90-day frozen upwind3 map
+   (1161433): heat flux 0.60–0.85 north of 45°N, rising to 0.63–0.92 at 0–22°N toward the objective time; stress
+   0.06–0.45; 57 % of the last slice's checker energy in the box at 282°E 24°N (Florida Straits). 2° 90-day maps
+   0.4–0.9, as noisy with GM/Redi off. 14-day 2° upwind3 gradients from 1993-01 (slice 1, then 2): nothing frozen
+   0.63–0.79, 0.67–0.84 (1167067); CATKE frozen 0.58–0.94, 0.60–0.96 (1167068); CATKE and slopes frozen the same
+   to two digits (1167069). Split by the forward run's convection (1167070, mean unstable interfaces per column
+   over days 0–14): nothing frozen, 0.77 in convecting blocks and 0.95 in stable ones; CATKE frozen, 0.88 and
+   0.75. The largest 100 heat-flux sensitivities lie in convecting columns (79–83 %, against 16 % of wet
+   columns) in all three. So freezing CATKE moves the noise into the convecting columns but does not cause it:
+   the exact adjoint is already at the white-noise level. The forward run's surface T has a grid-scale residual
+   of 0.26 K rms on day 1, growing to 0.35 K by day 14 (max 13 K at 119°E 8°N).
 ## Tooling added
 
 | File | Purpose |
@@ -431,6 +444,9 @@ Reference numbers (LS6 A100, Nz = 20):
 | Vista 1165330 | Calibration phase 2: 4 windows (1993-01, 04, 07, 10), 4 nodes, MPI, frozen | compile 12.5 min; κ 600, 600 → 1000.0, 1000.0 at iteration 8 (J 3.2e5 → 6.1 at iteration 10); then out of GPU memory after 11 gradients despite `GC.gc()` in `evaluate!`, other ranks hung to the 3 h limit; memory traced in 1166395 |
 | Vista 1166395 | Phase 1 rerun logging device memory per BFGS iteration | 1.0–1.1 GiB in use after every iteration, 0.15 GiB after GC: no held buffers; still out of memory in the forward window of iteration 10 (XLA's pool is ~72 GB). Garbage of the forward window's steps outran the host-triggered GC; stepping loops now collect when the pool is half full |
 | Vista 1166514 | 1166395 with the half-pool collection (`2aa9e25b`) | peak 35.9 of 71.3 GiB, iterations unchanged (~2.2 min); κ 1000.5, 999.7 after 9 iterations; iteration 10's line search found no decrease (J 2.1, the frozen gradient at the misfit's roughness) and BFGS stopped |
+| Vista 1166675 | Calibration phase 2 rerun with the half-pool collection: 4 windows, 4 nodes | κ 600, 600 → 1000.0, 1000.0 at iteration 8, J 3.2e5 → 6.1 at iteration 10; device memory peak 35.9 of 71.3 GiB, 0.15 GiB after GC every iteration; 1 h 39 min |
+| Vista 1167067–1167069 | 2° 14 days traced from 1993-01, upwind3: nothing frozen, CATKE frozen, CATKE and slopes frozen | compile 17.2, 16.9, 12.4 min; gradient 48–52 s; J 15.5628 Sv; max\|g\| 5.74, 4.56, 4.56; heat and freshwater flux sensitivities grid-scale in all three (finding 23) |
+| Vista 1167070 | forward_health, 2° 14 days from 1993-01, upwind3 | 1947–2389 unstable interfaces; surface T grid-scale residual 0.26 → 0.35 K rms; daily maps for finding 23 |
 | Vista 1164314 | Calibration phase 1: twin, 2° 90 days from 1993-01, upwind3, frozen | compile 12.8 min, window 16 s, gradient ~130 s; check ratios 0.31, 0.76 (finding 22); BFGS 600, 600 → 1000.5, 999.7 in 9 iterations, then out of GPU memory (discarded shadow models; `GC.gc()` before each evaluation) |
 
 ## Open
@@ -447,8 +463,11 @@ Reference numbers (LS6 A100, Nz = 20):
 - Julia 1.13 compile stall with 0.2.309: rerun with the SIGUSR1 profile for an upstream report.
 - Upstream reports still open: Enzyme-JAX #3965 (batch fission); Oceananigans #6529, #6530, PR #6531 (posted
   from ReactOcean).
-- Calibration: the frozen adjoint's κ gradient is biased over 90 days (finding 22); the 14-day checks say
-  whether short windows with differentiated slopes give the exact gradient.
+- Calibration: the frozen adjoint's κ gradient is biased over 90 days, and the 14-day misfit is rough in κ
+  (finding 22). Twin recovery works with 1 and 4 windows (1166514, 1166675).
+- Grid-scale noise in the buoyancy-flux sensitivities is in the exact adjoint (finding 23). Next tests: biharmonic
+  tracer diffusion (`biharmonic_tracer_timescale`, config only) and a vertical closure other than CATKE (the
+  gradient script does not pass `vertical_closure` yet).
 - Resolved since 11-06: finding 4 (`4cc69c3e`); `cse_reduce_transposed` excluded (`fb295782`) and fixed upstream
   (Enzyme-JAX #3970); zero shadow carries (#3971) and `uitofp` (#3969) fixed upstream, in Reactant 0.2.309;
   the Vista first-call failure (gone with per-step thunks); `atlantic_ocean_basin` avoided by the staircase
@@ -925,3 +944,10 @@ not attributed yet. Container: `$WORK/containers/julia_1.12_ls6.sif` links to a 
   collect when XLA's pool is half full. Gradient checks to attribute the
   shortfall: 90 days with CATKE differentiated, and 14 days frozen, with slopes differentiated, and with
   nothing frozen.
+
+### 2026-11-24
+
+- Calibration phase 2 (1166675): 4 windows over MPI recover κ = 1000.0, 1000.0 by iteration 8; device memory
+  peaks at 35.9 of 71.3 GiB with the half-pool collection.
+- Grid-scale noise attribution (1167067–1167070, finding 23): the 14-day exact adjoint's flux sensitivities are
+  as noisy as the frozen ones; freezing CATKE only moves the noise into the convecting columns.
