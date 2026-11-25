@@ -149,3 +149,23 @@ long-window adjoint growth.
   under the default PJRT "will never be properly supported"), i.e. a separate environment, since the preference
   changes the array types of every job in this one.
 - Compute used: ~5 GPU-node-hours (1168099 2.2, 1168552 1.9, 1168110/1168553/1168843 0.8).
+
+### 2026-11-25, sharded build and checkpoint slots
+
+- LS6 3612502 `ParShard2` ran (52 min): the sharded build failed in `ImmersedBoundaryGrid` (`set!` of the bottom
+  height → `interior(u) .= interior(v)` → `TypeError: expected ConcretePJRTArray{Float64, 3, 1}, got
+  ConcretePJRTArray{Float64, 3, 2}`); single device: build 185 s, compile primal 499 s, gradient compile 1590 s,
+  gradient 18.9 s, J 24.1308164238 Sv (= Vista 1153870), max|∂J/∂τx| 4.494038. Saved file has J only (no
+  gradients); kept as `results/reference_sharding_probe_3612502.jld2`.
+- Reproduced on the Mac (Reactant 0.2.309, CPU, two virtual devices, `scratchpad` scripts): with PJRT arrays,
+  (a) `view(a, ...) .= view(b, ...)` and `copyto!` between views of sharded arrays raise the same `TypeError`
+  and leave `a` donated; (b) `copyto!(a, host)` into a whole sharded array writes all elements into the first
+  shard's buffer (`copyto!(dest::ConcretePJRTArray, doffs, src::Array, ...)` uses `dest.data[1]`, no
+  single-shard check), i.e. a buffer overrun: the readback crashes Julia (illegal instruction); (c) `a .= host`
+  hangs; (d) `copyto!(view(a, ...), host)` is correct. (b) is what `regularize_fold_metrics!` and
+  Oceananigans' `restore_prognostic_state!(::Field, from)` (`copyto!(parent(restored), from.data)`) do, so a
+  sharded PJRT build and every checkpoint restore would corrupt memory even past the reported failure.
+  `ConcreteIFRTArray` has no such fast path (host data become a sharded IFRT array, then a compiled copy).
+- Checkpoint slots (user-approved): `slots` kept across evaluations, a store copies into the slot's host arrays
+  (`memory_snapshot!`) instead of allocating new ones. References on current code copied aside on Vista:
+  `results/reference_1window_1168553.jld2` (1 window, iterations 0–1), `reference_4windows_1168552.jld2`.

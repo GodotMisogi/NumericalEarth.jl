@@ -59,6 +59,12 @@ end
 
 memory_snapshot(model, arrays) = (arrays = map(Array, arrays), clocks = map(clock_snapshot, component_clocks(model)))
 
+# The same, into the host arrays of an earlier `snapshot`.
+function memory_snapshot!(snapshot, model, arrays)
+    foreach(copyto!, snapshot.arrays, arrays)
+    return (arrays = snapshot.arrays, clocks = map(clock_snapshot, component_clocks(model)))
+end
+
 function restore_memory!(model, arrays, snapshot)
     foreach(copyto!, arrays, snapshot.arrays)
     foreach(restore_clock!, component_clocks(model), snapshot.clocks)
@@ -102,7 +108,8 @@ function revolve_sweep!(model, dmodel, arrays, thunks, obj, n_steps, Δt, checkp
         action = next_action!(schedule)
         flag = action.actionflag
         if flag == Checkpointing.store
-            slots[action.cpnum] = memory_snapshot(model, arrays)
+            slots[action.cpnum] = haskey(slots, action.cpnum) ? memory_snapshot!(slots[action.cpnum], model, arrays) :
+                                                                memory_snapshot(model, arrays)
         elseif flag == Checkpointing.restore
             restore_memory!(model, arrays, slots[action.cpnum])
         elseif flag == Checkpointing.forward
@@ -189,12 +196,12 @@ function checkpointed_gradient(thunks, model, state, obj; n_steps, Δt, checkpoi
     1 <= average_steps <= n_steps ||
         throw(ArgumentError("average_steps must be between 1 and n_steps = $n_steps, got $average_steps"))
     arrays = device_arrays(model)
+    slots = Dict{Int, Any}()   # Revolve's checkpoints, kept across evaluations and overwritten at each store
 
     function evaluate!()
         dmodel = make_zero(model)
         restore_state!(model, state)
         start = memory_snapshot(model, arrays)     # the refresh's reverse pass runs from here
-        slots = Dict{Int, typeof(start)}()
         adjoint_trace === nothing || empty!(adjoint_trace.records)
         thunks.refresh(model)
         J = revolve_sweep!(model, dmodel, arrays, thunks, obj, n_steps, Δt, checkpoints, slots, average_steps,

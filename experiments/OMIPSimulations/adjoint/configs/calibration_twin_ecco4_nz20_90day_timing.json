@@ -1,0 +1,33 @@
+{
+  "_comment": "Gradient and GC time per evaluation: the phase 1 twin (calibration_twin_ecco4_nz20_90day.json) for 3 BFGS iterations, without the gradient check.",
+  "forcing": "ecco4",
+  "n_months": 5,
+  "Nz": 20,
+  "steps": 1080,
+  "dt": 7200.0,
+  "substeps": 50,
+  "backend": "gpu",
+  "roll_barotropic_substeps": true,
+  "frozen_mixing": true,
+  "frozen_buoyancy_gradients": true,
+  "advection": "upwind3",
+  "checkpoints": 40,
+  "average_days": 30,
+  "truth": [
+    1000.0,
+    1000.0
+  ],
+  "initial": [
+    600.0,
+    600.0
+  ],
+  "observed_levels": 20,
+  "observation_stride": 1,
+  "sigma_T": 0.1,
+  "sigma_S": 0.01,
+  "stages": "calibrate",
+  "check_h": 0.05,
+  "iterations": 3,
+  "initial_step": 0.3,
+  "output": "results/calibration_twin_ecco4_nz20_90day_timing.jld2"
+}
