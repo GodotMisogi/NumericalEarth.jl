@@ -1,0 +1,39 @@
+{
+  "_comment": "Checkerboard: does the step-120 anomaly of 1169075 (v-input adjoint 7.1e-5 against FD 4.8e-3; neighbors exact to ~10 %) follow the host garbage collection, which ran right before the state-120 snapshot (every 20th step)? Same test with a collection every 7th step: an anomaly at 112, 119, 126 and none at 118, 120, 121, 127 means GC corrupts the reverse pass.",
+  "forcing": "ecco4",
+  "n_months": 3,
+  "Nz": 20,
+  "steps": 168,
+  "dt": 7200.0,
+  "substeps": 50,
+  "backend": "gpu",
+  "stages": "step_dot",
+  "roll_barotropic_substeps": true,
+  "frozen_mixing": false,
+  "frozen_buoyancy_gradients": false,
+  "output": "results/ecco4_step_dot_nz20_14day_upwind3_unfrozen_gc7.jld2",
+  "start_date": "1993-01-01",
+  "advection": "upwind3",
+  "dot_steps": [
+    112,
+    118,
+    119,
+    120,
+    121,
+    126,
+    127
+  ],
+  "dot_scales": {
+    "u": 0.001,
+    "v": 0.001,
+    "T": 0.01,
+    "S": 0.001,
+    "e": 1e-07
+  },
+  "dot_epsilons": [
+    1,
+    0.25,
+    0.0625
+  ],
+  "dot_gc_every": 7
+}

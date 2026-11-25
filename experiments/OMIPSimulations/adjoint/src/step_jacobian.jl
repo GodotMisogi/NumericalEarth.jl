@@ -125,10 +125,11 @@ For each `s` in the ascending `steps`, the model is stepped to its `s`-th state 
 the interior of the output fields `names` (velocities and tracers). For each input field in `names`, with `v` noise
 of amplitude `scales[name]` in that field alone, compares the central difference
 ⟨λ, x⁺(xₛ + ε v) − x⁺(xₛ − ε v)⟩ / 2ε of the step's output x⁺, for each `ε` in `epsilons`, with ⟨λ̄, v⟩, where λ̄
-is the reverse pass of the step from xₛ seeded with λ. Returns one named tuple per step, input field and `ε`.
+is the reverse pass of the step from xₛ seeded with λ. The host garbage collector runs after every `gc_every`-th step
+on the way. Returns one named tuple per step, input field and `ε`.
 """
 function step_dot_products(model, state; steps, Δt, scales, names = (:u, :v, :T, :S, :e), epsilons = (1, 1/4, 1/16),
-                           compile_options = adjoint_compile_options(), while_unroll_threshold = 0)
+                           gc_every = 20, compile_options = adjoint_compile_options(), while_unroll_threshold = 0)
     (!isempty(steps) && issorted(steps) && first(steps) >= 0) ||
         throw(ArgumentError("steps must be nonnegative and ascending, got $steps"))
     thunks = compile_step_thunks(model; Δt, compile_options, while_unroll_threshold)
@@ -142,7 +143,7 @@ function step_dot_products(model, state; steps, Δt, scales, names = (:u, :v, :T
     for s in steps
         for n in (position + 1):s
             thunks.step(model, Δt)
-            n % 20 == 0 && GC.gc()
+            n % gc_every == 0 && GC.gc()
         end
         position = s
         xₛ = memory_snapshot(model, arrays)
