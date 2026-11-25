@@ -4,6 +4,8 @@
 #
 # Usage, from experiments/OMIPSimulations, with as many nodes as the config has windows:
 #   CONFIG=adjoint/configs/<cfg>.json sbatch -N <windows> -A ADCIRC --mail-user=<address> adjoint/calibrate_mpi.slurm
+# SCRIPT= runs another script on every node (default adjoint/calibrate.jl), PROJECT= another environment (default
+# adjoint; adjoint/ifrt for Reactant's IFRT runtime).
 # The ranks are started by srun with PMI-2: MPI.jl's MPICH reduces across nodes inside the container that way, not
 # with PMIx (adjoint/mpi_probe, job 1161912). Output: adjoint/logs/<name>.o<jobid>, results in adjoint/results/.
 #----------------------------------------------------
@@ -28,15 +30,17 @@ export JULIA_NUM_PRECOMPILE_TASKS=${SLURM_CPUS_PER_TASK:-16}
 export MPIR_CVAR_ASYNC_PROGRESS=1
 
 CONFIG=${CONFIG:?set CONFIG to a calibration config}
+SCRIPT=${SCRIPT:-adjoint/calibrate.jl}
+PROJECT=${PROJECT:-adjoint}
 SIF=${SIF:-$WORK/containers/julia_1.12_${TACC_SYSTEM}.sif}
 [ -f "$SIF" ] || { echo "Missing container $SIF" >&2; exit 1; }
 [ -f "$CONFIG" ] || { echo "Config not found: $CONFIG" >&2; exit 1; }
-echo "config: $CONFIG  container: $SIF  nodes: $SLURM_JOB_NODELIST"; date
+echo "script: $SCRIPT  config: $CONFIG  project: $PROJECT  container: $SIF  nodes: $SLURM_JOB_NODELIST"; date
 cp adjoint/Manifest.toml "adjoint/logs/Manifest.$SLURM_JOB_ID.toml" 2>/dev/null || true
 
 BIND=""
 for d in /work /work2 /scratch; do [ -d "$d" ] && BIND="${BIND:+$BIND,}$d"; done
-RUN="apptainer exec --nv ${BIND:+--bind $BIND} $SIF julia --project=adjoint"
+RUN="apptainer exec --nv ${BIND:+--bind $BIND} $SIF julia --project=$PROJECT"
 [ -f adjoint/LocalPreferences.toml ] || printf '[Reactant_jll]\ngpu = "cuda"\ngpu_version = "12.9"\n' > adjoint/LocalPreferences.toml
 
 # Once, on the first node: the ranks share the depot.
@@ -46,7 +50,7 @@ $RUN -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()' > "adjoint/logs/env.$SL
 echo "=== calibration ($(date +%T))"
 nvidia-smi -i 0 --query-gpu=timestamp,utilization.gpu,memory.used --format=csv -l 300 > "adjoint/logs/gpu.$SLURM_JOB_ID.csv" 2>&1 &
 SMI_PID=$!
-srun --mpi=pmi2 $RUN -O0 adjoint/calibrate.jl "$CONFIG"
+srun --mpi=pmi2 $RUN -O0 "$SCRIPT" "$CONFIG"
 STATUS=$?
 kill $SMI_PID 2>/dev/null
 date

@@ -37,10 +37,11 @@ export JULIA_NUM_PRECOMPILE_TASKS=${SLURM_CPUS_PER_TASK:-16}
 
 CONFIG=${CONFIG:-adjoint/configs/twodegree_nz20_1step.json}
 SCRIPT=${SCRIPT:-adjoint/test_omip_adjoint.jl}
+PROJECT=${PROJECT:-adjoint}   # adjoint/ifrt: the same packages with Reactant's IFRT runtime
 SIF=${SIF:-$WORK/containers/julia_1.12_${TACC_SYSTEM}.sif}
 [ -f "$SIF" ] || { echo "Missing container $SIF" >&2; exit 1; }
 [ -f "$CONFIG" ] || { echo "Config not found: $CONFIG" >&2; exit 1; }
-echo "script: $SCRIPT  config: $CONFIG  container: $SIF"; date; hostname
+echo "script: $SCRIPT  config: $CONFIG  project: $PROJECT  container: $SIF"; date; hostname
 # LS6 A100 nodes have three GPUs; the test uses one.
 export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
 nvidia-smi -i 0 --query-gpu=name,driver_version,memory.total --format=csv
@@ -48,7 +49,7 @@ cp adjoint/Manifest.toml "adjoint/logs/Manifest.$SLURM_JOB_ID.toml" 2>/dev/null 
 
 BIND=""
 for d in /work /work2 /scratch; do [ -d "$d" ] && BIND="${BIND:+$BIND,}$d"; done
-RUN="apptainer exec --nv ${BIND:+--bind $BIND} $SIF julia --project=adjoint"
+RUN="apptainer exec --nv ${BIND:+--bind $BIND} $SIF julia --project=$PROJECT"
 
 # The CUDA 13.1 Reactant_jll build fails to load on the GH200 nodes (undefined CUDA symbol); select 12.9.
 # LS6 shares this worktree, and so this file, through /work; its 570 driver (CUDA 12.8) runs 12.9 builds.
