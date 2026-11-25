@@ -209,3 +209,38 @@ checkpointed unfrozen gradient) was queued at 21:10 on gh-dev. If its unfrozen f
 with the FD after 8 steps, the CATKE derivative error is debuggable on a short window. Compare each scan's
 central slope with this run's own `gradient_*` offline: the scan's printed gᵀd uses 1167067's file only for its
 shapes.
+
+### 2026-11-24, the 8-step check (ChkFD8 1168601, 27.4 min)
+
+Config `ecco4_nz20_8step_upwind3_fd.json`: 8 steps from 1993-01, upwind3, nothing frozen, AMOC at the window's end.
+J 24.1118 Sv (primal and checkpointed gradient agree to 2.2e-14). FD slope (mean of the 4 smallest h) against
+this run's own gradient:
+
+| Direction | FD slope | adjoint gᵀd | FD / adjoint |
+|---|---|---|---|
+| heat flux (131, 38), 329°E 25°N | +4.7350e-5 | +4.7351e-5 | 0.99998 |
+| heat flux (132, 38), 331°E 25°N | −4.770e-5 | −4.751e-5 | 1.004 |
+| heat flux (136, 36), 340°E 19.4°N | +7.1134e-7 | +7.1125e-7 | 1.0001 |
+| 1167067's stress direction | 16.5736 | 16.5735 | 1.00001 |
+
+All four are linear over 12 octaves of h. **At 8 steps the unfrozen adjoint is exact, heat flux included.** So the
+CATKE reverse-pass error arises between 8 and 168 steps. The opposite-signed neighbors (131, 38) and (132, 38)
+are a real two-cell sensitivity after 16 h.
+
+Reconciling with the earlier records: the 2-step (1153869) and 8-step (3577970, 1153870) Taylor checks had CATKE
+differentiated (no `frozen_mixing` key; default false) and WENO advection, and they perturbed the wind only
+(`taylor_remainder_check` scans the wind gradient). They agree with this run. Their "known 8-step forcing Taylor
+mismatch 4.255e-3" is the three-point slope criterion; the central differences here match to 1e-5.
+
+Proposed bisection (not run):
+1. Step count: end-of-window AMOC at 42 and 84 steps (3.5 and 7 days), with the same four directions plus
+   1167067's never-convecting alternating heat-flux part. That is two jobs of ~30 min on gh-dev
+   (`stages` "primal,fd_scan,gradient", as `ecco4_nz20_8step_upwind3_fd.json`). Then halve the failing interval
+   once or twice more (~0.5 GPU-h per job).
+2. The term, once the step is known: a one-step dot-product check of the compiled step at a state just past the
+   onset. Compare ⟨λ, (x(s + εv) − x(s − εv)) / 2ε⟩ with ⟨reverse_step(λ), v⟩ for λ the stored adjoint and v a
+   random perturbation of T, S, e. This is a small extension of the `step_jacobian` stage. A wrong derivative of
+   one step must show here, since a chain of exact step derivatives is exact.
+3. Split the freeze: a flag that stop-gradients only e after the TKE step (so κ still varies with N² and shear),
+   against one that stop-gradients only the N² and shear inputs of the mixing length. That says whether the
+   error is in the TKE equation or in the diffusivity formula. Needs code in `frozen_mixing.jl`.
