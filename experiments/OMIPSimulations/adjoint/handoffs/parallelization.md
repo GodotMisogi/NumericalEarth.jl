@@ -115,3 +115,6 @@ long-window adjoint growth.
 - 1168110 `ParKc1` failed at the first compile: this XLA's `DebugOptions` has no
   `xla_gpu_enable_llvm_module_compilation_parallelism` (Reactant 0.2.309's own `persistent_kernel_cache_enabled`
   preference sets it, so that preference fails the same way). The key now sets `xla_gpu_kernel_cache_file` only.
+- Vista `gh-dev` runs one job per user at a time (QOS `qdevelopment`: MaxJobsPU 1, MaxSubmitPU 3), shared with
+  the checkerboard agent; `gh` allows 20. Resubmitted on `gh`: 1168552 `ParTime4b` (4 windows with the progress
+  thread, 3 iterations) and 1168553 `ParKc1b` (cold kernel cache), both at `69493d5f`.
