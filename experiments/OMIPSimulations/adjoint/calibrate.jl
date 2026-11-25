@@ -29,7 +29,8 @@ using Dates: now, format, DateTime
 
 ENV["DATADEPS_ALWAYS_ACCEPT"] = "true"   # the WOA download goes through DataDeps, which otherwise prompts
 
-MPI.Init()
+# Thread level `:multiple`, which MPICH needs to run a progress thread.
+MPI.Init(threadlevel = :multiple)
 comm = MPI.COMM_WORLD
 rank, nranks = MPI.Comm_rank(comm), MPI.Comm_size(comm)
 

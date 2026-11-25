@@ -23,6 +23,9 @@ module load tacc-apptainer 2>/dev/null || true
 command -v apptainer >/dev/null || { echo "apptainer not found (module load tacc-apptainer?)" >&2; exit 1; }
 set -uo pipefail
 export JULIA_NUM_PRECOMPILE_TASKS=${SLURM_CPUS_PER_TASK:-16}
+# MPICH moves messages only inside MPI calls: without a progress thread, a rank that returns from a reduction
+# and computes for minutes holds back the messages the other ranks still wait for (job 1168099).
+export MPIR_CVAR_ASYNC_PROGRESS=1
 
 CONFIG=${CONFIG:?set CONFIG to a calibration config}
 SIF=${SIF:-$WORK/containers/julia_1.12_${TACC_SYSTEM}.sif}

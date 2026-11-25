@@ -102,3 +102,13 @@ long-window adjoint growth.
   `xla_gpu_enable_llvm_module_compilation_parallelism` as Reactant's own preference sets it), passed through
   `adjoint_compile_options(; xla_debug_options)`. Vista 1168110 `ParKc1`: 1 window, 1 iteration, cold cache;
   a warm rerun follows. Both must reproduce 1166514's iteration 0 (J 7.138303e+04, |∂J/∂log κ| 7.147e+04).
+- **1168099 `ParTime4` found it** (cancelled after iteration 0; nodes c642-[022,071,081-082]): every rank has 72
+  CPUs (`Cpus_allowed_list 0-71`, so `--cpus-per-task` is moot), and every rank's evaluation takes one window's
+  time: gradient 146.7, 149.3, 151.3, 154.1 s (GC 41–48 s, 110 GiB host allocation each), misfit 9–10 s,
+  compile 12.6–12.7 min. The reductions are staggered: after the truth misfit rank 0 leaves `total` in 0.2 s,
+  ranks 1 and 2 after 151 s, rank 3 after 304 s; ranks 1–2 return exactly when rank 0 next enters MPI (end of
+  its gradient), rank 3 when ranks 1–2 do. Iteration 0's gradient reductions: 307, 169, 167, 23 s. So MPICH
+  (`MPICH_jll` 5.0.3, ch4:ofi) delivers a collective's last messages only when the sender calls MPI again, and
+  the ranks run their windows two to three deep in series: ~7 min per iteration.
+- Fix: MPICH's progress thread (`MPIR_CVAR_ASYNC_PROGRESS=1` in `calibrate_mpi.slurm`,
+  `MPI.Init(threadlevel = :multiple)` in `calibrate.jl`).
