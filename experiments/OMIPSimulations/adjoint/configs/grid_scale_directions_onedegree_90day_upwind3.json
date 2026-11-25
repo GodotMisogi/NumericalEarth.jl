@@ -1,0 +1,6 @@
+{
+  "_comment": "Alternating and smooth parts of the 1° 90-day frozen upwind3 flux gradient (1161433), and its alternating part in never-convecting blocks (forward state of health_ecco4_onedegree_nz20_90day_upwind3), for 1° finite-difference scans.",
+  "gradient": "results/ecco4_adjoint_onedegree_nz20_90day_frozen_gradients_upwind3_trace.jld2",
+  "output": "results/directions_onedegree_90day_upwind3",
+  "health": "results/forward_health_ecco4_onedegree_nz20_90day_upwind3.jld2"
+}

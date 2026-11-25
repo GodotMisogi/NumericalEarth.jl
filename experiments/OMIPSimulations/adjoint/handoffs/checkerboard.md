@@ -358,3 +358,35 @@ x₁₂₀ to disk, not yet written.
 - Submitted ChkTke168 1170952 (`ecco4_nz20_168step_upwind3_frozen_tke.json`: 168-step end-of-window gradient plus
   the step 119–121 dot test) and ChkTke14 1170953 (`ecco4_nz20_14day_upwind3_frozen_tke.json`: 1167067's
   configuration). The FD rows of ChkB168, ChkFD and ChkFD2 still apply, since the forward model is unchanged.
+
+### 2026-11-25, why stress is smooth and flux is grid-scale at 1° (added scope)
+
+- **Component split** (offline; the overlapping 2×2 share of `grid_scale_share.jl` split into its checker,
+  stripe-alternating-in-i and stripe-alternating-in-j parts; Atlantic 0–80°N; scratch script):
+
+  | Gradient | checker | stripe-i | stripe-j | total |
+  |---|---|---|---|---|
+  | 1° 90 d frozen upwind3 (1161433), ∂J/∂τx, slices 1–4 | 0.00–0.01 | 0.01–0.03 | 0.11–0.14 | 0.14–0.17 |
+  | same, ∂J/∂τy | 0.01–0.02 | 0.17–0.25 | 0.02–0.04 | 0.22–0.29 |
+  | same, ∂J/∂Q | 0.03–0.16 | 0.09–0.33 | 0.14–0.22 | 0.26–0.71 |
+  | 2° 90 d frozen WENO (1157589), ∂J/∂τx | 0.01–0.02 | 0.01–0.02 | 0.27–0.45 | 0.31–0.49 |
+  | same, ∂J/∂τy | 0.03–0.04 | 0.22–0.36 | 0.04–0.10 | 0.33–0.47 |
+  | same, ∂J/∂Q | 0.16–0.23 | 0.15–0.26 | 0.32–0.41 | 0.70–0.80 |
+  | 2° 14 d frozen CATKE (1167068), ∂J/∂τx / τy / Q | 0.01 / 0.03–0.05 / 0.12–0.13 | 0.01 / 0.37 / 0.12 | 0.34–0.41 / 0.06–0.09 / 0.52–0.60 | 0.36–0.42 / 0.46–0.51 / 0.77–0.83 |
+
+  **The stress gradient is filtered at the grid scale by construction.** `_prescribe_surface_fluxes!` puts the
+  stress at cell centers and interpolates it to the faces (`ℑxᶠᵃᵃ` for τx, `ℑyᵃᶠᵃ` for τy). So ∂J/∂τx at a center
+  is the mean of the two neighboring u-face adjoints, which annihilates any component alternating in i (the
+  checker and the i-stripe), and ∂J/∂τy likewise loses everything alternating in j. Exactly those components are
+  at 0.00–0.03 in every run, while the component the interpolation cannot see (τx's j-stripe, τy's i-stripe) is
+  as large as the flux's (2°: 0.27–0.45 against 0.32–0.41). The heat and freshwater fluxes enter at the centers
+  where they are applied, so their gradient keeps all three components. Part of the contrast is therefore
+  measurement: the stress control space carries a two-point average that the flux control space does not.
+  At 1° the stress's surviving stripe (0.11–0.25) is also smaller than the flux's (0.14–0.33), so resolution
+  adds a real difference on top.
+- Preliminary convecting / stable split at 1° (`grid_scale_share.jl` with the WENO health file 1158107; the
+  upwind3 one is queued). Heat flux, slices 1–4: convecting 0.39, 0.58, 0.69, 0.85; stable 0.25, 0.30, 0.55, 0.91.
+  Stress-x: convecting 0.13–0.28, stable 0.12–0.17. In the slice nearest the objective, the stable columns are
+  as grid-scale as the convecting ones, so convection is not the carrier at 1°. `grid_scale_share.jl` now prints
+  the split for stress-x and heat flux in every slice. `grid_scale_directions.jl` adds the alternating part in
+  convecting blocks and writes zero stress fields.
