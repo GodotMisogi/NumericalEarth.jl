@@ -32,6 +32,26 @@ function TurbulenceClosures.compute_closure_fields!(closure_fields, closure::Fla
     return nothing
 end
 
+const FREEZE_TKE = Ref(false)
+
+"""
+$(TYPEDSIGNATURES)
+
+Choose whether the CATKE turbulent kinetic energy is held constant in derivatives after each step of its equation
+(`true`): the viscosity and diffusivities still vary with N² and shear in the derivative, but not through e, and no
+derivative reaches the TKE equation. The choice is read when a model step is traced, so it must be set before
+`@compile`. Returns `flag`.
+"""
+freeze_tke!(flag::Bool) = (FREEZE_TKE[] = flag; flag)
+
+function TurbulenceClosures.step_closure_prognostics!(closure_fields, closure::FlavorOfCATKE,
+                                                      model::HydrostaticFreeSurfaceModel, Δt)
+    invoke(TurbulenceClosures.step_closure_prognostics!, Tuple{Any, FlavorOfCATKE, Any, Any},
+           closure_fields, closure, model, Δt)
+    FREEZE_TKE[] && (parent(model.tracers.e) .= ignore_derivatives(parent(model.tracers.e)))
+    return nothing
+end
+
 const FREEZE_BUOYANCY_GRADIENTS = Ref(false)
 
 """
