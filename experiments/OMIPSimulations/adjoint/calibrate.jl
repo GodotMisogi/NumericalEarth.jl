@@ -9,9 +9,8 @@
 #   CONFIG=adjoint/configs/<config>.json sbatch -N <length(windows)> adjoint/calibrate_mpi.slurm
 #
 # Config keys: n_months, Nx, Ny (default 180, 60), Nz, steps, dt, substeps, backend, roll_barotropic_substeps,
-# checkpoints, average_days, output; optional frozen_mixing, frozen_buoyancy_gradients, advection, windows (ISO
-# start dates, one per MPI rank; default ["1993-01-01"]), and xla_kernel_cache (a file under adjoint/ for XLA's
-# cache of compiled GPU kernels, which later compiles of the same program reuse).
+# checkpoints, average_days, output; optional frozen_mixing, frozen_buoyancy_gradients, advection, and windows (ISO
+# start dates, one per MPI rank; default ["1993-01-01"]).
 # truth, initial: [κ_skew, κ_symmetric] (m² s⁻¹). observed_levels (default Nz), observation_stride (default 1),
 # sigma_T (K), sigma_S (g kg⁻¹): the observations. stages: "check" (central differences of the misfit in log κ,
 # step check_h, a number or a list, against the adjoint) and/or "calibrate" (iterations, initial_step, gtol).
@@ -55,9 +54,6 @@ function reduced(label, evaluate)
                    timed.gctime, timed.bytes / 2^30, time() - t0))
     return value
 end
-cpus_allowed = only(filter(startswith("Cpus_allowed_list"), readlines("/proc/self/status")))
-stamp(gethostname(), ": ", Threads.nthreads(), " threads, ", Threads.ngcthreads(), " GC threads, ", Sys.CPU_THREADS,
-      " CPU threads, ", cpus_allowed)
 
 results = Dict{String, Any}("config" => P)
 output_path = joinpath(@__DIR__, P["output"])
@@ -98,11 +94,8 @@ stamp(@sprintf("window from %s built in %.1f s; %d observed cells", windows[rank
 Nx, Ny, Nz = size(observed)
 observations = TracerMisfit(observed, zeros(Nx, Ny, Nz), zeros(Nx, Ny, Nz), Float64(P["sigma_T"]), Float64(P["sigma_S"]))
 t0 = time()
-kernel_cache = haskey(P, "xla_kernel_cache") ?
-    (; xla_gpu_kernel_cache_file = joinpath(@__DIR__, P["xla_kernel_cache"])) : (;)
 calibration = build_eddy_calibration(model, state, observations; Δt, n_steps, average_steps,
-                                     checkpoints = P["checkpoints"],
-                                     compile_options = adjoint_compile_options(; xla_debug_options = kernel_cache))
+                                     checkpoints = P["checkpoints"])
 results["compile_seconds"] = time() - t0
 stamp(@sprintf("compiled in %.1f min", results["compile_seconds"] / 60))
 
@@ -153,11 +146,10 @@ if :calibrate in stages
         save_results()
         # Device memory before and after a full collection: growth that survives it is held, not garbage.
         stats = Reactant.XLA.allocatorstats()
-        gc_seconds = @elapsed GC.gc()
-        stamp(@sprintf("device memory in use %.2f GiB (peak %.2f, limit %.2f), %.2f GiB after GC (%.1f s)",
+        GC.gc()
+        stamp(@sprintf("device memory in use %.2f GiB (peak %.2f, limit %.2f), %.2f GiB after GC",
                        stats.bytes_in_use / 2^30, stats.peak_bytes_in_use / 2^30,
-                       something(stats.bytes_limit, 0) / 2^30, Reactant.XLA.allocatorstats().bytes_in_use / 2^30,
-                       gc_seconds))
+                       something(stats.bytes_limit, 0) / 2^30, Reactant.XLA.allocatorstats().bytes_in_use / 2^30))
     end
     bfgs_minimize(gradient!, misfit!, x0; iterations = P["iterations"],
                   initial_step = P["initial_step"], gtol = get(P, "gtol", 0.0), callback)

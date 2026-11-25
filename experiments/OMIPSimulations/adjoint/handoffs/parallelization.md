@@ -127,3 +127,12 @@ long-window adjoint growth.
   iterations 0 and 1 equal 1166514's (J 7.138303e+04, 2.433435e+04). Warm rerun: 1168843 `ParKc2`.
 - Remaining cost in an iteration: the gradient's host side, ~38 s of GC and 110 GiB of host allocation per
   gradient (the checkpoint copies `map(Array, arrays)` are allocated anew at each store).
+- 1168843 `ParKc2` (warm kernel cache, 76 MB): compile **12.5 min, no saving**, and the first compiled time step
+  then fails with `CUDA_ERROR_ILLEGAL_INSTRUCTION` in `reactant_time_step_`: XLA reused a cached kernel that does
+  not belong to this program. The kernel cache is unsafe here and buys nothing; the `xla_kernel_cache` key and its
+  config are removed again, and the cache file deleted. The autotune cache was already on and warm.
+- Deliverable 2, conclusion: no cheap way to share the compile. Reactant 0.2.309 has no executable
+  (de)serialization in Julia (only the raw `PJRT_Executable_Serialize`/`DeserializeAndLoad` C bindings), and
+  `serializable = true` exports StableHLO only. Within one job the ranks compile in parallel, so sharing would
+  save node-hours (4 × 12.5 min of idle GPUs per 4-window job), not wall time.
+- Self-review of the branch diff: cut the one-off affinity print and the callback's GC timing (answered); kept the per-rank evaluation and reduction times.
