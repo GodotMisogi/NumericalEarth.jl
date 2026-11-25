@@ -118,3 +118,12 @@ The long-window adjoint growth (STATUS "The long-window adjoint growth"), the da
   340°E 19.4°N and 329°E 25°N; the never-convecting one is led by 340°E 19.4°N (0.78). Scan config
   `ecco4_nz20_14day_upwind3_unfrozen_fd.json`: h0 100 (heat, W m⁻² per unit d; max perturbation 57 W m⁻²) and
   2e-4 (freshwater, kg m⁻² s⁻¹), 13 halvings.
+- Commit `2439af00`. Submitted: ChkBh50 1168067 (gh, experiment 2 gradient), ChkFD 1168096 (gh-dev, experiment 1
+  scans). CPU check of the new control helpers (2-step CPU window, random heat-flux direction): set/restore exact,
+  gᵀd as expected.
+- 19:06: ChkFD 1168096 (c642-022) and ChkBh50 1168067 (c637-062) running. Not yet submitted: the experiment-2
+  health run (`SCRIPT=adjoint/forward_health.jl CONFIG=adjoint/configs/health_ecco4_nz20_14day_upwind3_bh50.json
+  sbatch -J ChkBh50H -p gh -t 00:45:00 -A ADCIRC adjoint/omip_adjoint.slurm`), held back by the 2-job limit.
+- Side observation: 53 % of the heat-flux alternating energy lies within 4° of 26°N (the Atlantic section rows),
+  where the local share is 0.85; elsewhere it is 0.76. The AMOC objective is a one-row staircase, so part of the
+  grid-scale structure is the objective's own footprint.
