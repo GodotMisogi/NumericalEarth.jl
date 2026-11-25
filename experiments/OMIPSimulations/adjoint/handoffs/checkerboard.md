@@ -244,3 +244,19 @@ Proposed bisection (not run):
 3. Split the freeze: a flag that stop-gradients only e after the TKE step (so κ still varies with N² and shear),
    against one that stop-gradients only the N² and shear inputs of the mixing length. That says whether the
    error is in the TKE equation or in the diffusivity formula. Needs code in `frozen_mixing.jl`.
+
+### 2026-11-24, bisection (steps 1 and 2 of the plan; step 3 held for the user)
+
+- Submitted ChkB42 1168771 and ChkB84 1168772 (`ecco4_nz20_{42,84}step_upwind3_fd.json`, `220be3c8`): end-of-window
+  AMOC, FD along heat-flux cells (131, 38) and (136, 36), 1167067's never-convecting alternating heat-flux part and its
+  stress direction, then the unfrozen checkpointed gradient.
+- New `step_dot` stage (`step_dot_products`, `07c6aa8c`): a one-step dot-product test of the compiled reverse pass
+  at fixed states. λ is noise in u, v, T, S, e of the step's output; v perturbs one input field at a time.
+  Config `ecco4_nz20_14day_upwind3_unfrozen_step_dot.json` covers states 1, 8, 24, 48, 84, 120, 156 and 167 of
+  1167067's window. CPU check of its host helpers: add/read of the interior exact.
+- CATKE state over the window (1167070, daily): 44 unstable interfaces and κc_max 0 on day 0, then 1947
+  interfaces in 940 convecting columns and κc_max at the 3 m² s⁻¹ cap by day 1 (step 12). It then stays nearly
+  steady (2380 interfaces, 1009 columns, on day 14). Surface κc at (127, 38) is at the cap from day 1 (2–3
+  unstable interfaces), and (131, 38) convects similarly; (136, 36) never convects (surface κc 0.003–0.006).
+  So the 8-step window (16 h) ends before the convective regime is established. An onset between 8 and
+  ~12–24 steps would point to the CATKE state rather than the step count.
