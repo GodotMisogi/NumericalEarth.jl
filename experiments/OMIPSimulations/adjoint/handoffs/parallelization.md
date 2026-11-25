@@ -136,3 +136,16 @@ long-window adjoint growth.
   `serializable = true` exports StableHLO only. Within one job the ranks compile in parallel, so sharing would
   save node-hours (4 × 12.5 min of idle GPUs per 4-window job), not wall time.
 - Self-review of the branch diff: cut the one-off affinity print and the callback's GC timing (answered); kept the per-rank evaluation and reduction times.
+
+### 2026-11-25 01:10, status
+
+- Deliverable 1 done (`a4b0aaf8`): 4-window iteration 2.2 min = one window's. Deliverable 2: no cheap way
+  (above). Deliverable 3 blocked on the queue: LS6 3612502 `ParShard2` (`gpu-a100-dev`, at `94351713`'s probe,
+  sharded first) still pending after 5 h, priority 2378 → 2465, 16 higher-priority jobs (27 requested node-hours)
+  ahead on the partition's 3 working nodes. Left queued; its log will be
+  `NumericalEarth-parallel/experiments/OMIPSimulations/adjoint/logs/ParShard2.o3612502`.
+- Alternatives: LS6 `gpu-h100` (4 nodes, 1 drained, c318-002 known bad); or Vista multi-process sharding, which
+  needs Reactant's IFRT runtime (`xla_runtime = "IFRT"` preference; Reactant warns that `Distributed.initialize`
+  under the default PJRT "will never be properly supported"), i.e. a separate environment, since the preference
+  changes the array types of every job in this one.
+- Compute used: ~5 GPU-node-hours (1168099 2.2, 1168552 1.9, 1168110/1168553/1168843 0.8).
