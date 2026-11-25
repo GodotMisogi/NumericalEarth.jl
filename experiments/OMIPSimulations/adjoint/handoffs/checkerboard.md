@@ -127,3 +127,38 @@ The long-window adjoint growth (STATUS "The long-window adjoint growth"), the da
 - Side observation: 53 % of the heat-flux alternating energy lies within 4° of 26°N (the Atlantic section rows),
   where the local share is 0.85; elsewhere it is 0.76. The AMOC objective is a one-row staircase, so part of the
   grid-scale structure is the objective's own footprint.
+
+### 2026-11-24, results of experiments 1 and 2
+
+- **ChkFD 1168096** (29.5 min; compile of the checkpointed thunks 17 min, each 13-step scan 41–53 s): f0 =
+  15.56282979659 Sv, J of 1167067 to 2.3e-16. Central slopes (Sv per unit h) against 1167067's gᵀd:
+
+  | Direction | gᵀd (unfrozen) | central slope, h0 … h0/128 (spread) | FD / adjoint | slope at h ≤ h0/256 | frozen-CATKE gᵀd (1167068) |
+  |---|---|---|---|---|---|
+  | heat, alternating | 1.04e-3 | 2.35e-4 (±18 %) | 0.23 | 7.5e-4, 1.3e-3, 5.8e-4, 1.1e-3 | 4.7e-5 |
+  | heat, smooth | 5.09e-4 | 1.67e-4 (±8 %) | 0.33 | 4.5e-4, 7.4e-4, 4.0e-4, 4.9e-4 | 1.5e-5 |
+  | heat, alternating, never convecting | 5.16e-4 | 6.31e-5 (±3 %) | 0.12 | 7e-5, 1.1e-4, −9e-5, 6e-5, 4.7e-5 | 5.58e-5 (FD / frozen 1.13) |
+  | freshwater, alternating | 506 | 247 (±35 %) | 0.49 | 381, 531, 368, 411, 612 | 21 |
+  | freshwater, smooth | 281 | 190 (±27 %) | 0.68 | 325, 299, 289, 335, 470 | 3.2 |
+
+  h0 = 100 (heat) and 2e-4 (freshwater) per unit direction; the largest entry of each unit direction is 0.36–0.78,
+  so h0/128 is a perturbation of at most 0.3–0.6 W m⁻². Reading: below h ≈ h0/256 (≲ 0.2 W m⁻² at the largest
+  cell) the central slopes approach the unfrozen adjoint in four of five directions (alternating and smooth
+  alike), so the adjoint is the exact local derivative. Above it, J responds linearly with a slope 2–8× smaller,
+  stable over 7–8 octaves. The one-sided differences show why: along the heat-flux alternating direction
+  f(x₀ + h d) − f0 stays near 3e-5 Sv from h = 0.024 to 0.78, i.e. a step of ~3e-5 Sv (2e-6 of J) within the first
+  0.02 W m⁻². The local derivative is carried by tiny steep switches of the forward map (finding 9), the same in
+  the smooth and alternating parts; it is not an adjoint error and not specific to the grid scale. In the
+  never-convecting direction there is no small-h regime at all, and the frozen-CATKE adjoint matches the
+  finite-amplitude slope (1.13); the unfrozen one is 8× too large.
+- **ChkBh50 1168067** (26.8 min; J 11.0834 Sv, max|g| 7.28): biharmonic tracer diffusion (λ = 50 days) barely
+  lowers the share. Heat flux slice 1 by band (−35–0, 0–22, 22–32, 32–45, 45–80°N): 0.60 0.68 0.67 0.68 0.59
+  (1167067: 0.63 0.79 0.76 0.76 0.75); slice 2 0.53 0.67 0.70 0.66 0.73; Atlantic 0–80°N convecting 0.68, stable
+  0.66 (0.77, 0.95). Stress-x stays 0.40–0.85 (1167067: 0.28–0.85). Note the 14-day unfrozen stress
+  sensitivities are as grid-scale as the fluxes (0.55–0.85 outside 22–32°N). So an undamped tracer grid mode
+  is not what carries the noise.
+- Submitted ChkBh50H 1168467 (health run of experiment 2) and ChkFD2 1168469 (gh-dev): scans along 1167067's
+  stress gradient, single heat-flux cells at 340°E 19.4°N and 320°E 24.6°N (slice 1; directions written by a
+  scratch script: unit entry at (i, j) = (136, 36) and (127, 38)), and the alternating, smooth and
+  never-convecting alternating parts of the frozen-CATKE gradient (1167068). These test whether the
+  frozen adjoint is the finite-amplitude sensitivity along its own directions.
