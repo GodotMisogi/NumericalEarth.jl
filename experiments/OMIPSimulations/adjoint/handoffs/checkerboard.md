@@ -266,3 +266,8 @@ Proposed bisection (not run):
   heat-flux part 1.013, stress 0.998. The convecting cell (131, 38) switches (FD from +3e-6 to −2.9e-4 across h;
   median 1.09). **At 42 steps the unfrozen adjoint is still exact where J is smooth**, so the onset is after
   the convective regime is established: the CATKE state alone is not enough. ChkDot 1168959 (step_dot) queued.
+- **ChkB84 1168772** (27 min): 84 steps (7 days), J 16.6787 Sv. FD / own unfrozen adjoint: stress 1.0007,
+  heat-flux cell (136, 36) 1.013, never-convecting alternating part 0.990; (131, 38) switches. **Exact at 84
+  steps too.** The failing 14-day case differs in three ways: 168 steps, the 7-day mean objective (states
+  85–168), and 14 Revolve checkpoints (3 in the bisection runs). The frozen adjoint with that same averaging
+  and those checkpoints matched (stress 1.000), so the averaging is not the cause by itself.
