@@ -44,6 +44,16 @@ function power_iteration!(apply!, dmodel, arrays, iterations)
     return growth, records
 end
 
+# The diagnostic refresh, one time step and its reverse pass, compiled.
+function compile_step_thunks(model; Δt, compile_options, while_unroll_threshold)
+    return with_while_unroll_threshold(while_unroll_threshold) do
+        dmodel = make_zero(model)
+        (refresh = @compile(compile_options = compile_options, refresh_diagnostics!(model)),
+         step = @compile(compile_options = compile_options, time_step!(model, Δt)),
+         reverse_step = @compile(compile_options = compile_options, reverse_step!(model, dmodel, Δt)))
+    end
+end
+
 """
 $(TYPEDSIGNATURES)
 
@@ -59,12 +69,7 @@ function step_adjoint_growth(model, state; steps, iterations, Δt, compile_optio
                              while_unroll_threshold = 0)
     (!isempty(steps) && issorted(steps) && first(steps) >= 0) ||
         throw(ArgumentError("steps must be nonnegative and ascending, got $steps"))
-    thunks = with_while_unroll_threshold(while_unroll_threshold) do
-        dmodel = make_zero(model)
-        (refresh = @compile(compile_options = compile_options, refresh_diagnostics!(model)),
-         step = @compile(compile_options = compile_options, time_step!(model, Δt)),
-         reverse_step = @compile(compile_options = compile_options, reverse_step!(model, dmodel, Δt)))
-    end
+    thunks = compile_step_thunks(model; Δt, compile_options, while_unroll_threshold)
     arrays = device_arrays(model)
     restore_state!(model, state)
     thunks.refresh(model)
@@ -89,4 +94,78 @@ function step_adjoint_growth(model, state; steps, iterations, Δt, compile_optio
         mode = map(f -> Array(parent(f)), (u = om.velocities.u, v = om.velocities.v, T = om.tracers.T, S = om.tracers.S))
         (; step = s, growth, records, mode)
     end
+end
+
+#####
+##### One-step dot-product test of the reverse pass
+#####
+
+ocean_field(model, name) = name in (:u, :v, :w) ? getproperty(ocean_model(model).velocities, name) :
+                                                  getproperty(ocean_model(model).tracers, name)
+
+interior_parent_ranges(f) = map((H, n) -> H .+ (1:n), (f.grid.Hx, f.grid.Hy, f.grid.Hz), size(f))
+
+interior_host(f) = Array(parent(f))[interior_parent_ranges(f)...]
+
+function add_interior!(f, x)
+    a = Array(parent(f))
+    view(a, interior_parent_ranges(f)...) .+= x
+    copyto!(parent(f), a)
+    return nothing
+end
+
+# Deterministic noise of the interior shape of `f`, different for each `seed`.
+noise_like(f, seed) = [interior_noise(i + 101seed, j + 37seed, k + 11seed) for i in 1:size(f, 1), j in 1:size(f, 2), k in 1:size(f, 3)]
+
+"""
+$(TYPEDSIGNATURES)
+
+One-step dot-product test of the reverse pass at fixed states of the window that starts from the snapshot `state`.
+For each `s` in the ascending `steps`, the model is stepped to its `s`-th state xₛ, and λ is deterministic noise in
+the interior of the output fields `names` (velocities and tracers). For each input field in `names`, with `v` noise
+of amplitude `scales[name]` in that field alone, compares the central difference
+⟨λ, x⁺(xₛ + ε v) − x⁺(xₛ − ε v)⟩ / 2ε of the step's output x⁺, for each `ε` in `epsilons`, with ⟨λ̄, v⟩, where λ̄
+is the reverse pass of the step from xₛ seeded with λ. Returns one named tuple per step, input field and `ε`.
+"""
+function step_dot_products(model, state; steps, Δt, scales, names = (:u, :v, :T, :S, :e), epsilons = (1, 1/4, 1/16),
+                           compile_options = adjoint_compile_options(), while_unroll_threshold = 0)
+    (!isempty(steps) && issorted(steps) && first(steps) >= 0) ||
+        throw(ArgumentError("steps must be nonnegative and ascending, got $steps"))
+    thunks = compile_step_thunks(model; Δt, compile_options, while_unroll_threshold)
+    arrays = device_arrays(model)
+    restore_state!(model, state)
+    thunks.refresh(model)
+    λ = Dict(name => noise_like(ocean_field(model, name), n) for (n, name) in enumerate(names))
+    output_dot() = sum(sum(λ[name] .* interior_host(ocean_field(model, name))) for name in names)
+    rows = NamedTuple[]
+    position = 0
+    for s in steps
+        for n in (position + 1):s
+            thunks.step(model, Δt)
+            n % 20 == 0 && GC.gc()
+        end
+        position = s
+        xₛ = memory_snapshot(model, arrays)
+        dmodel = make_zero(model)
+        foreach(name -> add_interior!(ocean_field(dmodel, name), λ[name]), names)
+        thunks.reverse_step(model, dmodel, Δt)
+        for (n, name) in enumerate(names)
+            v = scales[name] .* noise_like(ocean_field(model, name), n + length(names))
+            adjoint = sum(interior_host(ocean_field(dmodel, name)) .* v)
+            for ε in epsilons
+                outputs = map((ε, -ε)) do δ
+                    restore_memory!(model, arrays, xₛ)
+                    add_interior!(ocean_field(model, name), δ .* v)
+                    thunks.step(model, Δt)
+                    output_dot()
+                end
+                fd = (outputs[1] - outputs[2]) / 2ε
+                @printf("  step %4d  input %-2s  ε %.4f  FD %+.10e  adjoint %+.10e  FD/adjoint − 1 %+.3e\n",
+                        s, name, ε, fd, adjoint, fd / adjoint - 1)
+                push!(rows, (; step = s, input = name, ε, fd, adjoint))
+            end
+        end
+        restore_memory!(model, arrays, xₛ)
+    end
+    return rows
 end

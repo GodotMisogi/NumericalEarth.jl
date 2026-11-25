@@ -22,6 +22,8 @@
 #             may then be {label: h0}
 #   step_jacobian  leading growth of one step's adjoint at the states `jacobian_steps` (step indices) by
 #             `jacobian_iterations` of power iteration (`step_adjoint_growth`)
+#   step_dot  one-step dot-product test of the reverse pass at the states `dot_steps` (`step_dot_products`), with
+#             input perturbation amplitudes `dot_scales` ({field: amplitude}) and step factors `dot_epsilons`
 # Optional `excluded_passes`: pattern names left out of Reactant's rewrite lists (default none).
 # Optional `while_unroll_threshold` (default 0, every loop rolled): Reactant's unroll pattern acts on
 # loops of at most this many iterations in every rewrite application, before and after Enzyme.
@@ -167,7 +169,7 @@ end
 # %%
 ##### Reactant model
 
-reactant_stages = (:primal, :fd_scan, :gradient, :step_jacobian)
+reactant_stages = (:primal, :fd_scan, :gradient, :step_jacobian, :step_dot)
 if any(in(stages), reactant_stages)
     :NVPTX in Reactant.LLVM.backends() ||
         error("Reactant lowers Oceananigans kernels through NVPTX; this Julia's LLVM lacks it (macOS). Run on the GPU cluster.")
@@ -324,6 +326,16 @@ if :step_jacobian in stages
     end
     stamp("step Jacobian stage in ", elapsed(t0))
     results["step_jacobian"] = jacobian
+    save_results()
+end
+
+if :step_dot in stages
+    t0 = time()
+    scales = Dict(Symbol(k) => Float64(v) for (k, v) in P["dot_scales"])
+    epsilons = Tuple(Float64.(P["dot_epsilons"]))
+    results["step_dot"] = step_dot_products(model, state; steps = P["dot_steps"], Δt, scales, names = Tuple(keys(scales)),
+                                            epsilons, compile_options = options, while_unroll_threshold)
+    stamp("step dot-product stage in ", elapsed(t0))
     save_results()
 end
 
