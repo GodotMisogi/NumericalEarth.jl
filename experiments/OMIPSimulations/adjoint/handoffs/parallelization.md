@@ -118,3 +118,12 @@ long-window adjoint growth.
 - Vista `gh-dev` runs one job per user at a time (QOS `qdevelopment`: MaxJobsPU 1, MaxSubmitPU 3), shared with
   the checkerboard agent; `gh` allows 20. Resubmitted on `gh`: 1168552 `ParTime4b` (4 windows with the progress
   thread, 3 iterations) and 1168553 `ParKc1b` (cold kernel cache), both at `69493d5f`.
+- **1168552 `ParTime4b` (progress thread): 4-window iterations 2.2, 2.3, 2.2 min** (iteration 2 has two
+  line-search misfits), against ~2.2 min for one window (1166514) and ~7 min before (1166675). Reduction waits
+  0–8 s (the spread of the ranks' evaluation times); gradients 115–122 s per rank after the first (148–156 s), GC
+  37–39 s of them; misfits 9.3–10 s. J and κ per iteration equal 1166675's to every printed digit (3.156515e+05,
+  1.081492e+05, 4.572485e+04, 2.253984e+04). Build 201–203 s, compile 12.5–12.7 min on each rank.
+- 1168553 `ParKc1b` (one window, cold kernel cache): compile 12.6 min (no change), cache file 76 MB;
+  iterations 0 and 1 equal 1166514's (J 7.138303e+04, 2.433435e+04). Warm rerun: 1168843 `ParKc2`.
+- Remaining cost in an iteration: the gradient's host side, ~38 s of GC and 110 GiB of host allocation per
+  gradient (the checkpoint copies `map(Array, arrays)` are allocated anew at each store).
