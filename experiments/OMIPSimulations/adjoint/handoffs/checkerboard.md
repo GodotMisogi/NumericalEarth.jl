@@ -260,3 +260,9 @@ Proposed bisection (not run):
   unstable interfaces), and (131, 38) convects similarly; (136, 36) never convects (surface κc 0.003–0.006).
   So the 8-step window (16 h) ends before the convective regime is established. An onset between 8 and
   ~12–24 steps would point to the CATKE state rather than the step count.
+- **ChkB42 1168771** (27 min): 42 steps (3.5 days, past the onset of convection on day 1), J 53.6036 Sv
+  (an adjustment transient; primal and gradient agree to 4.4e-13). FD / own unfrozen adjoint, median over 8
+  octaves: heat-flux cell (136, 36) 0.992 (FD 4.89–5.15e-5 against 5.148e-5), the never-convecting alternating
+  heat-flux part 1.013, stress 0.998. The convecting cell (131, 38) switches (FD from +3e-6 to −2.9e-4 across h;
+  median 1.09). **At 42 steps the unfrozen adjoint is still exact where J is smooth**, so the onset is after
+  the convective regime is established: the CATKE state alone is not enough. ChkDot 1168959 (step_dot) queued.
