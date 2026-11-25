@@ -271,3 +271,16 @@ Proposed bisection (not run):
   steps too.** The failing 14-day case differs in three ways: 168 steps, the 7-day mean objective (states
   85–168), and 14 Revolve checkpoints (3 in the bisection runs). The frozen adjoint with that same averaging
   and those checkpoints matched (stress 1.000), so the averaging is not the cause by itself.
+- **ChkDot 1168959** (22 min; `ecco4_nz20_14day_upwind3_unfrozen_step_dot.json`, global noise λ in u, v, T, S,
+  e and one input field at a time, ε = 1, 1/4, 1/16 of amplitudes u, v 1e-3 m s⁻¹, T 1e-2 K, S 1e-3 g kg⁻¹,
+  e 1e-7 m² s⁻²). The T, S and e inputs do not converge in ε at any state, step 1 included: e grows like 1/ε,
+  the signature of discontinuities. A global perturbation crosses some of the ~2000 near-neutral unstable
+  interfaces, where CATKE switches. So this test cannot judge the derivative in T, S, e. The velocity inputs
+  are smooth enough to read:
+  - u agrees to 1–9 % at steps 1, 24, 84, 120, 156 and 167, but not at 8 (−0.31 to −0.95) or 48 (+0.29 to +0.54).
+  - v agrees to 1–6 % at steps 24, 48, 84, 156 and 167.
+  - At step 120, v's FD is 4.8e-3, 4.8e-3, 3.2e-3 against an adjoint of 7.1e-5 (67× apart, steady in ε). Step 8
+    disagrees in sign (FD 3.3e-4, adjoint −1.3e-3).
+  Step 120 is inside the failing 168-step window and outside the exact 84-step ones, so it is a candidate onset.
+  Submitted ChkDot120 1169075 (`..._step_dot_around120.json`: steps 4–10 and 112–128) and ChkB168 1169004
+  (168 steps, end-of-window AMOC, 14 checkpoints).
