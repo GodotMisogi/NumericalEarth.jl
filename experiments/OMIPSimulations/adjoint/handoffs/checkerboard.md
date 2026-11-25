@@ -339,3 +339,22 @@ its floor, or regularize the singular factor (√e → √(e + e₀) in the deri
 and single-cell scans. To name the exact CATKE line first, run the one-column version of the step-120 test:
 perturb v only in column (126, 46) and λ only at (126, 46, 16) on the saved x₁₂₀. That needs code that snapshots
 x₁₂₀ to disk, not yet written.
+
+### 2026-11-25, fix (approved step 3)
+
+- Reading CATKE (Oceananigans 0.117.2, `TKEBasedVerticalDiffusivities`), the terms singular as e → 0 are:
+  `wb⁻_e = wb⁻ / e * (e > eᵐⁱⁿ)` in the implicit TKE operator (`fast_tke_tendency`, eᵐⁱⁿ = 1e-9);
+  `ω = √|e| / ℓᴰ` (`dissipation_rate`, with `ifelse(e < 0, …)`); and `√max(eᵐⁱⁿ, e)` in the diffusivities
+  (`turbulent_velocityᶜᶜᶜ`). All of them depend on velocity through ℓ, wb and shear, so the v-input spike at a
+  cell with e = 6e-8 fits any of them. I skipped the one-column test (scope 1): it would only localize again to
+  the column already found, and naming the line needs instrumenting the TKE kernels.
+- Remedy (i), `17ae1305`: `freeze_tke!` / config `frozen_tke`. It is a method of
+  `step_closure_prognostics!(closure_fields, ::FlavorOfCATKE, ::HydrostaticFreeSurfaceModel, Δt)` that calls
+  Oceananigans' and then stop-gradients e (`ignore_derivatives`, the pattern of `freeze_mixing!`). So no
+  derivative enters the TKE equation; κ still varies with N² and shear. `frozen_mixing` is unchanged, and
+  `checkpointed_gradient.jl` is untouched.
+  - A CPU check of forward identity is not possible with this harness: two CPU runs from `restore_state!`
+    already differ without the flag. The GPU runs check it through J.
+- Submitted ChkTke168 1170952 (`ecco4_nz20_168step_upwind3_frozen_tke.json`: 168-step end-of-window gradient plus
+  the step 119–121 dot test) and ChkTke14 1170953 (`ecco4_nz20_14day_upwind3_frozen_tke.json`: 1167067's
+  configuration). The FD rows of ChkB168, ChkFD and ChkFD2 still apply, since the forward model is unchanged.
