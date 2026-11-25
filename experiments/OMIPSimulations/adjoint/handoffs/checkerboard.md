@@ -284,3 +284,21 @@ Proposed bisection (not run):
   Step 120 is inside the failing 168-step window and outside the exact 84-step ones, so it is a candidate onset.
   Submitted ChkDot120 1169075 (`..._step_dot_around120.json`: steps 4–10 and 112–128) and ChkB168 1169004
   (168 steps, end-of-window AMOC, 14 checkpoints).
+
+### 2026-11-25, onset between 84 and 168 steps; the garbage collector is the suspect
+
+- **ChkB168 1169004** (27.8 min; 168 steps, AMOC at the window's end, 14 checkpoints; J 18.7899 Sv): FD / own
+  unfrozen adjoint is 0.82 for stress, 0.069 for heat-flux cell (136, 36) (FD 3.7–6.8e-5 against 6.6e-4) and 0.067
+  for the never-convecting alternating part. So the window length breaks it, not the 7-day averaging: **onset
+  between 84 (exact) and 168 steps.** The CATKE state is steady from day 1 (step 12) to day 14 (1167070:
+  1947–2389 unstable interfaces, κc at its cap), so the onset is not tied to a change of CATKE regime.
+- **ChkDot120 1169075** (22 min; steps 4–10 and 112–128): the v-input adjoint at step 120 is 7.1e-5 against an
+  FD of 4.8e-3 (×67). It is the only outlier among 112–128, where the adjoint is 4.1–6.8e-3 and agrees with FD
+  to 2–30 %. Step 10's FD does not converge in ε (2.6e-3, 1.7e-3, −3.9e-4), so it is not read.
+- Step 120 is the one state in both dot tests that followed a host `GC.gc()`: the step loop collects every 20th
+  step, right before the snapshot. In the gradients, `collect_device_garbage` (`2aa9e25b`, 11-24) collects
+  whenever XLA's pool is half full. That plausibly first happens between 84 and 168 steps of a Revolve sweep, and
+  later or never with the smaller frozen-CATKE reverse thunk. Hypothesis: a collection frees (finalizes) a
+  device buffer the reverse pass still uses. Every 14-day run on 11-24 (1167067–69) postdates `2aa9e25b`.
+- Test: ChkDotGC7 (`..._step_dot_gc7.json`, `284a2e89`) collects every 7th step and probes 112, 118, 119, 120,
+  121, 126 and 127. Under the hypothesis, 112, 119 and 126 go wrong and 120 is fine.
