@@ -1,5 +1,5 @@
 {
-  "_comment": "Checkerboard experiment 1 controls: as ecco4_nz20_14day_upwind3_unfrozen_fd (1168096), along 1167067's stress gradient and along single heat-flux cells (slice 1) at 340°E 19.4°N (never convecting) and 320°E 24.6°N (south of the section).",
+  "_comment": "Checkerboard experiment 1 controls: as ecco4_nz20_14day_upwind3_unfrozen_fd (1168096), along 1167067's stress gradient, along single heat-flux cells (slice 1) at 340°E 19.4°N (never convecting) and 320°E 24.6°N (south of the section), and along the alternating, smooth and never-convecting alternating parts of the frozen-CATKE heat-flux gradient (1167068; its gᵀd is recomputed offline, the scan's own uses 1167067's).",
   "forcing": "ecco4",
   "n_months": 3,
   "Nz": 20,
@@ -26,12 +26,18 @@
   "fd_directions": {
     "stress": "results/directions_14day_upwind3_unfrozen_stress.jld2",
     "heat_cell_stable": "results/directions_14day_upwind3_unfrozen_heat_cell_stable.jld2",
-    "heat_cell_section": "results/directions_14day_upwind3_unfrozen_heat_cell_section.jld2"
+    "heat_cell_section": "results/directions_14day_upwind3_unfrozen_heat_cell_section.jld2",
+    "frozen_heat_flux_alternating": "results/directions_14day_upwind3_frozen_mixing_heat_flux_alternating.jld2",
+    "frozen_heat_flux_smooth": "results/directions_14day_upwind3_frozen_mixing_heat_flux_smooth.jld2",
+    "frozen_heat_flux_alternating_stable": "results/directions_14day_upwind3_frozen_mixing_heat_flux_alternating_stable.jld2"
   },
   "fd_h0": {
     "stress": 0.4,
     "heat_cell_stable": 50.0,
-    "heat_cell_section": 50.0
+    "heat_cell_section": 50.0,
+    "frozen_heat_flux_alternating": 100.0,
+    "frozen_heat_flux_smooth": 100.0,
+    "frozen_heat_flux_alternating_stable": 100.0
   },
   "fd_nh": 12
 }
