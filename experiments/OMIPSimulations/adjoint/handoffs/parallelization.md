@@ -112,3 +112,6 @@ long-window adjoint growth.
   the ranks run their windows two to three deep in series: ~7 min per iteration.
 - Fix: MPICH's progress thread (`MPIR_CVAR_ASYNC_PROGRESS=1` in `calibrate_mpi.slurm`,
   `MPI.Init(threadlevel = :multiple)` in `calibrate.jl`).
+- 1168110 `ParKc1` failed at the first compile: this XLA's `DebugOptions` has no
+  `xla_gpu_enable_llvm_module_compilation_parallelism` (Reactant 0.2.309's own `persistent_kernel_cache_enabled`
+  preference sets it, so that preference fails the same way). The key now sets `xla_gpu_kernel_cache_file` only.

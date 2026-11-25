@@ -98,9 +98,7 @@ stamp(@sprintf("window from %s built in %.1f s; %d observed cells", windows[rank
 Nx, Ny, Nz = size(observed)
 observations = TracerMisfit(observed, zeros(Nx, Ny, Nz), zeros(Nx, Ny, Nz), Float64(P["sigma_T"]), Float64(P["sigma_S"]))
 t0 = time()
-kernel_cache = haskey(P, "xla_kernel_cache") ?
-    (; xla_gpu_kernel_cache_file = joinpath(@__DIR__, P["xla_kernel_cache"]),
-       xla_gpu_enable_llvm_module_compilation_parallelism = true) : (;)
+kernel_cache = haskey(P, "xla_kernel_cache") ? (; xla_gpu_kernel_cache_file = joinpath(@__DIR__, P["xla_kernel_cache"])) : (;)
 calibration = build_eddy_calibration(model, state, observations; Δt, n_steps, average_steps,
                                      checkpoints = P["checkpoints"],
                                      compile_options = adjoint_compile_options(; xla_debug_options = kernel_cache))
