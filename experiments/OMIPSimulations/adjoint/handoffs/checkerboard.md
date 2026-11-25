@@ -162,3 +162,50 @@ The long-window adjoint growth (STATUS "The long-window adjoint growth"), the da
   scratch script: unit entry at (i, j) = (136, 36) and (127, 38)), and the alternating, smooth and
   never-convecting alternating parts of the frozen-CATKE gradient (1167068). These test whether the
   frozen adjoint is the finite-amplitude sensitivity along its own directions.
+
+### 2026-11-24, controls (ChkFD2 1168469, 26.6 min) and the verdict
+
+FD slopes are the median central slope over h0 … h0/128 (8 octaves), same forward model and f0 (2.3e-16 from
+1167067's J) as ChkFD; gᵀd of each gradient recomputed offline along each direction:
+
+| Direction | FD slope (spread) | FD / unfrozen (1167067) | FD / frozen CATKE (1167068) | FD / frozen CATKE + slopes (1167069) |
+|---|---|---|---|---|
+| 1167067's stress gradient | 13.908 (±0 %, linear over 12 octaves) | 0.889 | **1.000** | **1.000** |
+| heat flux, one cell 340°E 19.4°N, slice 1 | 7.20e-5 (±3 %) | 0.161 | **0.999** | **0.997** |
+| frozen gradient's heat-flux alternating part, never-convecting blocks | 7.79e-5 (±9 %) | 0.212 | **0.997** | 0.995 |
+| frozen gradient's heat-flux alternating part | 1.69e-4 (±18 %) | 0.729 | 0.806 | 0.805 |
+| frozen gradient's heat-flux smooth part | 9.54e-5 (±23 %) | 1.441 | 0.810 | 0.811 |
+| heat flux, one cell 320°E 24.6°N (south of the section) | −7.0e-5 (±73 %, switching) | 0.089 | −3.6 | −3.4 |
+
+From ChkFD, along the unfrozen gradient's own parts: FD / unfrozen 0.23 (alternating), 0.33 (smooth), 0.12
+(alternating, never convecting), 0.49 and 0.68 (freshwater).
+
+**Verdict.**
+1. Differentiating CATKE is the artifact. Where the forward map is smooth (the stress direction, a single
+   stable cell), J is linear in the control over 9–12 octaves of h, with no small-h regime. That slope equals
+   the frozen-CATKE adjoint to 0.1–0.3 %. The exact (unfrozen) adjoint is 1.12× too large along stress and 6–8×
+   along heat flux. So the reverse pass through CATKE adds a sensitivity that the discrete forward model does not
+   have: it is not the derivative of J, even locally. My earlier reading (local derivative carried by tiny steep
+   switches, after ChkFD) is wrong. The small-h drift in ChkFD's directions is roughness from the convecting
+   cells those directions concentrate on.
+2. The grid-scale structure of the frozen-CATKE gradient is real. Its alternating part (all blocks and
+   never-convecting blocks) is confirmed by the forward model at 0.81 ± 0.18 and 0.997 ± 0.09, about the same as
+   its smooth part (0.81 ± 0.23). The frozen gradient's heat-flux share is 0.58–0.96 (finding 23), so the
+   discrete model really responds to checkerboard fluxes, mostly in and near convecting columns.
+   Near the 26.5°N section the response switches (single-cell scan at 320°E 24.6°N: Δ± of the same sign, no
+   linear regime).
+3. Experiment 2 (biharmonic tracer diffusion, λ = 50 days) lowers the unfrozen share only to 0.53–0.73, and
+   the convecting / stable split to 0.68 / 0.80. So an undamped tracer grid mode is not the carrier. Its
+   forward run (ChkBh50H 1168467, 11 min) cuts the surface-T grid-scale residual from 0.35 to 0.18 K by day 14
+   (S 0.082 → 0.050), with 2318 unstable interfaces (2380 without). The 0.26 K residual is already in the
+   ECCO4 initial state (day 0 of both health files): that is experiment 4's answer.
+4. For the calibration: use the frozen-CATKE adjoint (it is the better gradient, here exact to 0.1 % where the
+   map is smooth). Treat the flux controls' grid-scale part as real but useless: a smoothness prior or a coarse
+   control basis, not an adjoint fix.
+
+Open: why the CATKE reverse pass is wrong. The 8-step test ChkFD8 1168601 (`ecco4_nz20_8step_upwind3_fd.json`:
+primal, then FD along single heat-flux cells (131, 38), (132, 38), (136, 36) and the stress direction, then the
+checkpointed unfrozen gradient) was queued at 21:10 on gh-dev. If its unfrozen flux gradient already disagrees
+with the FD after 8 steps, the CATKE derivative error is debuggable on a short window. Compare each scan's
+central slope with this run's own `gradient_*` offline: the scan's printed gᵀd uses 1167067's file only for its
+shapes.
