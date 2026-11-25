@@ -1,0 +1,32 @@
+{
+  "_comment": "Checkerboard: where is the step-120 v-input anomaly (1169075, 1169296, independent of GC)? The dot-product test at 119, 120 and 121 saving the state and λ̄ fields, to find the cells where λ̄ at 120 departs from its neighbors.",
+  "forcing": "ecco4",
+  "n_months": 3,
+  "Nz": 20,
+  "steps": 168,
+  "dt": 7200.0,
+  "substeps": 50,
+  "backend": "gpu",
+  "stages": "step_dot",
+  "roll_barotropic_substeps": true,
+  "frozen_mixing": false,
+  "frozen_buoyancy_gradients": false,
+  "output": "results/ecco4_step_dot_nz20_14day_upwind3_unfrozen_fields120.jld2",
+  "start_date": "1993-01-01",
+  "advection": "upwind3",
+  "dot_steps": [
+    119,
+    120,
+    121
+  ],
+  "dot_scales": {
+    "u": 0.001,
+    "v": 0.001,
+    "T": 0.01,
+    "S": 0.001,
+    "e": 1e-07
+  },
+  "dot_epsilons": [
+    0.25
+  ]
+}

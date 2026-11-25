@@ -126,7 +126,8 @@ the interior of the output fields `names` (velocities and tracers). For each inp
 of amplitude `scales[name]` in that field alone, compares the central difference
 ⟨λ, x⁺(xₛ + ε v) − x⁺(xₛ − ε v)⟩ / 2ε of the step's output x⁺, for each `ε` in `epsilons`, with ⟨λ̄, v⟩, where λ̄
 is the reverse pass of the step from xₛ seeded with λ. The host garbage collector runs after every `gc_every`-th step
-on the way. Returns one named tuple per step, input field and `ε`.
+on the way. Returns the rows, one named tuple per step, input field and `ε`, and for each step the interior of the
+state xₛ and of λ̄ in the fields `names`.
 """
 function step_dot_products(model, state; steps, Δt, scales, names = (:u, :v, :T, :S, :e), epsilons = (1, 1/4, 1/16),
                            gc_every = 20, compile_options = adjoint_compile_options(), while_unroll_threshold = 0)
@@ -138,7 +139,7 @@ function step_dot_products(model, state; steps, Δt, scales, names = (:u, :v, :T
     thunks.refresh(model)
     λ = Dict(name => noise_like(ocean_field(model, name), n) for (n, name) in enumerate(names))
     output_dot() = sum(sum(λ[name] .* interior_host(ocean_field(model, name))) for name in names)
-    rows = NamedTuple[]
+    rows, snapshots = NamedTuple[], NamedTuple[]
     position = 0
     for s in steps
         for n in (position + 1):s
@@ -150,6 +151,9 @@ function step_dot_products(model, state; steps, Δt, scales, names = (:u, :v, :T
         dmodel = make_zero(model)
         foreach(name -> add_interior!(ocean_field(dmodel, name), λ[name]), names)
         thunks.reverse_step(model, dmodel, Δt)
+        restore_memory!(model, arrays, xₛ)
+        push!(snapshots, (; step = s, state = Dict(name => interior_host(ocean_field(model, name)) for name in names),
+                            adjoint = Dict(name => interior_host(ocean_field(dmodel, name)) for name in names)))
         for (n, name) in enumerate(names)
             v = scales[name] .* noise_like(ocean_field(model, name), n + length(names))
             adjoint = sum(interior_host(ocean_field(dmodel, name)) .* v)
@@ -168,5 +172,5 @@ function step_dot_products(model, state; steps, Δt, scales, names = (:u, :v, :T
         end
         restore_memory!(model, arrays, xₛ)
     end
-    return rows
+    return (; rows, snapshots)
 end
