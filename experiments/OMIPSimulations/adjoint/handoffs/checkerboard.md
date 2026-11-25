@@ -302,3 +302,13 @@ Proposed bisection (not run):
   device buffer the reverse pass still uses. Every 14-day run on 11-24 (1167067–69) postdates `2aa9e25b`.
 - Test: ChkDotGC7 (`..._step_dot_gc7.json`, `284a2e89`) collects every 7th step and probes 112, 118, 119, 120,
   121, 126 and 127. Under the hypothesis, 112, 119 and 126 go wrong and 120 is fine.
+- **ChkDotGC7 1169296** (22.5 min): **the GC hypothesis is wrong.** Collecting every 7th step leaves every probed
+  value bit-identical to 1169075: 112, 119 and 126 agree as before (v-input FD / adjoint − 1 within −0.29…+0.17,
+  u within −0.15…+0.18), and step 120 again gives 7.1143e-5 against FD 4.83e-3, 4.78e-3, 3.20e-3. So the
+  step-120 reverse pass is deterministically wrong in its velocity input, and that is a property of the state
+  x₁₂₀. It lies inside the failing 84–168 interval. Since the frozen-CATKE adjoint is right over the same window,
+  the likely carrier is a CATKE term whose derivative is singular at some cell of that state (e.g. √e or
+  e^{3/2}/ℓ near e's floor, or a stability function near N² = 0). There AD's exact local derivative is
+  enormous on a set too small for any finite perturbation to see.
+- Submitted ChkDotF120 (1169321, `..._step_dot_fields120.json`, `25b17312`): the same test at 119, 120 and 121, saving the state
+  and λ̄ fields to locate the cells where λ̄ at 120 departs from its neighbors.
