@@ -169,3 +169,15 @@ long-window adjoint growth.
 - Checkpoint slots (user-approved): `slots` kept across evaluations, a store copies into the slot's host arrays
   (`memory_snapshot!`) instead of allocating new ones. References on current code copied aside on Vista:
   `results/reference_1window_1168553.jld2` (1 window, iterations 0–1), `reference_4windows_1168552.jld2`.
+- Same scripts under Reactant's IFRT runtime (scratch env with `xla_runtime = "IFRT"`): all five write paths
+  correct (view ← view, view ← host, whole ← host by `copyto!` and by broadcast, whole ← concrete); and on a
+  2-way sharded 2° `TripolarGrid` (`scratchpad/repro/tripolar_bottom.jl`) the fold-metric `copyto!`, the bottom
+  height's parent write and `set_bottom_height!` (the failing call) are all correct, where PJRT segfaults.
+  **Fix for the sharded build: the IFRT runtime; no change to `ocean_only_model.jl`.** TODO (Reactant, upstream):
+  `copyto!(::ConcretePJRTArray, ::Array)` should refuse or shard-split a multi-shard destination; reproducers in
+  `scratchpad/repro/` (`one_case.jl`, `tripolar_bottom.jl`), to be copied into the upstream report.
+- `da8577a9`: environment `adjoint/ifrt` (Project committed; Manifest = `../Manifest.toml` with the three path
+  entries one level deeper; LocalPreferences = `../LocalPreferences.toml` + `[Reactant] xla_runtime = "IFRT"`,
+  both untracked), `PROJECT=` and `SCRIPT=` in the Slurm scripts, probe key `distributed`, probe saves gradients.
+  LS6 `ParShardI` (single process, two A100s, IFRT) queued on `gpu-a100-dev`; Vista 2-node IFRT probe waits for
+  a free slot (ParSlot1 1170932, ParSlot4 1170933 queued).
