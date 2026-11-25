@@ -312,3 +312,30 @@ Proposed bisection (not run):
   enormous on a set too small for any finite perturbation to see.
 - Submitted ChkDotF120 (1169321, `..._step_dot_fields120.json`, `25b17312`): the same test at 119, 120 and 121, saving the state
   and λ̄ fields to locate the cells where λ̄ at 120 departs from its neighbors.
+- **ChkDotF120 1169321** (22 min): **the step-120 anomaly is one column at the base of the mixed layer.** λ̄_v at
+  (i, j, k) = (126, 46, 16), 314.7°E 46.7°N (off the Grand Banks, the long-window burst site in STATUS), is −2.2
+  at step 119, **+13.4 at step 120** and −0.12 at step 121 (max |λ̄_v| elsewhere ≈ 1–2). The rest of that column
+  also flips sign at 120: k = 17…20 go from +0.15…+0.50 to −1.7…−5.2. That one cell contributes −3.3e-3 to the
+  inner product, which cancels the global 6.8e-3 → 7.1e-5. Its state: e = 6.1e-8 m² s⁻², between 3.5e-8 below
+  (k = 15) and 1.2e-4 above (k = 17), T 6.8 °C. So it sits at the mixed-layer base, where e drops by four
+  decades to near its floor. The next-largest departures share that structure, e.g. (46, 44, 16–17) at 160°E
+  42.5°N (Kuroshio extension), e 2.9e-9 under 5.5e-5. The u-input spike at (126, 45, 16) has e 1.8e-4 over
+  4.3e-7. The step's forward map is smooth for finite perturbations there (FD 4.8e-3 at three ε), so the
+  reverse pass has an enormous local derivative at a cell where e is at the bottom of the turbulent layer.
+  That is a CATKE term whose derivative blows up as e → its floor (√e in the mixing length or κ = ℓ√e,
+  e^{3/2}/ℓ dissipation, or the floor's clamp itself).
+
+**Summary of the bisection.** The unfrozen adjoint is exact (FD / adjoint 0.99–1.01 where J is smooth) at 8, 42
+and 84 steps. It is wrong at 168 steps with or without the 7-day average (0.07–0.82). Garbage collection is not
+the cause (identical bits at any collection cadence). The first wrong state found is step 120. It is a property
+of the state, not of the step count: one mixed-layer-base cell with e near its floor gets a one-step λ̄ 6–60× its
+neighbors'. CATKE's regime is steady from day 1, so it is the arrival of particular cells at e's floor under an
+active layer that matters, not convection onset. GPU use on this thread: ≈ 4.9 GPU-h (12 jobs).
+
+Recommended (for the user to choose): (a) calibrate with the frozen-CATKE adjoint, which matches the finite
+differences of the full model to 0.1–0.3 % on the same window; or (b) step 3 of the plan, restricted to what this
+points at. Stop the derivative through e (not κ's N² and shear dependence) where e is within a few decades of
+its floor, or regularize the singular factor (√e → √(e + e₀) in the derivative only), then repeat ChkFD2's stress
+and single-cell scans. To name the exact CATKE line first, run the one-column version of the step-120 test:
+perturb v only in column (126, 46) and λ only at (126, 46, 16) on the saved x₁₂₀. That needs code that snapshots
+x₁₂₀ to disk, not yet written.
