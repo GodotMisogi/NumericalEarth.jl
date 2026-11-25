@@ -1,0 +1,39 @@
+{
+  "_comment": "Checkerboard: is the flux adjoint exact over a short window? 8 steps from 1993-01, upwind3, nothing frozen, AMOC at the window's end: central differences of the compiled primal along single heat-flux cells (slice 1) at the section (131, 38; 132, 38, opposite-signed neighbors in the 8-step gradient of 3577970) and at 340°E 19.4°N (136, 36), and along the 14-day stress gradient; then the checkpointed gradient of the same window. fd_gradient is only a file of the right shapes; gᵀd is recomputed offline from this run's own gradient.",
+  "forcing": "ecco4",
+  "n_months": 3,
+  "Nz": 20,
+  "steps": 8,
+  "dt": 7200.0,
+  "substeps": 50,
+  "backend": "gpu",
+  "stages": "primal,fd_scan,gradient",
+  "roll_barotropic_substeps": true,
+  "frozen_mixing": false,
+  "checkpoints": 3,
+  "repeat_evaluation": false,
+  "frozen_buoyancy_gradients": false,
+  "start_date": "1993-01-01",
+  "advection": "upwind3",
+  "output": "results/ecco4_fd_nz20_8step_upwind3.jld2",
+  "fd_gradient": "results/ecco4_adjoint_nz20_14day_upwind3_unfrozen.jld2",
+  "fd_controls": [
+    "u",
+    "v",
+    "heat_flux",
+    "freshwater_flux"
+  ],
+  "fd_directions": {
+    "heat_cell_131_38": "results/directions_heat_cell_131_38.jld2",
+    "heat_cell_132_38": "results/directions_heat_cell_132_38.jld2",
+    "heat_cell_stable": "results/directions_14day_upwind3_unfrozen_heat_cell_stable.jld2",
+    "stress": "results/directions_14day_upwind3_unfrozen_stress.jld2"
+  },
+  "fd_h0": {
+    "heat_cell_131_38": 50.0,
+    "heat_cell_132_38": 50.0,
+    "heat_cell_stable": 50.0,
+    "stress": 0.4
+  },
+  "fd_nh": 12
+}
