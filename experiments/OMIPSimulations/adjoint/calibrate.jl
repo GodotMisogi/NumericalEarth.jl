@@ -13,7 +13,9 @@
 # start dates, one per MPI rank; default ["1993-01-01"]).
 # truth, initial: [κ_skew, κ_symmetric] (m² s⁻¹). observed_levels (default Nz), observation_stride (default 1),
 # sigma_T (K), sigma_S (g kg⁻¹): the observations. stages: "check" (central differences of the misfit in log κ,
-# step check_h, a number or a list, against the adjoint) and/or "calibrate" (iterations, initial_step, gtol).
+# step check_h, a number or a list, against the adjoint), "scan" (the adjoint gradient at scan_gradient_points,
+# [κ_skew, κ_symmetric] pairs, then the misfit on each of scan_grids, {"skew": [...], "symmetric": [...]} in m² s⁻¹,
+# by forward windows only) and/or "calibrate" (iterations, initial_step, gtol).
 # ==============================================================================
 
 using OMIPAdjoint
@@ -128,6 +130,28 @@ if :check in stages
     end
     results["check"] = (; x0, J0, adjoint = g0, central_difference = fd, h)
     save_results()
+end
+
+# %%
+##### Misfit surface: the adjoint gradient at chosen points, then J on grids of κ by forward windows alone
+
+if :scan in stages
+    points = [Float64.(p) for p in get(P, "scan_gradient_points", [])]
+    evaluations = [gradient!(log.(p)) for p in points]
+    for (p, (J, g)) in zip(points, evaluations)
+        stamp₀(@sprintf("κ %.1f, %.1f: J %.6e, adjoint ∂J/∂log κ %+.6e, %+.6e", p[1], p[2], J, g[1], g[2]))
+    end
+    results["scan_gradients"] = (; points, J = first.(evaluations), adjoint = last.(evaluations))
+    save_results()
+    for (n, grid) in enumerate(P["scan_grids"])
+        κ_skew, κ_symmetric = Float64.(grid["skew"]), Float64.(grid["symmetric"])
+        J = fill(NaN, length(κ_skew), length(κ_symmetric))
+        for i in eachindex(κ_skew)   # saved row by row, so a time limit keeps the rows done
+            J[i, :] .= [misfit!(log.([κ_skew[i], b])) for b in κ_symmetric]
+            results["scan/$n"] = (; κ_skew, κ_symmetric, J)
+            save_results()
+        end
+    end
 end
 
 # %%
