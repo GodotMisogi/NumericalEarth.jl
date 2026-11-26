@@ -15,15 +15,27 @@
 #   gradient  compile the gradient, evaluate twice, shadow census, Taylor remainder check (when the config
 #             gives `taylor_h0` and `taylor_nh`)
 #   fd_scan   finite differences of the primal window along a saved gradient (`fd_gradient`, a results file
-#             of the same configuration) for `fd_nh` step sizes halving from `fd_h0`; needs `primal`
+#             of the same configuration) for `fd_nh` step sizes halving from `fd_h0`; needs `primal`, or with
+#             `average_days` the window average from the checkpointed steps. Optional `fd_controls` (default
+#             ["u", "v"]) names the forcing controls perturbed; optional `fd_directions` ({label: results file})
+#             scans along each file's `gradient_<control>` instead of the gradient's own direction, and `fd_h0`
+#             may then be {label: h0}
 #   step_jacobian  leading growth of one step's adjoint at the states `jacobian_steps` (step indices) by
 #             `jacobian_iterations` of power iteration (`step_adjoint_growth`)
+#   step_dot  one-step dot-product test of the reverse pass at the states `dot_steps` (`step_dot_products`), with
+#             input perturbation amplitudes `dot_scales` ({field: amplitude}) and step factors `dot_epsilons`;
+#             optional `dot_gc_every` (default 20) steps between host garbage collections
 # Optional `excluded_passes`: pattern names left out of Reactant's rewrite lists (default none).
 # Optional `while_unroll_threshold` (default 0, every loop rolled): Reactant's unroll pattern acts on
 # loops of at most this many iterations in every rewrite application, before and after Enzyme.
 # Optional `frozen_mixing` (default false): the CATKE viscosity and diffusivities enter the gradient as
 # constants (`freeze_mixing!`); the forward model is unchanged, so the Taylor check then measures the
 # frozen-mixing approximation, not the adjoint's exactness.
+# Optional `frozen_mixing_above` (m² s⁻¹; default none): the CATKE viscosity and diffusivities enter the gradient as
+# constants in the cells where the tracer diffusivity is at least this (`freeze_mixing_above!`).
+# Optional `frozen_tke` (default false): the CATKE turbulent kinetic energy enters the gradient as a constant after
+# each step of its equation (`freeze_tke!`); the diffusivities still vary with N² and shear, and the forward model is
+# unchanged.
 # Optional `unroll_steps` (default false): unroll the time-step loop at trace time instead of tracing
 # it, so Enzyme's reverse pass is straight-line too (no loop-carried shadow state).
 # Optional `checkpoints`: compile one step and its reverse pass instead of the whole window, and run them on
@@ -52,8 +64,7 @@
 # this many steps of the reverse sweep (`AdjointTrace`), saved as `adjoint_trace`.
 # Optional `repeat_evaluation` (default true): evaluate the gradient a second time and require the same result.
 # Optional `average_days` (needs `checkpoints`): the objective is averaged over the window's last
-# `average_days` instead of taken at its end; the primal and fd_scan stages evaluate the end value, so they
-# do not apply.
+# `average_days` instead of taken at its end; the primal stage evaluates the end value, so it does not apply.
 # ==============================================================================
 
 using OMIPAdjoint
@@ -122,8 +133,7 @@ adjoint_trace = haskey(P, "adjoint_trace_every") ? AdjointTrace(P["adjoint_trace
 average_steps = haskey(P, "average_days") ? round(Int, P["average_days"] * 86400 / Δt) : 1
 if average_steps > 1
     haskey(P, "checkpoints") || error("average_days needs the checkpointed gradient (config `checkpoints`)")
-    any(in(stages), (:primal, :fd_scan)) &&
-        error("the primal and fd_scan stages evaluate the window's end, not the average over average_days")
+    :primal in stages && error("the primal stage evaluates the window's end, not the average over average_days")
 end
 
 stamp(msg...) = (println("[", format(now(), "HH:MM:SS"), "] ", msg...); flush(stdout))
@@ -165,13 +175,15 @@ end
 # %%
 ##### Reactant model
 
-reactant_stages = (:primal, :gradient, :step_jacobian)
+reactant_stages = (:primal, :fd_scan, :gradient, :step_jacobian, :step_dot)
 if any(in(stages), reactant_stages)
     :NVPTX in Reactant.LLVM.backends() ||
         error("Reactant lowers Oceananigans kernels through NVPTX; this Julia's LLVM lacks it (macOS). Run on the GPU cluster.")
     Reactant.set_default_backend(P["backend"])
     roll_barotropic_substeps!(P["roll_barotropic_substeps"])
     freeze_mixing!(get(P, "frozen_mixing", false))
+    freeze_tke!(get(P, "frozen_tke", false))
+    freeze_mixing_above!(Float64(get(P, "frozen_mixing_above", Inf)))
     freeze_buoyancy_gradients!(frozen_gradients)
     options = haskey(P, "excluded_passes") ? adjoint_compile_options(; excluded_passes = String.(P["excluded_passes"])) :
                                              adjoint_compile_options()
@@ -211,14 +223,31 @@ if :primal in stages
 end
 
 if :fd_scan in stages
-    :primal in stages || error("the fd_scan stage evaluates the compiled primal window; add \"primal\" to stages")
-    saved = jldopen(f -> (u = f["gradient_u"], v = f["gradient_v"], J = f["J"]), joinpath(@__DIR__, P["fd_gradient"]))
-    t0 = time()
-    scan = finite_difference_scan(model, primal!, saved; h0 = P["fd_h0"], nh = P["fd_nh"])
-    stamp(@sprintf("finite-difference scan in %s; f0 vs the saved gradient's J: relative difference %.2e",
-                   elapsed(t0), abs(scan.f0 - saved.J) / abs(saved.J)))
-    results["fd_scan"] = scan
-    save_results()
+    if average_steps > 1
+        t0 = time()
+        thunks = compile_checkpointed_thunks(model, obj; Δt, compile_options = options, while_unroll_threshold)
+        stamp("checkpointed steps compiled in ", elapsed(t0))
+        objective! = () -> window_average_objective!(thunks, model, state, obj; n_steps, Δt, average_steps)
+    else
+        :primal in stages || error("the fd_scan stage evaluates the compiled primal window; add \"primal\" to stages")
+        objective! = primal!
+    end
+    controls = Tuple(Symbol.(get(P, "fd_controls", ["u", "v"])))
+    read_controls(path) = jldopen(joinpath(@__DIR__, path)) do f
+        NamedTuple{controls}(map(c -> f["gradient_$c"], controls))
+    end
+    g = read_controls(P["fd_gradient"])
+    J_saved = jldopen(f -> f["J"], joinpath(@__DIR__, P["fd_gradient"]))
+    for (label, path) in get(P, "fd_directions", Dict("" => P["fd_gradient"]))
+        t0 = time()
+        h0 = P["fd_h0"] isa AbstractDict ? P["fd_h0"][label] : P["fd_h0"]
+        stamp("finite-difference scan ", label)
+        scan = finite_difference_scan(model, objective!, g; direction = read_controls(path), h0, nh = P["fd_nh"])
+        stamp(@sprintf("finite-difference scan in %s; f0 vs the saved gradient's J: relative difference %.2e",
+                       elapsed(t0), abs(scan.f0 - J_saved) / abs(J_saved)))
+        results[isempty(label) ? "fd_scan" : "fd_scan/$label"] = scan
+        save_results()
+    end
 end
 
 if :gradient in stages
@@ -305,6 +334,17 @@ if :step_jacobian in stages
     end
     stamp("step Jacobian stage in ", elapsed(t0))
     results["step_jacobian"] = jacobian
+    save_results()
+end
+
+if :step_dot in stages
+    t0 = time()
+    scales = Dict(Symbol(k) => Float64(v) for (k, v) in P["dot_scales"])
+    epsilons = Tuple(Float64.(P["dot_epsilons"]))
+    results["step_dot"] = step_dot_products(model, state; steps = P["dot_steps"], Δt, scales, names = Tuple(keys(scales)),
+                                            epsilons, gc_every = get(P, "dot_gc_every", 20), compile_options = options,
+                                            while_unroll_threshold)
+    stamp("step dot-product stage in ", elapsed(t0))
     save_results()
 end
 

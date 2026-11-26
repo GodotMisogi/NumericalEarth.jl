@@ -2,13 +2,13 @@ module OMIPAdjoint
 
 export omip_adjoint_setup, ecco_adjoint_setup, PrescribedFluxOcean,
        OverturningStrength, objective_host,
-       roll_barotropic_substeps!, freeze_mixing!, freeze_buoyancy_gradients!,
+       roll_barotropic_substeps!, freeze_mixing!, freeze_mixing_above!, freeze_tke!, freeze_buoyancy_gradients!,
        adjoint_compile_options, snapshot_state, build_primal, build_gradient, build_checkpointed_gradient,
-       AdjointDamping, AdjointTrace, step_adjoint_growth,
+       AdjointDamping, AdjointTrace, step_adjoint_growth, step_dot_products,
        wind_gradient, forcing_gradient, surface_geometry, shadow_census, print_shadow_census,
        taylor_remainder_check, finite_difference_scan,
        eddy_diffusivity_gradient, eddy_diffusivity, set_eddy_diffusivity!, eddy_diffusivity_taylor_check,
-       compile_checkpointed_thunks, checkpointed_gradient,
+       compile_checkpointed_thunks, checkpointed_gradient, window_average_objective!,
        TracerWeights, TracerMisfit, observed_cells, misfit, build_eddy_calibration, bfgs_minimize
 
 using Oceananigans

@@ -20,6 +20,17 @@ differentiated (`false`). The choice is read when a model step is traced, so it 
 """
 freeze_mixing!(flag::Bool) = (FREEZE_MIXING[] = flag; flag)
 
+const FREEZE_MIXING_ABOVE = Ref(Inf)
+
+"""
+$(TYPEDSIGNATURES)
+
+Choose the tracer diffusivity `κ★` (m² s⁻¹) at and above which the CATKE viscosity and diffusivities are held
+constant in derivatives, cell by cell; elsewhere they are differentiated. `Inf` (the default) holds none. The choice
+is read when a model step is traced, so it must be set before `@compile`. Returns `κ★`.
+"""
+freeze_mixing_above!(κ★) = (FREEZE_MIXING_ABOVE[] = κ★; κ★)
+
 function TurbulenceClosures.compute_closure_fields!(closure_fields, closure::FlavorOfCATKE,
                                                     model::HydrostaticFreeSurfaceModel; parameters = :xyz)
     invoke(TurbulenceClosures.compute_closure_fields!, Tuple{Any, FlavorOfCATKE, Any},
@@ -28,7 +39,32 @@ function TurbulenceClosures.compute_closure_fields!(closure_fields, closure::Fla
         for κ in (closure_fields.κu, closure_fields.κc, closure_fields.κe)
             parent(κ) .= ignore_derivatives(parent(κ))
         end
+    elseif isfinite(FREEZE_MIXING_ABOVE[])
+        strong = parent(closure_fields.κc) .>= FREEZE_MIXING_ABOVE[]
+        for κ in (closure_fields.κu, closure_fields.κc, closure_fields.κe)
+            parent(κ) .= ifelse.(strong, ignore_derivatives(parent(κ)), parent(κ))
+        end
     end
+    return nothing
+end
+
+const FREEZE_TKE = Ref(false)
+
+"""
+$(TYPEDSIGNATURES)
+
+Choose whether the CATKE turbulent kinetic energy is held constant in derivatives after each step of its equation
+(`true`): the viscosity and diffusivities still vary with N² and shear in the derivative, but not through e, and no
+derivative reaches the TKE equation. The choice is read when a model step is traced, so it must be set before
+`@compile`. Returns `flag`.
+"""
+freeze_tke!(flag::Bool) = (FREEZE_TKE[] = flag; flag)
+
+function TurbulenceClosures.step_closure_prognostics!(closure_fields, closure::FlavorOfCATKE,
+                                                      model::HydrostaticFreeSurfaceModel, Δt)
+    invoke(TurbulenceClosures.step_closure_prognostics!, Tuple{Any, FlavorOfCATKE, Any, Any},
+           closure_fields, closure, model, Δt)
+    FREEZE_TKE[] && (parent(model.tracers.e) .= ignore_derivatives(parent(model.tracers.e)))
     return nothing
 end
 

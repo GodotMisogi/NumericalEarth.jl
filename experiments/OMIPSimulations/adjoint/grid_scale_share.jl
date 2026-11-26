@@ -4,8 +4,8 @@
 # energy of the three alternating components (checker, stripe in i, stripe in j) over the total. White noise gives
 # 0.75, a smooth field near 0. For each results file, prints the share of the stress-x, heat-flux and
 # freshwater-flux sensitivities in each forcing slice by latitude band of the Atlantic (260–380°E). With a
-# forward_health.jl file of the same grid first, also prints the heat-flux share (slice 1, Atlantic 0–80°N) in
-# convecting blocks (all four columns with mean statically unstable interfaces ≥ 1) and in stable ones (none in any).
+# forward_health.jl file of the same grid first, also prints the stress-x and heat-flux shares (each slice, Atlantic
+# 0–80°N) in convecting blocks (all four columns with mean statically unstable interfaces ≥ 1) and in stable ones (none in any).
 #
 #   julia +1.12 --project=adjoint adjoint/grid_scale_share.jl [health.jld2] results.jld2 ...
 # ==============================================================================
@@ -57,12 +57,15 @@ for path in paths
     if unstable !== nothing
         size(unstable) == size(geometry.land) ||
             error("the health file's grid $(size(unstable)) differs from $(basename(path))'s $(size(geometry.land))")
-        h = ifelse.(geometry.land, NaN, file["gradient_heat_flux"][:, :, 1, 1])
         ua, ub, uc, ud = blocks(unstable)
         atlantic = (0 .<= φc .< 80) .& in_atlantic.(λc)
-        @printf("  heat flux slice 1, Atlantic 0–80°N: convecting %.2f, stable %.2f\n",
-                grid_scale_share(h, atlantic .& (min.(ua, ub, uc, ud) .>= 1)),
-                grid_scale_share(h, atlantic .& (max.(ua, ub, uc, ud) .== 0)))
+        for name in ("gradient_u", "gradient_heat_flux"), s in axes(file[name], 4)
+            h = ifelse.(geometry.land, NaN, file[name][:, :, 1, s])
+            all(iszero, filter(isfinite, h)) && continue
+            @printf("  %-18s slice %d, Atlantic 0–80°N: convecting %.2f, stable %.2f\n", name, s,
+                    grid_scale_share(h, atlantic .& (min.(ua, ub, uc, ud) .>= 1)),
+                    grid_scale_share(h, atlantic .& (max.(ua, ub, uc, ud) .== 0)))
+        end
     end
     close(file)
 end

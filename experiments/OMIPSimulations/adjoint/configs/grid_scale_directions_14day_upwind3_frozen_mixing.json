@@ -1,0 +1,6 @@
+{
+  "_comment": "Alternating and smooth parts of the 14-day frozen-CATKE flux gradient (1167068), and the alternating part in never-convecting blocks of 1167070: is the frozen adjoint the window's response along them?",
+  "gradient": "results/ecco4_adjoint_nz20_14day_upwind3_frozen_mixing.jld2",
+  "output": "results/directions_14day_upwind3_frozen_mixing",
+  "health": "results/forward_health_ecco4_nz20_14day_upwind3.jld2"
+}

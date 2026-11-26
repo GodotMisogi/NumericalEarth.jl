@@ -213,3 +213,22 @@ function checkpointed_gradient(thunks, model, state, obj; n_steps, Δt, checkpoi
     end
     return evaluate!
 end
+
+"""
+$(TYPEDSIGNATURES)
+
+Forward window from the snapshot `state` with the compiled `thunks` ([`compile_checkpointed_thunks`](@ref)): the
+objective `obj` averaged over the last `average_steps` of `n_steps` states, the `J` that the checkpointed gradient
+returns.
+"""
+function window_average_objective!(thunks, model, state, obj; n_steps, Δt, average_steps)
+    restore_state!(model, state)
+    thunks.refresh(model)
+    J = 0.0
+    for n in 1:n_steps
+        thunks.step(model, Δt)
+        collect_device_garbage()
+        n > n_steps - average_steps && (J += host_number(thunks.objective(model, obj)))
+    end
+    return J / average_steps
+end
