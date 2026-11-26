@@ -234,3 +234,26 @@ long-window adjoint growth.
   device-to-device `copyto!`. (2) cannot reach Oceananigans' own `copyto!(parent(field), host)`
   (`restore_prognostic_state!`, used by every `restore_state!`), so multi-process needs the one-line Reactant fix
   (no `device` when the destination is sharded) or a pirated method in OMIPAdjoint; either is the user's call.
+
+### 2026-11-26, ParShardI (LS6 3615047, one process, two A100s, IFRT): sharded build FAILED, 54 min
+
+- **The PJRT failure is gone**: the sharded build passes the fold metrics and `set_bottom_height!` and fails one
+  step later, after 137 s, compiling the first kernel launch on the sharded grid: `ImmersedBoundaryGrid` →
+  `materialize_immersed_boundary` → `compute_numerical_heights!(bottom, top, grid, ib)` → `launch!` → Reactant
+  `compile` → `codegen_unflatten_aliased_args!` → `TODO(#2234): Not yet Implemented. Open an issue on
+  Reactant.jl.` (Codegen.jl: an argument reachable by two paths, here `bottom` and `ib.bottom_height`, that the
+  program had to reshard on input; the source says "I need an MWE to debug this codepath").
+- No sharded J or gradient. Single device under IFRT, against PJRT (3612502) on the same node type: build 177.8 s
+  (185.4), compile primal 493.0 s (498.8), compile gradient 1582.6 s (1589.6), **gradient 82.8 s (18.9)**, J
+  24.1308164238 Sv (equal), max|∂J/∂τx| 4.494038 (equal). The IFRT runtime costs ~4× per checkpointed gradient
+  call at 8 steps (Vista process 1 of 1171559: 81.7 s against PJRT 27 s, 1153870): host-side overhead per thunk
+  call and host copy, to be measured if IFRT stays.
+- Warnings: 51 × `shardy_xla_pass.cc:434 Module contains sdy shardings ... even when HloShardingV3 is enabled ...
+  Disabling HloShardingV3` (all within 07:51:15–07:51:25, the sharded build's small compiles); no resharding or
+  host-copy warnings.
+- `results/sharding_probe_ecco4_nz20_8step.jld2` (LS6 run) now holds the IFRT single-device gradients
+  (`single_gradient`), the reference for the next sharded attempt; the PJRT-run file is
+  `reference_sharding_probe_3612502.jld2`.
+- Next for single-process sharding: an MWE of the aliased, resharded kernel argument for Reactant #2234; or
+  avoid the alias for the sharded build (e.g. materialize the immersed boundary on the CPU twin and move its
+  arrays onto the sharded grid). Not applied.
