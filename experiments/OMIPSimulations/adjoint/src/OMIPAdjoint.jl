@@ -6,7 +6,7 @@ export omip_adjoint_setup, ecco_adjoint_setup, PrescribedFluxOcean,
        adjoint_compile_options, snapshot_state, build_primal, build_gradient, build_checkpointed_gradient,
        AdjointDamping, AdjointTrace, step_adjoint_growth, step_dot_products,
        wind_gradient, forcing_gradient, surface_geometry, shadow_census, print_shadow_census,
-       taylor_remainder_check, finite_difference_scan,
+       taylor_remainder_check, finite_difference_scan, smooth_flux_controls,
        eddy_diffusivity_gradient, eddy_diffusivity, set_eddy_diffusivity!, eddy_diffusivity_taylor_check,
        compile_checkpointed_thunks, checkpointed_gradient, window_average_objective!,
        TracerWeights, TracerMisfit, observed_cells, misfit, build_eddy_calibration, bfgs_minimize
@@ -66,6 +66,7 @@ include("overturning.jl")
 include("rolled_substeps.jl")
 include("frozen_mixing.jl")
 include("gradient.jl")
+include("flux_control_smoothing.jl")
 include("adjoint_damping.jl")
 include("adjoint_trace.jl")
 include("checkpointed_gradient.jl")

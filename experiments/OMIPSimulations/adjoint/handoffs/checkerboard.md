@@ -475,3 +475,39 @@ x₁₂₀ to disk, not yet written.
   resolution does (1°: τx stripe 0.11–0.14, Q 0.26–0.71).
 - GPU since the fix was approved: fix scope ≈ 2.1 GPU-h (ChkTke168 1.03, ChkTke14 0.56, ChkTkeA01 0.55); 1° scope
   ≈ 0.8 GPU-h (ChkH1deg 0.23, ChkFD1deg 0.60). Thread total ≈ 7.8 GPU-h.
+
+## Log (flux-control smoothing)
+
+Branch `ajs/omip-adjoint-flux-smoothing` from `bf0c4078` (approved 11-26).
+
+### Plan
+
+- **Control:** Q = Q_ECCO + S c, and the same for the freshwater flux. So ∂J/∂c = Sᵀ ∂J/∂Q, and at c = 0 the forward
+  run is unchanged. The stress control stays as it is. Everything is linear post-processing on the host, so the
+  compiled program does not change and nothing is recompiled.
+- **The operator.** One pass is S₁ = Bⱼ Bᵢ, and p passes are S = (Bⱼ Bᵢ)ᵖ, so Sᵀ = (Bᵢ Bⱼ)ᵖ. Here
+  B_d = P (I − L_d / 4) P:
+  - P zeroes land;
+  - L_d is the graph Laplacian of the wet–wet edges in direction d, symmetric by construction, so each B_d is
+    symmetric and Sᵀ is just the reverse order;
+  - between wet cells, B is the 1-2-1 average, which removes the checker and both stripes exactly;
+  - at a land neighbor the edge is missing, so no weight leaks to land and the cell keeps it (Neumann);
+  - i is periodic. The southern edge and the tripolar fold (row Ny) have no edges: the U-pivot fold repeats row Ny,
+    so connecting across it would couple duplicated controls, and the Arctic fold row is far from the objective.
+- **Code (OMIPAdjoint `src/`).**
+  - `smooth_flux_controls(controls, wet; passes, transpose = false)` acts on a named tuple of `(Nx, Ny, 1, Nt)`
+    arrays, applying S, or Sᵀ, to `heat_flux` and `freshwater_flux` and leaving `u` and `v` alone.
+  - `finite_difference_scan` gains `map_direction` (default `identity`): the controls move along
+    `map_direction(d̂)` while gᵀd is taken in the scanned space.
+- **`test_omip_adjoint.jl`.** Config key `flux_smoothing_passes` (default 0, today's behavior):
+  - the gradient stage stores Sᵀ g as `gradient_heat_flux` and `gradient_freshwater_flux`;
+  - `fd_scan` perturbs along S d.
+- **Verification.**
+  1. Local CPU dot test ⟨S x, y⟩ = ⟨x, Sᵀ y⟩ on the 2° and 1° land masks, for 1 and 2 passes. Also check that S
+     removes the checker and the stripes in an all-wet region and leaves land at zero.
+  2. One GPU job: FD scan on the 2° 14-day frozen-CATKE window (1167068's configuration, 7-day mean),
+     `flux_smoothing_passes` 1, against Sᵀ g computed on the host from 1167068's saved gradient. Directions:
+     random white c (heat flux, both slices; then S d is smooth), a single c cell at (136, 36), and random white c
+     in the freshwater flux. Target: FD / adjoint within 0.1–0.3 % where ChkFD2 achieved it.
+  3. `grid_scale_share.jl` on Sᵀ g, for 1 and 2 passes, on 1167068 (2° 14 days) and 1161433 (1° 90 days),
+     compared with the stress shares. Done offline.

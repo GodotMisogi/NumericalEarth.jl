@@ -58,6 +58,8 @@
 # Optional `adjoint_trace_every` (steps; needs `checkpoints`): record per-field summaries of the ocean adjoint every
 # this many steps of the reverse sweep (`AdjointTrace`), saved as `adjoint_trace`.
 # Optional `repeat_evaluation` (default true): evaluate the gradient a second time and require the same result.
+# Optional `flux_smoothing_passes` (default 0): the heat- and freshwater-flux controls are c with Q = Q₀ + S c, S that many
+# passes of `smooth_flux_controls`; the gradient stage saves ∂J/∂c = Sᵀ ∂J/∂Q, and `fd_scan` moves the fluxes along S d.
 # Optional `average_days` (needs `checkpoints`): the objective is averaged over the window's last
 # `average_days` instead of taken at its end; the primal stage evaluates the end value, so it does not apply.
 # ==============================================================================
@@ -91,6 +93,7 @@ advection = Symbol(get(P, "advection", "weno"))
 frozen_gradients = get(P, "frozen_buoyancy_gradients", false)   # stored buoyancy gradients, constant in derivatives
 date_kwargs = haskey(P, "start_date") ? (; start_date = DateTime(P["start_date"])) : (;)
 eddy_fields = get(P, "eddy_diffusivity_fields", false)   # GM/Redi diffusivities as fields, with a gradient
+flux_smoothing_passes = get(P, "flux_smoothing_passes", 0)   # flux controls c with Q = Q₀ + S c
 if forcing == "ecco4"
     n_months = P["n_months"]
     (n_months - 1) * 28 * 86400 > n_steps * Δt || error("$(n_months) monthly slices do not cover $(n_steps) steps of $(Δt) s")
@@ -191,6 +194,7 @@ if any(in(stages), reactant_stages)
                                               diffusivity = get(P, "adjoint_diffusivity", 0), Δt) : nothing
     state = snapshot_state(model)
     results["geometry"] = surface_geometry(setup.cpu_grid)
+    wet = .!results["geometry"].land
     results["slice_times"] = Array(setup.times)   # a device array under ReactantState
     results["window_seconds"] = n_steps * Δt
     results["average_seconds"] = average_steps * Δt
@@ -235,7 +239,8 @@ if :fd_scan in stages
         t0 = time()
         h0 = P["fd_h0"] isa AbstractDict ? P["fd_h0"][label] : P["fd_h0"]
         stamp("finite-difference scan ", label)
-        scan = finite_difference_scan(model, objective!, g; direction = read_controls(path), h0, nh = P["fd_nh"])
+        scan = finite_difference_scan(model, objective!, g; direction = read_controls(path), h0, nh = P["fd_nh"],
+                                      map_direction = d -> smooth_flux_controls(d, wet; passes = flux_smoothing_passes))
         stamp(@sprintf("finite-difference scan in %s; f0 vs the saved gradient's J: relative difference %.2e",
                        elapsed(t0), abs(scan.f0 - J_saved) / abs(J_saved)))
         results[isempty(label) ? "fd_scan" : "fd_scan/$label"] = scan
@@ -275,6 +280,7 @@ if :gradient in stages
 
     # Saved before the repeat evaluation, which can fail on its own (out of memory, time limit).
     results["J"] = J
+    g = smooth_flux_controls(g, wet; passes = flux_smoothing_passes, transpose = true)
     for (name, value) in pairs(g)
         results["gradient_$name"] = value
     end
