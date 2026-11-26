@@ -28,7 +28,8 @@ using Dates: now, format, DateTime
 
 ENV["DATADEPS_ALWAYS_ACCEPT"] = "true"   # the WOA download goes through DataDeps, which otherwise prompts
 
-MPI.Init()
+# Thread level `:multiple`, which MPICH needs to run a progress thread.
+MPI.Init(threadlevel = :multiple)
 comm = MPI.COMM_WORLD
 rank, nranks = MPI.Comm_rank(comm), MPI.Comm_size(comm)
 
@@ -43,6 +44,16 @@ stamp(msg...) = (println("[", format(now(), "HH:MM:SS"), "] rank $rank: ", msg..
 stamp₀(msg...) = rank == 0 && stamp(msg...)
 # Sum over the windows, broadcast from rank 0 so that every rank's BFGS sees the same numbers.
 total(v) = MPI.bcast(MPI.Allreduce(v, +, comm), 0, comm)
+# The rank's own evaluation time, with its GC share and host allocation, then its wait in the reduction (the slowest
+# rank's lead).
+function reduced(label, evaluate)
+    timed = @timed evaluate()
+    t0 = time()
+    value = map(total, timed.value)
+    stamp(@sprintf("%s: evaluation %.1f s (GC %.1f s, %.1f GiB allocated), reduction %.1f s", label, timed.time,
+                   timed.gctime, timed.bytes / 2^30, time() - t0))
+    return value
+end
 
 results = Dict{String, Any}("config" => P)
 output_path = joinpath(@__DIR__, P["output"])
@@ -100,8 +111,8 @@ results["forward_seconds"] = time() - t0
 stamp(@sprintf("truth window in %.1f s: observed mean T %.4f, S %.4f", results["forward_seconds"],
                sum(T°[observed]) / count(observed), sum(S°[observed]) / count(observed)))
 x0 = log.(Float64.(P["initial"]))
-misfit!(x) = total(calibration.misfit!(x))
-gradient!(x) = ((J, g) = calibration.gradient!(x); (total(J), total(g)))
+misfit!(x) = reduced("misfit", () -> calibration.misfit!(x))
+gradient!(x) = reduced("gradient", () -> calibration.gradient!(x))
 
 # %%
 ##### Gradient check: central differences of the misfit in log κ

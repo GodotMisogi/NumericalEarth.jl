@@ -1,7 +1,7 @@
 # %%
 # ==============================================================================
 # Does the ECCO4 prescribed-flux ocean run, and differentiate, on a grid sharded across the GPUs of one process?
-# Builds the model on one device and on `Distributed(ReactantState(); partition)`, then for each: the primal window
+# Builds the model on `Distributed(ReactantState(); partition)` and on one device, then for each: the primal window
 # objective and the checkpointed gradient. Each stage is attempted separately and its failure reported, so one job
 # shows how far sharding gets; where both succeed, J and every forcing gradient are compared.
 #
@@ -9,7 +9,8 @@
 #       sbatch -p gpu-a100 -A ADCIRC adjoint/omip_adjoint.slurm        (Lonestar6: three A100s per node)
 #
 # Config keys: n_months, Nz, steps, dt, substeps, backend, roll_barotropic_substeps, checkpoints, partition ([Rx, Ry]),
-# output; optional Nx, Ny (default 180, 60).
+# output; optional Nx, Ny (default 180, 60), distributed (default false: one process; true: one process per GPU,
+# started by srun, with Reactant's distributed runtime, which needs the IFRT environment adjoint/ifrt).
 # ==============================================================================
 
 using OMIPAdjoint
@@ -25,7 +26,9 @@ using Dates: now, format
 config_path = length(ARGS) >= 1 ? ARGS[1] : error("usage: sharding_probe.jl <config.json>")
 P = JSON.parsefile(config_path)
 n_steps, Δt = P["steps"], Float64(P["dt"])
-stamp(msg...) = (println("[", format(now(), "HH:MM:SS"), "] ", msg...); flush(stdout))
+get(P, "distributed", false) && Reactant.Distributed.initialize()
+process = Reactant.Distributed.local_rank()
+stamp(msg...) = (println("[", format(now(), "HH:MM:SS"), "] process $process: ", msg...); flush(stdout))
 
 Reactant.set_default_backend(P["backend"])
 roll_barotropic_substeps!(P["roll_barotropic_substeps"])
@@ -69,9 +72,10 @@ function probe(arch, label)
 end
 
 # %%
-single = probe(ReactantState(), "single device")
+# Sharded first: if the job's time runs out, it does so in the single-device reference.
 sharded_arch = attempt(() -> Distributed(ReactantState(); partition = Partition(P["partition"]...)), "sharded architecture")
 sharded = sharded_arch === nothing ? (; label = "sharded") : probe(sharded_arch, "sharded $(P["partition"])")
+single = probe(ReactantState(), "single device")
 
 # %%
 comparison = Dict{String, Any}()
@@ -88,8 +92,11 @@ end
 for (key, value) in sort(collect(comparison))
     stamp(@sprintf("sharded vs single, relative difference of %s: %.3e", key, value))
 end
-output_path = joinpath(@__DIR__, P["output"])
-mkpath(dirname(output_path))
-jldsave(output_path; config = P, comparison, single_J = get(single, :J_primal, nothing),
-        sharded_J = get(sharded, :J_primal, nothing))
-stamp("saved ", output_path)
+if process == 0
+    output_path = joinpath(@__DIR__, P["output"])
+    mkpath(dirname(output_path))
+    jldsave(output_path; config = P, comparison, single_J = get(single, :J_primal, nothing),
+            sharded_J = get(sharded, :J_primal, nothing), single_gradient = get(single, :gradient, nothing),
+            sharded_gradient = get(sharded, :gradient, nothing))
+    stamp("saved ", output_path)
+end
