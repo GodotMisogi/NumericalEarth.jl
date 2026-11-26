@@ -511,3 +511,30 @@ Branch `ajs/omip-adjoint-flux-smoothing` from `bf0c4078` (approved 11-26).
      in the freshwater flux. Target: FD / adjoint within 0.1–0.3 % where ChkFD2 achieved it.
   3. `grid_scale_share.jl` on Sᵀ g, for 1 and 2 passes, on 1167068 (2° 14 days) and 1161433 (1° 90 days),
      compared with the stress shares. Done offline.
+
+### 2026-11-26, build and offline verification
+
+- `91f6b43d`: `src/flux_control_smoothing.jl` (`smooth_flux_controls`), `finite_difference_scan(...; map_direction)`,
+  and the `flux_smoothing_passes` key in `test_omip_adjoint.jl` (gradient stage: Sᵀ g; `fd_scan`: along S d).
+- **Dot test** (local CPU, scratch script; random x, y with three slices, both fluxes, on the land masks of
+  1167068 at 2° and 1161433 at 1°): ⟨S x, y⟩ = ⟨x, Sᵀ y⟩ to a relative 0–2.5e-16 (2°) and 4e-16 to 5.5e-15 (1°),
+  for 1 and 2 passes. S x is exactly zero on land, and u passes through untouched. On a pure checker, i-stripe
+  or j-stripe, S gives exactly 0 at every cell whose (4p + 1)² neighborhood is wet (4510 and 3012 cells at 2°,
+  33633 and 28586 at 1°, for p = 1 and 2). The fold row is wet in 56 of 180 columns at 2° and 112 of 360 at 1°;
+  S closes it as a boundary.
+- **Grid-scale share of Sᵀ g** (`grid_scale_share.jl` on host-smoothed copies of the saved gradients; the stress is
+  unchanged):
+
+  | Window | heat flux, raw | 1 pass | 2 passes | stress-x |
+  |---|---|---|---|---|
+  | 2° 14 d frozen CATKE (1167068), by band, slices 1–2 | 0.58–0.96 | 0.24–0.56 | 0.12–0.31 | 0.28–0.84 |
+  | same, Atlantic convecting / stable | 0.88 / 0.75 | 0.41–0.46 / 0.41–0.50 | 0.20–0.23 / 0.25–0.26 | 0.36–0.42 / 0.26–0.28 |
+  | 1° 90 d (1161433), by band, slices 1–4 | 0.17–0.92 | 0.07–0.52 | 0.04–0.29 | 0.06–0.45 |
+  | same, Atlantic convecting / stable | 0.35–0.66 / 0.23–0.91 | 0.14–0.25 / 0.12–0.46 | 0.09–0.15 / 0.09–0.24 | 0.12–0.28 / 0.12–0.17 |
+
+  With 2 passes the flux shares fall to or below the stress ones at both resolutions. One pass leaves 0.52 in the
+  1° slice nearest the objective at 0–22°N, and 0.46 in its stable blocks. The overlapping-block share is not zero
+  for a smooth field: it also counts the gradients of smooth fields and the coastal cells.
+- Submitted ChkSmooth 1171615 (gh-dev; `ecco4_nz20_14day_upwind3_flux_smoothing1_fd.json`): 1 pass, c-space
+  directions of white heat-flux noise (slices 1–2; max |S d̂| 0.017), one c cell at (136, 36) (max |S d̂| 0.375) and
+  white freshwater noise, against (Sᵀ g)ᵀ d̂ from 1167068 smoothed on the host: +2.99e-7, +3.36e-5, +0.220.
