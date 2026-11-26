@@ -214,3 +214,23 @@ long-window adjoint growth.
   waits ≤ 4.5 s; **iterations 1.55, 1.73 (two misfits), 1.55 min**, within ~5 % of one window's.
 - Submitted Vista 1171559 `ParShardV` (2 nodes, IFRT, multi-process sharding probe, `22a996fa`); LS6 3615047
   `ParShardI` still pending. Compute so far: ~7 GPU-node-hours on Vista, ~0.9 on LS6.
+
+### 2026-11-26, ParShardV (Vista 1171559, 2 nodes, IFRT, multi-process): FAILED, 42 min
+
+- Distributed runtime came up (2 global devices on both processes), sharded architecture built in 2 s. **Sharded
+  build failed on process 1** after 60 s in `regularize_fold_metrics!` → `copyto!(::ConcreteIFRTArray, ::Matrix)`
+  → `INVALID_ARGUMENT: Cannot copy array to non-addressable device cuda:0`. Reactant's
+  `copyto!(dest::AnyConcreteIFRTArray, src::Array)` builds the host array with `device = XLA.device(dest)`, the
+  first device of the mesh, which process 1 does not own. Process 0 printed nothing after the architecture: it
+  waited in the build for process 1 (out of lockstep), until process 1 finished and the shutdown barrier timed out
+  (02:13, `DEADLINE_EXCEEDED`, both aborted).
+- No sharded J or gradient. Process 1 then ran the single-device reference to the end: build 143 s, compile
+  primal 365 s, compile gradient 1211 s, gradient 81.7 s, **J 24.1308164238 Sv (equal to 3612502 and 1153870
+  under IFRT)**, max|∂J/∂τx| 4.494038; not saved (process 0 saves).
+- Single-process sharding (LS6 3615047, all devices addressable) does not take this path's failing branch.
+- Proposed (not applied): (1) in the probe, rethrow in `attempt` when distributed, so a failure on one process
+  ends the job instead of hanging the other; (2) host-to-sharded writes in our code (`regularize_fold_metrics!`,
+  `fill_everywhere!`, `restore_memory!`) through `Reactant.to_rarray(a; sharding = dest.sharding)` and a
+  device-to-device `copyto!`. (2) cannot reach Oceananigans' own `copyto!(parent(field), host)`
+  (`restore_prognostic_state!`, used by every `restore_state!`), so multi-process needs the one-line Reactant fix
+  (no `device` when the destination is sharded) or a pirated method in OMIPAdjoint; either is the user's call.
