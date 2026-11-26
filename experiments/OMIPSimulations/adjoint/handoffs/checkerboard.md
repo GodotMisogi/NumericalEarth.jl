@@ -448,3 +448,30 @@ x₁₂₀ to disk, not yet written.
   `results/ecco4_adjoint_nz20_14day_upwind3_frozen_tke_above0.1.jld2`) and ChkFD1deg 1171121 (pending on gh;
   output `results/ecco4_fd_onedegree_nz20_90day_upwind3.jld2`). To evaluate them, copy the files to the Mac and
   run the FD-vs-gradient comparison against ChkFD/ChkFD2 (fix iii), or against 1161433's gradient (1°).
+
+### 2026-11-26, fix (iii) result; 1° scans; resolution versus advection
+
+- **ChkTkeA01 1171105** (33 min; frozen_tke plus κ held constant where κc ≥ 0.1 m² s⁻¹). J equals frozen_tke's
+  to all digits. FD / adjoint: stress 1.004, heat cell (136, 36) 1.021, never-convecting alternating parts
+  1.018 and 1.094. But along convecting directions it is still wrong: the unfrozen gradient's heat alternating /
+  smooth give 0.099 / 0.112, the freshwater ones 0.33 / 0.46, the frozen gradient's alternating / smooth −1.7 /
+  −1.3, and the section cell 0.018. **Fix (iii) fails.** The spurious term also lives in cells with κc < 0.1
+  near convection, or in other N²-dependent CATKE paths (surface buoyancy flux, convective penetration), so a
+  κ threshold does not isolate it. As recommended and agreed, I am stopping the CATKE-derivative work here. The
+  usable adjoint is frozen CATKE, which matches the full model's FD to 0.1–0.3 % at 2° along smooth directions.
+  `frozen_tke` and `frozen_mixing_above` stay on the branch as off-by-default diagnostics; `frozen_tke` shifts J
+  at rounding (2e-10 Sv over 168 steps).
+- **ChkFD1deg 1171121** (35.7 min; all three 5-step scans ran, 5.5 min each, ~33 s per 1° forward window; f0 is
+  1161433's J to 1.8e-15). Central FD / 1161433's frozen adjoint, h = h0 … h0/16:
+  - heat-flux alternating part, never-convecting blocks: 1.019, 1.039, 1.006, 0.984, 0.966, i.e. **1.00 ± 0.03**;
+  - heat-flux alternating part, convecting blocks: 1.79, 2.03, 1.84, 3.23, 2.08 (rough; FD ≈ 2× the frozen adjoint);
+  - stress: 0.888, 0.948, 0.986, 0.9987, 1.0034, converging to 1 as h falls (nonlinear only at the largest h).
+  **At 1° the grid-scale heat-flux sensitivity in stable columns is real**, the stress sensitivity is exact,
+  and in convecting columns the full model responds about twice as strongly as the frozen-CATKE adjoint
+  predicts, with roughness.
+- **Task 3 offline** (no GPU): 1162458's 2° 90-day frozen-gradients upwind3 gradient (finding 20) against the
+  2° WENO one. Heat flux 0.34–0.91 by band (WENO 0.52–0.92); components τx j-stripe 0.27–0.43 (WENO 0.27–0.45),
+  τy i-stripe 0.21–0.36, Q 0.57–0.71 (WENO 0.70–0.80). So advection does not explain the 2°/1° difference;
+  resolution does (1°: τx stripe 0.11–0.14, Q 0.26–0.71).
+- GPU since the fix was approved: fix scope ≈ 2.1 GPU-h (ChkTke168 1.03, ChkTke14 0.56, ChkTkeA01 0.55); 1° scope
+  ≈ 0.8 GPU-h (ChkH1deg 0.23, ChkFD1deg 0.60). Thread total ≈ 7.8 GPU-h.
