@@ -475,3 +475,82 @@ x₁₂₀ to disk, not yet written.
   resolution does (1°: τx stripe 0.11–0.14, Q 0.26–0.71).
 - GPU since the fix was approved: fix scope ≈ 2.1 GPU-h (ChkTke168 1.03, ChkTke14 0.56, ChkTkeA01 0.55); 1° scope
   ≈ 0.8 GPU-h (ChkH1deg 0.23, ChkFD1deg 0.60). Thread total ≈ 7.8 GPU-h.
+
+## Log (flux-control smoothing)
+
+Branch `ajs/omip-adjoint-flux-smoothing` from `bf0c4078` (approved 11-26).
+
+### Plan
+
+- **Control:** Q = Q_ECCO + S c, and the same for the freshwater flux. So ∂J/∂c = Sᵀ ∂J/∂Q, and at c = 0 the forward
+  run is unchanged. The stress control stays as it is. Everything is linear post-processing on the host, so the
+  compiled program does not change and nothing is recompiled.
+- **The operator.** One pass is S₁ = Bⱼ Bᵢ, and p passes are S = (Bⱼ Bᵢ)ᵖ, so Sᵀ = (Bᵢ Bⱼ)ᵖ. Here
+  B_d = P (I − L_d / 4) P:
+  - P zeroes land;
+  - L_d is the graph Laplacian of the wet–wet edges in direction d, symmetric by construction, so each B_d is
+    symmetric and Sᵀ is just the reverse order;
+  - between wet cells, B is the 1-2-1 average, which removes the checker and both stripes exactly;
+  - at a land neighbor the edge is missing, so no weight leaks to land and the cell keeps it (Neumann);
+  - i is periodic. The southern edge and the tripolar fold (row Ny) have no edges: the U-pivot fold repeats row Ny,
+    so connecting across it would couple duplicated controls, and the Arctic fold row is far from the objective.
+- **Code (OMIPAdjoint `src/`).**
+  - `smooth_flux_controls(controls, wet; passes, transpose = false)` acts on a named tuple of `(Nx, Ny, 1, Nt)`
+    arrays, applying S, or Sᵀ, to `heat_flux` and `freshwater_flux` and leaving `u` and `v` alone.
+  - `finite_difference_scan` gains `map_direction` (default `identity`): the controls move along
+    `map_direction(d̂)` while gᵀd is taken in the scanned space.
+- **`test_omip_adjoint.jl`.** Config key `flux_smoothing_passes` (default 0, today's behavior):
+  - the gradient stage stores Sᵀ g as `gradient_heat_flux` and `gradient_freshwater_flux`;
+  - `fd_scan` perturbs along S d.
+- **Verification.**
+  1. Local CPU dot test ⟨S x, y⟩ = ⟨x, Sᵀ y⟩ on the 2° and 1° land masks, for 1 and 2 passes. Also check that S
+     removes the checker and the stripes in an all-wet region and leaves land at zero.
+  2. One GPU job: FD scan on the 2° 14-day frozen-CATKE window (1167068's configuration, 7-day mean),
+     `flux_smoothing_passes` 1, against Sᵀ g computed on the host from 1167068's saved gradient. Directions:
+     random white c (heat flux, both slices; then S d is smooth), a single c cell at (136, 36), and random white c
+     in the freshwater flux. Target: FD / adjoint within 0.1–0.3 % where ChkFD2 achieved it.
+  3. `grid_scale_share.jl` on Sᵀ g, for 1 and 2 passes, on 1167068 (2° 14 days) and 1161433 (1° 90 days),
+     compared with the stress shares. Done offline.
+
+### 2026-11-26, build and offline verification
+
+- `91f6b43d`: `src/flux_control_smoothing.jl` (`smooth_flux_controls`), `finite_difference_scan(...; map_direction)`,
+  and the `flux_smoothing_passes` key in `test_omip_adjoint.jl` (gradient stage: Sᵀ g; `fd_scan`: along S d).
+- **Dot test** (local CPU, scratch script; random x, y with three slices, both fluxes, on the land masks of
+  1167068 at 2° and 1161433 at 1°): ⟨S x, y⟩ = ⟨x, Sᵀ y⟩ to a relative 0–2.5e-16 (2°) and 4e-16 to 5.5e-15 (1°),
+  for 1 and 2 passes. S x is exactly zero on land, and u passes through untouched. On a pure checker, i-stripe
+  or j-stripe, S gives exactly 0 at every cell whose (4p + 1)² neighborhood is wet (4510 and 3012 cells at 2°,
+  33633 and 28586 at 1°, for p = 1 and 2). The fold row is wet in 56 of 180 columns at 2° and 112 of 360 at 1°;
+  S closes it as a boundary.
+- **Grid-scale share of Sᵀ g** (`grid_scale_share.jl` on host-smoothed copies of the saved gradients; the stress is
+  unchanged):
+
+  | Window | heat flux, raw | 1 pass | 2 passes | stress-x |
+  |---|---|---|---|---|
+  | 2° 14 d frozen CATKE (1167068), by band, slices 1–2 | 0.58–0.96 | 0.24–0.56 | 0.12–0.31 | 0.28–0.84 |
+  | same, Atlantic convecting / stable | 0.88 / 0.75 | 0.41–0.46 / 0.41–0.50 | 0.20–0.23 / 0.25–0.26 | 0.36–0.42 / 0.26–0.28 |
+  | 1° 90 d (1161433), by band, slices 1–4 | 0.17–0.92 | 0.07–0.52 | 0.04–0.29 | 0.06–0.45 |
+  | same, Atlantic convecting / stable | 0.35–0.66 / 0.23–0.91 | 0.14–0.25 / 0.12–0.46 | 0.09–0.15 / 0.09–0.24 | 0.12–0.28 / 0.12–0.17 |
+
+  With 2 passes the flux shares fall to or below the stress ones at both resolutions. One pass leaves 0.52 in the
+  1° slice nearest the objective at 0–22°N, and 0.46 in its stable blocks. The overlapping-block share is not zero
+  for a smooth field: it also counts the gradients of smooth fields and the coastal cells.
+- Submitted ChkSmooth 1171615 (gh-dev; `ecco4_nz20_14day_upwind3_flux_smoothing1_fd.json`): 1 pass, c-space
+  directions of white heat-flux noise (slices 1–2; max |S d̂| 0.017), one c cell at (136, 36) (max |S d̂| 0.375) and
+  white freshwater noise, against (Sᵀ g)ᵀ d̂ from 1167068 smoothed on the host: +2.99e-7, +3.36e-5, +0.220.
+- **ChkSmooth 1171615** (24.6 min; f0 equals 1167068's J to 1.1e-16). Central differences along S d̂ against
+  (Sᵀ g)ᵀ d̂, h = h0 … h0/128:
+  - **one c cell at (136, 36):** FD 2.93, 2.96, 2.89, 2.85, 2.82, 2.97e-5 over the six largest h, then noise
+    (5.1e-5, −1.3e-5), against an adjoint of 3.356e-5. So **FD / adjoint = 0.86 ± 0.02, steady over 6 octaves**. The
+    plumbing is right: without S the FD would be the raw cell's 7.2e-5 per unit. The 14 % gap is the frozen-CATKE
+    adjoint's, not S's, because S d̂ reaches into row j = 37, whose three columns convect (1.6, 0.93, 3.8 unstable
+    interfaces on average in 1167070). The raw single cell, which stays in stable columns, gave 0.999 in ChkFD2.
+  - **white heat-flux noise:** the adjoint's 2.99e-7 is tiny (the direction is nearly orthogonal to Sᵀ g). The FD
+    is −0.68 to −3.8e-6 (median −1.28e-6), so the ratio means nothing. Measured against the gradient's size, the
+    mismatch is (FD − gᵀd) / |Sᵀ g| = −1.5e-2 (range −0.9 to −3.9e-2).
+  - **white freshwater noise:** adjoint +0.220, FD −1.5 to −3.9 (median −2.65); (FD − gᵀd) / |Sᵀ g| = −6.7e-2.
+  So along directions spread over the whole basin, and therefore over convecting columns, the frozen-CATKE
+  adjoint is off by 1.5 % (heat) and 6.7 % (freshwater) of the gradient's norm. It reaches the 0.1–0.3 % of
+  ChkFD2 only for directions confined to stable columns or stress. The smoothing itself is exact (dot test
+  ≤ 5.5e-15). The limit on accuracy is the frozen-CATKE adjoint in convecting columns (findings 24–25: 0.81 at 2°,
+  ~2× at 1°), with or without S.

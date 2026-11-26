@@ -1,0 +1,38 @@
+{
+  "_comment": "Flux-control smoothing check: central differences of 1167068's 14-day window (frozen CATKE, 7-day mean AMOC) with flux_smoothing_passes 1, so the fluxes move along S d. Compared with (Sᵀ g)ᵀ d from 1167068's saved gradient smoothed on the host (results/smoothed_2deg_14day_frozen_mixing_passes1.jld2). Directions in c: white noise in the heat flux (slices 1-2), one c cell at (136, 36), white noise in the freshwater flux.",
+  "forcing": "ecco4",
+  "n_months": 3,
+  "Nz": 20,
+  "steps": 168,
+  "dt": 7200.0,
+  "substeps": 50,
+  "backend": "gpu",
+  "stages": "fd_scan",
+  "roll_barotropic_substeps": true,
+  "frozen_mixing": true,
+  "checkpoints": 14,
+  "average_days": 7,
+  "frozen_buoyancy_gradients": false,
+  "output": "results/ecco4_fd_nz20_14day_upwind3_flux_smoothing1.jld2",
+  "start_date": "1993-01-01",
+  "advection": "upwind3",
+  "flux_smoothing_passes": 1,
+  "fd_gradient": "results/smoothed_2deg_14day_frozen_mixing_passes1.jld2",
+  "fd_controls": [
+    "u",
+    "v",
+    "heat_flux",
+    "freshwater_flux"
+  ],
+  "fd_directions": {
+    "heat_random_smooth": "results/directions_smoothing_heat_random_smooth.jld2",
+    "heat_cell_smooth": "results/directions_smoothing_heat_cell_smooth.jld2",
+    "freshwater_random_smooth": "results/directions_smoothing_freshwater_random_smooth.jld2"
+  },
+  "fd_h0": {
+    "heat_random_smooth": 1000.0,
+    "heat_cell_smooth": 50.0,
+    "freshwater_random_smooth": 0.0027
+  },
+  "fd_nh": 8
+}

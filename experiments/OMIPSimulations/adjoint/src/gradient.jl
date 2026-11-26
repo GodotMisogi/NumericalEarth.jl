@@ -428,21 +428,22 @@ Finite differences of the objective `objective!()` (e.g. a compiled primal windo
 `h = h0 / 2ⁱ`, `i = 0:nh-1`: the forward slope `(f(x₀ + h d) − f(x₀)) / h` and the central slope
 `(f(x₀ + h d) − f(x₀ − h d)) / 2h`, each relative to `gᵀd`, with `d = direction / |direction|`. `g` and
 `direction` are named tuples of `(Nx, Ny, 1, Nt)` arrays over the same forcing controls (`u`, `v`,
-`heat_flux`, `freshwater_flux`, as from [`forcing_gradient`](@ref)). Unlike [`taylor_remainder_check`](@ref) it
+`heat_flux`, `freshwater_flux`, as from [`forcing_gradient`](@ref)). The controls move along `map_direction(d)`, a
+linear map of the scanned space onto the forcing (for smoothed flux controls, S of
+[`smooth_flux_controls`](@ref)); `gᵀd` is taken in the scanned space. Unlike [`taylor_remainder_check`](@ref) it
 needs no gradient evaluations, so `h` can span many octaves; it shows where the objective stops being smooth
 along `d`. Returns `f0`, `gᵀd` and the rows.
 """
-function finite_difference_scan(model, objective!, g; direction = g, h0 = 1.0, nh = 25)
+function finite_difference_scan(model, objective!, g; direction = g, map_direction = identity, h0 = 1.0, nh = 25)
     fields = forcing_fields(model)[keys(g)]
     x0 = control_vector(fields)
-    gvec = mapreduce(vec, vcat, g)
-    dvec = mapreduce(vec, vcat, direction)
-    length(gvec) == length(x0) ||
-        throw(DimensionMismatch("gradient has $(length(gvec)) entries, the control $(length(x0))"))
-    magnitude = sqrt(sum(abs2, dvec))
+    magnitude = sqrt(sum(a -> sum(abs2, a), direction))
     magnitude > 0 || throw(ArgumentError("the direction is zero"))
-    d = dvec ./ magnitude
-    gd = sum(gvec .* d)
+    unit = map(a -> a ./ magnitude, direction)
+    gd = sum(map((a, b) -> sum(a .* b), values(g), values(unit)))
+    d = mapreduce(vec, vcat, map_direction(unit))
+    length(d) == length(x0) ||
+        throw(DimensionMismatch("direction has $(length(d)) entries, the control $(length(x0))"))
     set_control!(fields, x0)
     f0 = objective!()
     println("finite_difference_scan (h0 = $h0, nh = $nh):")
