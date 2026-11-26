@@ -181,3 +181,24 @@ long-window adjoint growth.
   both untracked), `PROJECT=` and `SCRIPT=` in the Slurm scripts, probe key `distributed`, probe saves gradients.
   LS6 `ParShardI` (single process, two A100s, IFRT) queued on `gpu-a100-dev`; Vista 2-node IFRT probe waits for
   a free slot (ParSlot1 1170932, ParSlot4 1170933 queued).
+- Minimal Reactant reproducer (0.2.309, default PJRT runtime; run with the CPU backend and two virtual devices):
+
+      ENV["XLA_FLAGS"] = "--xla_force_host_platform_device_count=2"
+      using Reactant; Reactant.set_default_backend("cpu")
+      mesh = Sharding.Mesh(reshape(Reactant.devices()[1:2], 2, 1), (:x, :y))
+      sharding = Sharding.DimsSharding(mesh, (1, 2), (:x, :y))
+      a = Reactant.to_rarray(zeros(8, 4, 1); sharding); b = Reactant.to_rarray(ones(8, 4, 1); sharding)
+      view(a, 2:7, 2:3, 1:1) .= view(b, 2:7, 2:3, 1:1)  # TypeError: expected ConcretePJRTArray{Float64, 3, 1}, got ...{Float64, 3, 2}
+      c = Reactant.to_rarray(zeros(8, 4, 1); sharding)
+      copyto!(c, ones(8, 4, 1)); Array(c)                 # overruns the first shard's buffer: crash or garbage
+
+  With `xla_runtime = "IFRT"` both are correct.
+- Status 20:07: Vista 1170932 `ParSlot1` (1 window, 3 iterations, new slots) and 1170933 `ParSlot4` (4 windows)
+  pending on `gh` since 17:37; LS6 3615047 `ParShardI` pending. The Vista 2-node IFRT probe is not yet
+  submitted (my two Vista slots are taken): `SCRIPT=adjoint/sharding_probe.jl PROJECT=adjoint/ifrt
+  CONFIG=adjoint/configs/sharding_probe_ecco4_nz20_8step_2processes.json sbatch -J ParShardV -N 2 -p gh -t
+  02:00:00 -A ADCIRC --mail-user=<address> adjoint/calibrate_mpi.slurm`. Checks once they run: ParSlot1's
+  records against `reference_1window_1168553.jld2` (iterations 0–1, full precision) and its gradient/GC times
+  against 1168553's (151/46 s first, 120/38 s second); ParSlot4's records against `reference_4windows_1168552.jld2`
+  and its iteration times against 2.2 min; the probes' J against 24.1308164238 Sv.
+- Compute used so far: ~5 GPU-node-hours on Vista + ~0.9 on LS6 (3612502).
