@@ -426,3 +426,20 @@ x₁₂₀ to disk, not yet written.
   constant in derivatives in the cells where κc ≥ κ★, keeps them differentiated elsewhere, and is combined with
   frozen_tke. Submitted ChkTkeA01 1171105 (14 days, κ★ = 0.1 m² s⁻¹; convecting cells sit at the 3 m² s⁻¹ cap,
   stable surface cells at 0.003–0.006 in 1167070). Also queued: ChkH1deg 1171100 (1° upwind3 health run).
+- Grid-scale share of the frozen_tke 14-day gradient (2°): heat flux 0.48–0.83 by band (unfrozen 0.63–0.84); Atlantic
+  convecting / stable 0.77 / 0.76 and 0.76 / 0.83 in slices 1 and 2. Stress-x 0.30–0.84, convecting 0.43,
+  stable 0.26–0.28.
+- **ChkH1deg 1171100** (14 min; `health_ecco4_onedegree_nz20_90day_upwind3.json`, the forward state of 1161433):
+  convecting / stable split with `grid_scale_share.jl`, Atlantic 0–80°N, slices 1–4. Heat flux: convecting 0.35,
+  0.47, 0.57, 0.66; stable 0.23, 0.28, 0.55, **0.91**. Stress-x: convecting 0.21, 0.28, 0.12, 0.16; stable 0.17,
+  0.12, 0.14, 0.13. These agree with the WENO-state preliminary. In the slice nearest the objective the
+  never-convecting blocks are the most grid-scale, so at 1° convection does not carry the flux checkerboard.
+- 1° directions (`grid_scale_directions_onedegree_90day_upwind3.json`, 1161433's gradient and 1171100's state; all
+  slices; global non-overlapping blocks), heat flux, |part|² / |g|²: alternating 0.379, smooth 0.621, alternating in
+  never-convecting blocks 0.097, in convecting blocks 0.110. The unit directions are far less concentrated than
+  at 2°: the largest entries are 0.24 (never convecting) and 0.41 (convecting), with 259 and 39 cells above a
+  tenth of the largest. The stress direction is 1161433's (τx, τy) gradient (max entry 0.11).
+- Submitted ChkFD1deg 1171121 (gh, 2.5 h limit; `ecco4_onedegree_nz20_90day_upwind3_fd.json`): central differences of
+  the 30-day-mean AMOC over the full 90-day window, h0 = 100 (heat), 0.4 (stress), 5 halvings, along the three
+  directions. The forward window is about 2–3 min at 1°, so ~1.5–2 GPU-h; the 90-day window is kept so the
+  directions are 1161433's own, and no shorter-window share check is needed.
