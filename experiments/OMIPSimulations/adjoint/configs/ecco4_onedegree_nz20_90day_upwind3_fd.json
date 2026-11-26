@@ -1,0 +1,38 @@
+{
+  "_comment": "Checkerboard, 1°: central differences of 1161433's 30-day-mean AMOC (1° 90 days from 1993-01, upwind3) along its frozen gradient's heat-flux alternating part in never-convecting and in convecting blocks (forward state of health_ecco4_onedegree_nz20_90day_upwind3, 1171100) and along its stress gradient. Is the 1° flux checkerboard real sensitivity, as at 2° (FD / frozen adjoint 0.81-1.00)?",
+  "forcing": "ecco4",
+  "n_months": 5,
+  "Nx": 360,
+  "Ny": 180,
+  "Nz": 20,
+  "steps": 1080,
+  "dt": 7200.0,
+  "substeps": 100,
+  "backend": "gpu",
+  "stages": "fd_scan",
+  "roll_barotropic_substeps": true,
+  "frozen_mixing": true,
+  "checkpoints": 30,
+  "average_days": 30,
+  "frozen_buoyancy_gradients": true,
+  "output": "results/ecco4_fd_onedegree_nz20_90day_upwind3.jld2",
+  "advection": "upwind3",
+  "fd_gradient": "results/ecco4_adjoint_onedegree_nz20_90day_frozen_gradients_upwind3_trace.jld2",
+  "fd_controls": [
+    "u",
+    "v",
+    "heat_flux",
+    "freshwater_flux"
+  ],
+  "fd_directions": {
+    "heat_flux_alternating_stable": "results/directions_onedegree_90day_upwind3_heat_flux_alternating_stable.jld2",
+    "heat_flux_alternating_convecting": "results/directions_onedegree_90day_upwind3_heat_flux_alternating_convecting.jld2",
+    "stress": "results/directions_onedegree_90day_upwind3_stress.jld2"
+  },
+  "fd_h0": {
+    "heat_flux_alternating_stable": 100.0,
+    "heat_flux_alternating_convecting": 100.0,
+    "stress": 0.4
+  },
+  "fd_nh": 5
+}
