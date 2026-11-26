@@ -257,3 +257,17 @@ long-window adjoint growth.
 - Next for single-process sharding: an MWE of the aliased, resharded kernel argument for Reactant #2234; or
   avoid the alias for the sharded build (e.g. materialize the immersed boundary on the CPU twin and move its
   arrays onto the sharded grid). Not applied.
+
+### 2026-11-26, Reactant reproducers (local, not posted)
+
+- Drafts and scripts in the session scratchpad (`reactant_issue2/`), Mac only, Reactant 0.2.309 + IFRT:
+  1. **Multi-process `copyto!` (ParShardV)**: reproduced with two local CPU processes
+     (`Reactant.Distributed.initialize` on 127.0.0.1, one device each): process 1 `Cannot copy array to
+     non-addressable device cpu:0`, process 0 returns and its next collective times out. Same with a device
+     source: the cause is `copyto!(::ConcreteIFRTArray, ::ConcreteIFRTArray)` (the compiled `mycopyto!` aliases
+     `src`, codegen emits `copy(src.data)` = `ifrt_copy_array` over all devices of the sharding), not the host
+     source or a `device` keyword (`XLA.device` of a sharded IFRT array is `nothing`). Not a comment on #3844
+     (PJRT, different mechanism): a new issue, cross-referencing #3844 and #2234.
+  2. **`TODO(#2234)` (ParShardI)**: Oceananigans-free MWE: an unsharded array read by a sharded program through
+     two argument paths (`f!(w, u, Holder(u))`), which `codegen_flatten!` reshards on input and
+     `codegen_unflatten_aliased_args!` cannot write back (Codegen.jl:1448-1451). Passing it once, or sharded, works.
