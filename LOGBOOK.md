@@ -39,6 +39,10 @@ and dropped, and what is open. Dates are 2026.
 | 11-16 | Adjoint-only damping is the intended long-window remedy; forward-viscosity runs only as diagnostics (user) | Standard practice (Hoteit et al. 2005) |
 | 11-17 | Test Reactant main (0.2.309, git `2bb32e28`, Reactant_jll 0.0.445) on its own branch and worktree `ajs/omip-adjoint-r309` | Leaves the jobs queued in the shared worktree on 0.2.303 |
 | 11-19 | Move `ajs/omip-adjoint-oc117` to Reactant 0.2.309 (`8cfba671`); keep the `cse_reduce_transposed` exclusion | 0.2.309 reproduces 0.2.303's gradients and removes the first-call cost; dropping the exclusion needs its own compile-time check |
+| 11-26 | Heat- and freshwater-flux controls through the smoothing S, `flux_smoothing_passes` (default 0; use 2) (user) | Their sensitivities are grid-scale but real; 2 passes bring them to the stress's smoothness (finding 28) |
+| 11-26 | Accept the frozen-CATKE adjoint's bias in convecting columns (user) | Exact along stress and stable-column fluxes; the alternatives are a stable-column control mask or smoothed CATKE switches, a physics change |
+| 11-26 | Pause sharding within a window; calibrate with windows over MPI (user) | Two Reactant gaps block the sharded build, and IFRT, the only runtime where sharding works, makes each gradient ~4× slower (finding 27) |
+| 11-26 | Test the frozen κ gradient against the misfit surface J(κ) from forward windows (user) | Finding 22's unfrozen reference is wrong past ~120 steps (finding 24); forward runs need no adjoint |
 | standing | Manifests and `../omip_adjoint_handoff/` stay uncommitted | Local manifests |
 | standing | Scripts take a JSON config, never environment variables | Project convention |
 
@@ -373,7 +377,25 @@ Reference numbers (LS6 A100, Nz = 20):
    memory; Oceananigans' `set!` and checkpoint restore make that call (Reactant.jl #3844). With
    `xla_runtime = "IFRT"` both are correct, including the failing build step (CPU, two virtual devices).
    Environment `adjoint/ifrt` (same packages, the preference added). Single-device 8-step reference on two A100s:
-   J 24.1308164238 Sv, gradient compile 26.5 min.
+   J 24.1308164238 Sv, gradient compile 26.5 min. Under IFRT the sharded build still fails, and the gradient call
+   is ~4× slower (11-26, `adjoint/handoffs/parallelization.md`). Two processes on two Vista nodes (ParShardV
+   1171559): `copyto!(::ConcreteIFRTArray, ::Array)` puts the host array on the mesh's first device, which the
+   other process cannot address (`regularize_fold_metrics!`). One process with two A100s (ParShardI 3615047): the
+   first kernel on the sharded grid, `compute_numerical_heights!`, receives one field by two paths and needs a
+   reshard, which Reactant does not implement (`codegen_unflatten_aliased_args!`, `TODO(#2234)`). Single device
+   under IFRT: J and gradients identical to PJRT, compile times the same, gradient 82.8 s against 18.9 s (LS6)
+   and 81.7 against 27 s (Vista).
+28. **Smoothed flux controls make the flux gradients as smooth as the stress's (11-26,
+   `adjoint/handoffs/checkerboard.md`).** Controls c with Q = Q₀ + S c, so ∂J/∂c = Sᵀ ∂J/∂Q; S is `passes`
+   passes of a 1-2-1 average in i (periodic) and then in j, over wet–wet edges only, closed at the southern
+   boundary and the fold (`smooth_flux_controls`, `flux_smoothing_passes`, `1bc70878`). Dot test
+   ⟨S x, y⟩ = ⟨x, Sᵀ y⟩ to ≤ 5.5e-15 (CPU, 2° and 1° masks). Grid-scale share of the heat-flux sensitivity, raw /
+   1 pass / 2 passes against stress-x: 2° 14 days (1167068) 0.58–0.96 / 0.24–0.56 / 0.12–0.31 against
+   0.28–0.84; 1° 90 days (1161433) 0.17–0.92 / 0.07–0.52 / 0.04–0.29 against 0.06–0.45. GPU check, 1 pass
+   (ChkSmooth 1171615): FD / adjoint 0.86 ± 0.02 over 6 octaves for one smoothed cell, whose S d reaches a row of
+   convecting columns (the raw cell, in stable columns, gave 0.999); along white heat- and freshwater-flux
+   directions the central differences do not converge (5× spread over h), so those two say nothing. The accuracy
+   limit is the frozen-CATKE adjoint in convecting columns (findings 24–25), with or without S.
 ## Tooling added
 
 | File | Purpose |
@@ -395,7 +417,8 @@ Reference numbers (LS6 A100, Nz = 20):
 | `reduce_gradients.jl`, `omip_cpu.slurm`, `plots/` | Reduction on LS6 CPU nodes; plots locally (`plot_lead_sensitivity.jl`, Pillar maps) |
 | `grid_scale_share.jl`, `grid_scale_directions.jl` | Grid-scale share of the forcing sensitivities by band, convecting/stable split for stress and heat flux; alternating and smooth parts of a gradient as scan directions |
 | `fd_scan` and `step_dot` stages of `test_omip_adjoint.jl` | Central differences along any forcing direction (`fd_controls`, `fd_directions`, per-label `fd_h0`); one compiled step's central difference against its reverse pass at saved states (`gc_every`) |
-| `calibrate.jl`, `calibrate_mpi.slurm`, `sharding_probe.jl`, `adjoint/ifrt/` | Per-rank evaluation, GC and reduction times; MPICH progress thread; `PROJECT=`/`SCRIPT=`; multi-process sharding probe (`distributed` key) under the IFRT environment |
+| `calibrate.jl`, `calibrate_mpi.slurm`, `sharding_probe.jl`, `adjoint/ifrt/` | Per-rank evaluation, GC and reduction times; MPICH progress thread; `PROJECT=`/`SCRIPT=`; multi-process sharding probe (`distributed` key) under the IFRT environment; `scan` stage (J on κ grids, adjoint at chosen points) |
+| `src/flux_control_smoothing.jl`, `flux_smoothing_passes` key | Flux controls through the smoothing S: gradient stage saves Sᵀ g, `fd_scan` moves along S d |
 | `test_omip_adjoint.jl` keys since 11-07 | `checkpoints`, `average_days`, `frozen_mixing`, `eddy_diffusivity`, `advection`, `Nx`/`Ny`, `horizontal_diffusivity`, `biharmonic_tracer_timescale`, `convective_adjustment`, `laplacian_viscosity`, `adjoint_viscosity`/`adjoint_diffusivity`, `start_date`, `repeat_evaluation` |
 
 ## Jobs (LS6 unless noted)
@@ -496,7 +519,9 @@ Reference numbers (LS6 A100, Nz = 20):
 | Vista 1167070 | forward_health, 2° 14 days from 1993-01, upwind3 | 1947–2389 unstable interfaces; surface T grid-scale residual 0.26 → 0.35 K rms; daily maps for finding 23 |
 | Vista 1168067–1171121 (`Chk…`) | Checkerboard agent: biharmonic, flux finite differences, step bisection, `step_dot`, `frozen_tke`, 1° scans; table in `handoffs/checkerboard.md` | findings 24, 25 |
 | Vista 1168099–1170933, LS6 3612502 (`Par…`) | Parallel agent: per-rank timing, MPICH progress thread, kernel cache, sharding probe, preallocated slots; `handoffs/parallelization.md` | findings 26, 27 |
-| Vista 1171559, LS6 3615047 | `ParShardV` (2 nodes, IFRT, multi-process), `ParShardI` (two A100s, IFRT) | pending on 11-26 |
+| Vista 1171559, LS6 3615047 | `ParShardV` (2 nodes, IFRT, multi-process), `ParShardI` (two A100s, IFRT) | both fail in the sharded build (finding 27) |
+| Vista 1171615 | `ChkSmooth`: central differences along smoothed flux directions, 1 pass | finding 28 |
+| Vista 1172435, 1172436 | `KapScan14`, `KapScan90`: J on κ grids (17 × 17 from 250 to 4000 m² s⁻¹, cuts through 600, 600 in log steps of 0.0125) and the frozen adjoint at five points, 14- and 90-day twins (`calibration_twin_ecco4_nz20_{14,90}day_scan.json`, `50fd79d6`) | pending on 11-26 |
 | Vista 1164314 | Calibration phase 1: twin, 2° 90 days from 1993-01, upwind3, frozen | compile 12.8 min, window 16 s, gradient ~130 s; check ratios 0.31, 0.76 (finding 22); BFGS 600, 600 → 1000.5, 999.7 in 9 iterations, then out of GPU memory (discarded shadow models; `GC.gc()` before each evaluation) |
 
 ## Open
@@ -515,12 +540,15 @@ Reference numbers (LS6 A100, Nz = 20):
   from ReactOcean).
 - Calibration: the frozen adjoint's κ gradient is biased over 90 days, and the 14-day misfit is rough in κ
   (finding 22; its unfrozen reference is itself wrong past ~120 steps, finding 24). Twin recovery works with 1
-  and 4 windows (1166514, 1166675).
-- Flux controls: the grid-scale sensitivity is real (finding 25); smoothing of the flux control perturbation
-  (as the stress's face interpolation does) is being added (11-26).
-- Sharding: `ParShardV`/`ParShardI` under IFRT (finding 27); then `Partition(3, 1)`, 1°, and windows × shards.
-- Unfrozen CATKE adjoint: would need smoothed switches in the forward model (finding 24), a physics change.
+  and 4 windows (1166514, 1166675). The J(κ) scans KapScan14/KapScan90 (1172435, 1172436) test the frozen
+  gradient against secants at every scale.
+- Flux controls: smoothing merged (finding 28); `calibrate.jl` does not use flux controls yet.
+- Sharding: paused 11-26 (finding 27). Resume when a window no longer fits on one GPU, after the two Reactant
+  gaps are fixed and IFRT's per-call cost is understood; then `Partition(3, 1)`, 1°, and windows × shards.
+- Unfrozen CATKE adjoint: would need smoothed switches in the forward model (finding 24), a physics change;
+  not pursued (bias accepted 11-26).
 - Upstream: Reactant.jl #3844 (sharded PJRT `copyto!`), #3845 (kernel-cache preference), filed 11-26.
+  Reproducers being written for the multi-process IFRT `copyto!` and the aliased reshard (`TODO(#2234)`).
 - Resolved since 11-06: finding 4 (`4cc69c3e`); `cse_reduce_transposed` excluded (`fb295782`) and fixed upstream
   (Enzyme-JAX #3970); zero shadow carries (#3971) and `uitofp` (#3969) fixed upstream, in Reactant 0.2.309;
   the Vista first-call failure (gone with per-step thunks); `atlantic_ocean_basin` avoided by the staircase
@@ -1010,3 +1038,5 @@ not attributed yet. Container: `$WORK/containers/julia_1.12_ls6.sif` links to a 
 - Both handoff agents finished; their branches are merged into `oc117` (`6a775aa6`, `b38c2d84`) without the
   `frozen_tke` and `frozen_mixing_above` flags (`e64484e6`). Findings 24–27.
 - Calibration keeps the frozen-CATKE adjoint. Reactant.jl #3844 and #3845 filed.
+- Flux smoothing merged (`1bc70878`, finding 28). Convecting-column bias accepted; sharding paused after both
+  IFRT probes failed in the build (finding 27). κ scan stage (`50fd79d6`); KapScan14/90 submitted.
