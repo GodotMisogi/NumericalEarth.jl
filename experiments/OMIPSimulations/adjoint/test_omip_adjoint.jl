@@ -31,6 +31,8 @@
 # Optional `frozen_mixing` (default false): the CATKE viscosity and diffusivities enter the gradient as
 # constants (`freeze_mixing!`); the forward model is unchanged, so the Taylor check then measures the
 # frozen-mixing approximation, not the adjoint's exactness.
+# Optional `frozen_mixing_above` (m² s⁻¹; default none): the CATKE viscosity and diffusivities enter the gradient as
+# constants in the cells where the tracer diffusivity is at least this (`freeze_mixing_above!`).
 # Optional `frozen_tke` (default false): the CATKE turbulent kinetic energy enters the gradient as a constant after
 # each step of its equation (`freeze_tke!`); the diffusivities still vary with N² and shear, and the forward model is
 # unchanged.
@@ -181,6 +183,7 @@ if any(in(stages), reactant_stages)
     roll_barotropic_substeps!(P["roll_barotropic_substeps"])
     freeze_mixing!(get(P, "frozen_mixing", false))
     freeze_tke!(get(P, "frozen_tke", false))
+    freeze_mixing_above!(Float64(get(P, "frozen_mixing_above", Inf)))
     freeze_buoyancy_gradients!(frozen_gradients)
     options = haskey(P, "excluded_passes") ? adjoint_compile_options(; excluded_passes = String.(P["excluded_passes"])) :
                                              adjoint_compile_options()

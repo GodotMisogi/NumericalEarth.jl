@@ -20,6 +20,17 @@ differentiated (`false`). The choice is read when a model step is traced, so it 
 """
 freeze_mixing!(flag::Bool) = (FREEZE_MIXING[] = flag; flag)
 
+const FREEZE_MIXING_ABOVE = Ref(Inf)
+
+"""
+$(TYPEDSIGNATURES)
+
+Choose the tracer diffusivity `κ★` (m² s⁻¹) at and above which the CATKE viscosity and diffusivities are held
+constant in derivatives, cell by cell; elsewhere they are differentiated. `Inf` (the default) holds none. The choice
+is read when a model step is traced, so it must be set before `@compile`. Returns `κ★`.
+"""
+freeze_mixing_above!(κ★) = (FREEZE_MIXING_ABOVE[] = κ★; κ★)
+
 function TurbulenceClosures.compute_closure_fields!(closure_fields, closure::FlavorOfCATKE,
                                                     model::HydrostaticFreeSurfaceModel; parameters = :xyz)
     invoke(TurbulenceClosures.compute_closure_fields!, Tuple{Any, FlavorOfCATKE, Any},
@@ -27,6 +38,11 @@ function TurbulenceClosures.compute_closure_fields!(closure_fields, closure::Fla
     if FREEZE_MIXING[]
         for κ in (closure_fields.κu, closure_fields.κc, closure_fields.κe)
             parent(κ) .= ignore_derivatives(parent(κ))
+        end
+    elseif isfinite(FREEZE_MIXING_ABOVE[])
+        strong = parent(closure_fields.κc) .>= FREEZE_MIXING_ABOVE[]
+        for κ in (closure_fields.κu, closure_fields.κc, closure_fields.κe)
+            parent(κ) .= ifelse.(strong, ignore_derivatives(parent(κ)), parent(κ))
         end
     end
     return nothing
