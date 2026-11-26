@@ -330,6 +330,50 @@ Reference numbers (LS6 A100, Nz = 20):
    columns) in all three. So freezing CATKE moves the noise into the convecting columns but does not cause it:
    the exact adjoint is already at the white-noise level. The forward run's surface T has a grid-scale residual
    of 0.26 K rms on day 1, growing to 0.35 K by day 14 (max 13 K at 119°E 8°N).
+24. **The CATKE-differentiated adjoint is wrong from about step 120; the frozen-CATKE adjoint is right (11-24 to
+   11-26, `adjoint/handoffs/checkerboard.md`).** Central differences of the 14-day window along flux and stress
+   directions (`fd_scan` over any forcing control, ChkFD2 1168469): the frozen-CATKE adjoint matches to 0.1–0.3 %;
+   the unfrozen adjoint gives FD/adjoint 0.889 along stress and 0.16 for one heat-flux cell. Unfrozen, the
+   end-of-window AMOC is exact at 8, 42 and 84 steps (0.99–1.01; ChkFD8 1168601, ChkB42 1168771, ChkB84 1168772)
+   and wrong at 168 (0.07–0.82, ChkB168 1169004). A one-step dot-product test (`step_dot` stage) finds step 120:
+   v-input adjoint 7.1e-5 against FD 4.8e-3 (ChkDot 1168959, ChkDot120 1169075; not GC, ChkDotGC7 1169296). One
+   cell at the mixed-layer base where e is near its floor (314.7°E 46.7°N, level 16, e 6e-8 under 1e-4 m² s⁻²)
+   gets a reverse-pass value 60× its neighbors' and cancels the step's inner product (ChkDotF120 1169321); the
+   next anomalies have the same structure at the Kuroshio Extension, the sites of the long-window bursts.
+   Holding e constant in derivatives after each TKE step (`frozen_tke`) removes the spike and is right along
+   stress (1.015) and in stable columns (1.02), but along convecting directions gives −0.19 to 0.03 (ChkTke168
+   1170952, ChkTke14 1170953); also freezing κ where κc ≥ 0.1 m² s⁻¹ (`frozen_mixing_above`) does not help
+   (0.10, −1.7; ChkTkeA01 1171105). The rest is CATKE's convective and near-neutral switches; no stop-gradient
+   mask fixes it. Both flags stay on `ajs/omip-adjoint-checkerboard` (`17ae1305`, `180dc3be`), not on `oc117`.
+   Finding 22's unfrozen 14-day κ ratios (1165329) are therefore suspect too.
+25. **The flux sensitivities' grid-scale part is real; the stress gradient is filtered by construction (11-25 to
+   11-26).** 2° 14 days, frozen CATKE: FD/adjoint 0.997 along the grid-scale heat-flux part in never-convecting
+   blocks. 1° 90 days (1161433's window, ChkFD1deg 1171121): 1.00 ± 0.03 along the same part, 1.003 along stress
+   (converged); in convecting blocks the model responds about 2× the frozen adjoint (1.8–3.2, rough).
+   `_prescribe_surface_fluxes!` interpolates the cell-center stress to faces (`ℑxᶠᵃᵃ`, `ℑyᵃᶠᵃ`), so ∂J/∂τx has
+   no component alternating in i and ∂J/∂τy none alternating in j (0.00–0.04 in every run); the fluxes enter at
+   centers and keep all three. The surviving stress stripe is as large as the flux's at 2° (0.27–0.45 against
+   0.32–0.41) and smaller at 1° (0.11–0.25 against 0.14–0.33). At 1° the stable columns, not the convecting
+   ones, are the most grid-scale near the objective (0.91 against 0.66; ChkH1deg 1171100), so convection does not
+   carry it. Advection barely matters (2° 90-day upwind3 1162458 against WENO). Biharmonic tracer diffusion at
+   50 days lowers the 14-day share only to 0.53–0.73 (ChkBh50 1168067); the forward surface-T residual 0.26 K is
+   already in the ECCO4 initial state (ChkBh50H 1168467).
+26. **Windows over MPI scale: one iteration of N windows costs one window (11-24 to 11-26,
+   `adjoint/handoffs/parallelization.md`).** The 3× slowdown of 1166675 was MPICH_jll's collectives progressing
+   only when a rank next calls MPI (ParTime4 1168099: reductions released exactly when rank 0 re-entered MPI);
+   `MPIR_CVAR_ASYNC_PROGRESS=1` and `MPI.Init(threadlevel = :multiple)` fix it (ParTime4b 1168552: 2.2 min per
+   4-window iteration, J identical to 1166675). Revolve's checkpoint slots allocated once and overwritten
+   (`76710bdd`): bit-identical, gradient 120 → 78 s, GC 38 → 1–2 s, host allocation 110 → 0.6 GiB, iteration
+   2.2 → 1.5 min (ParSlot1 1170932); 4 windows 1.55–1.73 min (ParSlot4 1170933). No cheap compile sharing: XLA's
+   kernel cache saves nothing and reuses a wrong kernel (`CUDA_ERROR_ILLEGAL_INSTRUCTION`, ParKc2 1168843);
+   Reactant's `persistent_kernel_cache_enabled` sets a removed XLA option (Reactant.jl #3845).
+27. **Sharding needs Reactant's IFRT runtime (11-25).** The sharded 2° build fails in `set_bottom_height!` with
+   a `TypeError` from a broadcast between views of sharded PJRT arrays (LS6 ParShard2 3612502), and
+   `copyto!(::ConcretePJRTArray, ::Array)` writes a host array into the first shard's buffer only, corrupting
+   memory; Oceananigans' `set!` and checkpoint restore make that call (Reactant.jl #3844). With
+   `xla_runtime = "IFRT"` both are correct, including the failing build step (CPU, two virtual devices).
+   Environment `adjoint/ifrt` (same packages, the preference added). Single-device 8-step reference on two A100s:
+   J 24.1308164238 Sv, gradient compile 26.5 min.
 ## Tooling added
 
 | File | Purpose |
@@ -349,6 +393,9 @@ Reference numbers (LS6 A100, Nz = 20):
 | `buoyancy_gradient_check.jl` (config `buoyancy_gradient_check_jan1993.json`) | CPU: stored against inline buoyancy gradients at every stencil index (interior and halos), then both models stepped side by side with per-step u, v, T, S, η differences |
 | `AdjointTrace` (`src/adjoint_trace.jl`, config `adjoint_trace_every`) | Per-field summaries of the ocean adjoint (largest finite entry and its indices, root sum of squares, non-finite count) every N reversed steps, saved as `adjoint_trace` |
 | `reduce_gradients.jl`, `omip_cpu.slurm`, `plots/` | Reduction on LS6 CPU nodes; plots locally (`plot_lead_sensitivity.jl`, Pillar maps) |
+| `grid_scale_share.jl`, `grid_scale_directions.jl` | Grid-scale share of the forcing sensitivities by band, convecting/stable split for stress and heat flux; alternating and smooth parts of a gradient as scan directions |
+| `fd_scan` and `step_dot` stages of `test_omip_adjoint.jl` | Central differences along any forcing direction (`fd_controls`, `fd_directions`, per-label `fd_h0`); one compiled step's central difference against its reverse pass at saved states (`gc_every`) |
+| `calibrate.jl`, `calibrate_mpi.slurm`, `sharding_probe.jl`, `adjoint/ifrt/` | Per-rank evaluation, GC and reduction times; MPICH progress thread; `PROJECT=`/`SCRIPT=`; multi-process sharding probe (`distributed` key) under the IFRT environment |
 | `test_omip_adjoint.jl` keys since 11-07 | `checkpoints`, `average_days`, `frozen_mixing`, `eddy_diffusivity`, `advection`, `Nx`/`Ny`, `horizontal_diffusivity`, `biharmonic_tracer_timescale`, `convective_adjustment`, `laplacian_viscosity`, `adjoint_viscosity`/`adjoint_diffusivity`, `start_date`, `repeat_evaluation` |
 
 ## Jobs (LS6 unless noted)
@@ -447,6 +494,9 @@ Reference numbers (LS6 A100, Nz = 20):
 | Vista 1166675 | Calibration phase 2 rerun with the half-pool collection: 4 windows, 4 nodes | κ 600, 600 → 1000.0, 1000.0 at iteration 8, J 3.2e5 → 6.1 at iteration 10; device memory peak 35.9 of 71.3 GiB, 0.15 GiB after GC every iteration; 1 h 39 min. ~7 min per iteration against ~2.2 min with one window (1166514), and rank 0's GPU at 0 % in 17 of 20 five-minute samples: the ranks wait (`adjoint/handoffs/parallelization.md`) |
 | Vista 1167067–1167069 | 2° 14 days traced from 1993-01, upwind3: nothing frozen, CATKE frozen, CATKE and slopes frozen | compile 17.2, 16.9, 12.4 min; gradient 48–52 s; J 15.5628 Sv; max\|g\| 5.74, 4.56, 4.56; heat and freshwater flux sensitivities grid-scale in all three (finding 23) |
 | Vista 1167070 | forward_health, 2° 14 days from 1993-01, upwind3 | 1947–2389 unstable interfaces; surface T grid-scale residual 0.26 → 0.35 K rms; daily maps for finding 23 |
+| Vista 1168067–1171121 (`Chk…`) | Checkerboard agent: biharmonic, flux finite differences, step bisection, `step_dot`, `frozen_tke`, 1° scans; table in `handoffs/checkerboard.md` | findings 24, 25 |
+| Vista 1168099–1170933, LS6 3612502 (`Par…`) | Parallel agent: per-rank timing, MPICH progress thread, kernel cache, sharding probe, preallocated slots; `handoffs/parallelization.md` | findings 26, 27 |
+| Vista 1171559, LS6 3615047 | `ParShardV` (2 nodes, IFRT, multi-process), `ParShardI` (two A100s, IFRT) | pending on 11-26 |
 | Vista 1164314 | Calibration phase 1: twin, 2° 90 days from 1993-01, upwind3, frozen | compile 12.8 min, window 16 s, gradient ~130 s; check ratios 0.31, 0.76 (finding 22); BFGS 600, 600 → 1000.5, 999.7 in 9 iterations, then out of GPU memory (discarded shadow models; `GC.gc()` before each evaluation) |
 
 ## Open
@@ -464,11 +514,13 @@ Reference numbers (LS6 A100, Nz = 20):
 - Upstream reports still open: Enzyme-JAX #3965 (batch fission); Oceananigans #6529, #6530, PR #6531 (posted
   from ReactOcean).
 - Calibration: the frozen adjoint's κ gradient is biased over 90 days, and the 14-day misfit is rough in κ
-  (finding 22). Twin recovery works with 1 and 4 windows (1166514, 1166675).
-- Handed off on 11-24 to two agents, `adjoint/handoffs/` (checkerboard, parallelization, coordination).
-- Grid-scale noise in the buoyancy-flux sensitivities is in the exact adjoint (finding 23). Next tests: biharmonic
-  tracer diffusion (`biharmonic_tracer_timescale`, config only) and a vertical closure other than CATKE (the
-  gradient script does not pass `vertical_closure` yet).
+  (finding 22; its unfrozen reference is itself wrong past ~120 steps, finding 24). Twin recovery works with 1
+  and 4 windows (1166514, 1166675).
+- Flux controls: the grid-scale sensitivity is real (finding 25); smoothing of the flux control perturbation
+  (as the stress's face interpolation does) is being added (11-26).
+- Sharding: `ParShardV`/`ParShardI` under IFRT (finding 27); then `Partition(3, 1)`, 1°, and windows × shards.
+- Unfrozen CATKE adjoint: would need smoothed switches in the forward model (finding 24), a physics change.
+- Upstream: Reactant.jl #3844 (sharded PJRT `copyto!`), #3845 (kernel-cache preference), filed 11-26.
 - Resolved since 11-06: finding 4 (`4cc69c3e`); `cse_reduce_transposed` excluded (`fb295782`) and fixed upstream
   (Enzyme-JAX #3970); zero shadow carries (#3971) and `uitofp` (#3969) fixed upstream, in Reactant 0.2.309;
   the Vista first-call failure (gone with per-step thunks); `atlantic_ocean_basin` avoided by the staircase
@@ -952,3 +1004,9 @@ not attributed yet. Container: `$WORK/containers/julia_1.12_ls6.sif` links to a 
   peaks at 35.9 of 71.3 GiB with the half-pool collection.
 - Grid-scale noise attribution (1167067–1167070, finding 23): the 14-day exact adjoint's flux sensitivities are
   as noisy as the frozen ones; freezing CATKE only moves the noise into the convecting columns.
+
+### 2026-11-25 to 11-26
+
+- Both handoff agents finished; their branches are merged into `oc117` (`6a775aa6`, `b38c2d84`) without the
+  `frozen_tke` and `frozen_mixing_above` flags (`e64484e6`). Findings 24–27.
+- Calibration keeps the frozen-CATKE adjoint. Reactant.jl #3844 and #3845 filed.
