@@ -390,3 +390,39 @@ x₁₂₀ to disk, not yet written.
   as grid-scale as the convecting ones, so convection is not the carrier at 1°. `grid_scale_share.jl` now prints
   the split for stress-x and heat flux in every slice. `grid_scale_directions.jl` adds the alternating part in
   convecting blocks and writes zero stress fields.
+
+### 2026-11-25, verification of fix (i) frozen_tke
+
+- **ChkTke168 1170952** (62 min) and **ChkTke14 1170953** (34 min). Both compile in 27 min instead of 15–17.
+- **The forward model is not bit-identical; it differs at rounding.** J differs from the flag-free runs by
+  −2.2e-10 Sv (168 steps: 18.789870576046 against …576269) and +1.6e-11 Sv (14 days), and the step-dot FDs differ
+  in the 9th digit. The stop-gradient assignment changes XLA's fusion. This is far below every FD signal
+  (≥ 1e-6 Sv) but is not the "bit-identical" asked for.
+- Step-120 dot test: **the anomaly is gone.** The v input gives adjoint 5.06e-3 against FD 4.83e-3 / 4.78e-3 (ε 1 and
+  1/4), and 119 and 121 agree to 1–10 % as before. So the step-120 spike comes through e.
+- FD / adjoint with frozen_tke (FD rows of ChkB168, ChkFD, ChkFD2):
+
+  | Window, direction | unfrozen | frozen_tke | frozen CATKE |
+  |---|---|---|---|
+  | 168 steps, stress | 0.82 | 0.928 | — |
+  | 168 steps, heat cell (136, 36) | 0.069 | 0.974 (FD ± 24 %) | — |
+  | 168 steps, alternating never-convecting | 0.067 | 1.114 (FD ± 18 %) | — |
+  | 14 d, stress | 0.889 | **1.015** | 1.000 |
+  | 14 d, heat cell (136, 36) | 0.161 | **1.022** | 0.999 |
+  | 14 d, frozen gradient's alternating part, never convecting | 0.212 | **1.017** | 0.997 |
+  | 14 d, unfrozen gradient's alternating part, never convecting | 0.12 | 1.093 | — |
+  | 14 d, unfrozen gradient's heat-flux alternating / smooth | 0.23 / 0.33 | **0.026 / 0.029** | — |
+  | 14 d, unfrozen gradient's freshwater alternating / smooth | 0.49 / 0.68 | 0.081 / 0.108 | — |
+  | 14 d, frozen gradient's alternating / smooth | 0.73 / 1.44 | **−0.19 / −0.16** | 0.81 / 0.81 |
+  | 14 d, heat cell south of the section (convecting) | 0.089 | 0.005 | −3.6 |
+
+  **Fix (i) is right in stable columns and along stress, and badly wrong along convecting directions.** There its
+  gᵀd is 9e-3 against FD 2.4e-4, and max|g| is 11.2 against 5.6. With e frozen, what remains is κ's derivative
+  in N² and shear. In convecting cells that runs through CATKE's convective and near-neutral switches
+  (`step(x, c, w)` ramps, `w★ / √N²⁺` as N² → 0⁺, the 3 m² s⁻¹ caps). These are steep, so their local derivative
+  has nothing to do with the response to any practical perturbation. Remedy (ii) (√e regularized in the derivative)
+  would not touch them, so I did not build it.
+- Fix (iii), `180dc3be`: `freeze_mixing_above!` / config `frozen_mixing_above` (m² s⁻¹). It holds κu, κc and κe
+  constant in derivatives in the cells where κc ≥ κ★, keeps them differentiated elsewhere, and is combined with
+  frozen_tke. Submitted ChkTkeA01 1171105 (14 days, κ★ = 0.1 m² s⁻¹; convecting cells sit at the 3 m² s⁻¹ cap,
+  stable surface cells at 0.003–0.006 in 1167070). Also queued: ChkH1deg 1171100 (1° upwind3 health run).
