@@ -202,3 +202,15 @@ long-window adjoint growth.
   against 1168553's (151/46 s first, 120/38 s second); ParSlot4's records against `reference_4windows_1168552.jld2`
   and its iteration times against 2.2 min; the probes' J against 24.1308164238 Sv.
 - Compute used so far: ~5 GPU-node-hours on Vista + ~0.9 on LS6 (3612502).
+
+### 2026-11-26, checkpoint slots verified
+
+- **Preallocated slots (`76710bdd`) are bit-identical**: J, ∂J/∂log κ and κ of every common record equal the
+  references exactly (1 window, iterations 0–1, vs 1168553; 4 windows, iterations 0–3, vs 1168552).
+- 1170932 `ParSlot1` (1 window): **gradient 79.0, 78.7, 77.8 s with GC 1–2 s and 0.6 GiB host allocation**,
+  against 120 s, GC 38 s, 110 GiB before (1168553); first gradient 103.9 s (GC 3.1 s, 6.5 GiB) against 150.8 s.
+  Iterations 1.52, 1.63 (two misfits), 1.47 min, against ~2.2 min. Compile 12.8 min, misfit 9 s unchanged.
+- 1170933 `ParSlot4` (4 windows): gradients 77.6–82.3 s per rank (GC 1–2 s), first 105.8–108.6 s; reduction
+  waits ≤ 4.5 s; **iterations 1.55, 1.73 (two misfits), 1.55 min**, within ~5 % of one window's.
+- Submitted Vista 1171559 `ParShardV` (2 nodes, IFRT, multi-process sharding probe, `22a996fa`); LS6 3615047
+  `ParShardI` still pending. Compute so far: ~7 GPU-node-hours on Vista, ~0.9 on LS6.
