@@ -548,7 +548,7 @@ Reference numbers (LS6 A100, Nz = 20):
 - Unfrozen CATKE adjoint: would need smoothed switches in the forward model (finding 24), a physics change;
   not pursued (bias accepted 11-26).
 - Upstream: Reactant.jl #3844 (sharded PJRT `copyto!`), #3845 (kernel-cache preference), filed 11-26.
-  Reproducers being written for the multi-process IFRT `copyto!` and the aliased reshard (`TODO(#2234)`).
+  Reactant.jl #3847 (multi-process IFRT `copyto!`) and an MWE on #2234 (aliased reshard), posted 11-26.
 - Resolved since 11-06: finding 4 (`4cc69c3e`); `cse_reduce_transposed` excluded (`fb295782`) and fixed upstream
   (Enzyme-JAX #3970); zero shadow carries (#3971) and `uitofp` (#3969) fixed upstream, in Reactant 0.2.309;
   the Vista first-call failure (gone with per-step thunks); `atlantic_ocean_basin` avoided by the staircase
