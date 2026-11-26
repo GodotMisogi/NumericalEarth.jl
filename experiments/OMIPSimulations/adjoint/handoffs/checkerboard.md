@@ -443,3 +443,8 @@ x₁₂₀ to disk, not yet written.
   the 30-day-mean AMOC over the full 90-day window, h0 = 100 (heat), 0.4 (stress), 5 halvings, along the three
   directions. The forward window is about 2–3 min at 1°, so ~1.5–2 GPU-h; the 90-day window is kept so the
   directions are 1161433's own, and no shorter-window share check is needed.
+- 2026-11-25 ~20:05: my Mac-side job watchers were stopped by Claude Code because the Mac was low on memory. They
+  were not restarted. In flight: ChkTkeA01 1171105 (running, ~24 min in; output
+  `results/ecco4_adjoint_nz20_14day_upwind3_frozen_tke_above0.1.jld2`) and ChkFD1deg 1171121 (pending on gh;
+  output `results/ecco4_fd_onedegree_nz20_90day_upwind3.jld2`). To evaluate them, copy the files to the Mac and
+  run the FD-vs-gradient comparison against ChkFD/ChkFD2 (fix iii), or against 1161433's gradient (1°).
