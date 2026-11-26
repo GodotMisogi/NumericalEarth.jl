@@ -538,3 +538,19 @@ Branch `ajs/omip-adjoint-flux-smoothing` from `bf0c4078` (approved 11-26).
 - Submitted ChkSmooth 1171615 (gh-dev; `ecco4_nz20_14day_upwind3_flux_smoothing1_fd.json`): 1 pass, c-space
   directions of white heat-flux noise (slices 1–2; max |S d̂| 0.017), one c cell at (136, 36) (max |S d̂| 0.375) and
   white freshwater noise, against (Sᵀ g)ᵀ d̂ from 1167068 smoothed on the host: +2.99e-7, +3.36e-5, +0.220.
+- **ChkSmooth 1171615** (24.6 min; f0 equals 1167068's J to 1.1e-16). Central differences along S d̂ against
+  (Sᵀ g)ᵀ d̂, h = h0 … h0/128:
+  - **one c cell at (136, 36):** FD 2.93, 2.96, 2.89, 2.85, 2.82, 2.97e-5 over the six largest h, then noise
+    (5.1e-5, −1.3e-5), against an adjoint of 3.356e-5. So **FD / adjoint = 0.86 ± 0.02, steady over 6 octaves**. The
+    plumbing is right: without S the FD would be the raw cell's 7.2e-5 per unit. The 14 % gap is the frozen-CATKE
+    adjoint's, not S's, because S d̂ reaches into row j = 37, whose three columns convect (1.6, 0.93, 3.8 unstable
+    interfaces on average in 1167070). The raw single cell, which stays in stable columns, gave 0.999 in ChkFD2.
+  - **white heat-flux noise:** the adjoint's 2.99e-7 is tiny (the direction is nearly orthogonal to Sᵀ g). The FD
+    is −0.68 to −3.8e-6 (median −1.28e-6), so the ratio means nothing. Measured against the gradient's size, the
+    mismatch is (FD − gᵀd) / |Sᵀ g| = −1.5e-2 (range −0.9 to −3.9e-2).
+  - **white freshwater noise:** adjoint +0.220, FD −1.5 to −3.9 (median −2.65); (FD − gᵀd) / |Sᵀ g| = −6.7e-2.
+  So along directions spread over the whole basin, and therefore over convecting columns, the frozen-CATKE
+  adjoint is off by 1.5 % (heat) and 6.7 % (freshwater) of the gradient's norm. It reaches the 0.1–0.3 % of
+  ChkFD2 only for directions confined to stable columns or stress. The smoothing itself is exact (dot test
+  ≤ 5.5e-15). The limit on accuracy is the frozen-CATKE adjoint in convecting columns (findings 24–25: 0.81 at 2°,
+  ~2× at 1°), with or without S.
