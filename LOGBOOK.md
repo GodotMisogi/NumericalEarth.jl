@@ -1067,3 +1067,5 @@ not attributed yet. Container: `$WORK/containers/julia_1.12_ls6.sif` links to a 
 - Handoffs closed: their results are findings 24–29 and the open items above. `adjoint/handoffs/` removed
   from `oc117`; the full logs are in git at `74d7eb5c` (checkerboard) and `14c43725` (parallelization, on
   `ajs/omip-adjoint-parallel`). `frozen_tke` and `frozen_mixing_above` stay on `ajs/omip-adjoint-checkerboard`.
+  The agents' worktrees are removed; their job logs and results are in `adjoint/logs/{checkerboard,parallel}/`
+  and `adjoint/results/{checkerboard,parallel}/` of the shared worktree, and the IFRT manifest in `adjoint/ifrt/`.
