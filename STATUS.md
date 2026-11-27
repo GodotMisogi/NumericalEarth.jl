@@ -93,9 +93,12 @@ before the end of the window, near coasts and fronts. What is known:
 6. Calibration (11-23 to 11-26): twin recovery works with 1 and 4 windows (1166514, 1166675) and uses the
    frozen-CATKE adjoint (finding 24). Chosen 11-26: a J(κ) scan rather than a slope taper; done 11-27
    (finding 29). Proposed: central-difference gradients for κ in `calibrate.jl`.
-7. Done 11-26: both handoffs (`adjoint/handoffs/`) merged (`6a775aa6`, `b38c2d84`; `frozen_tke` and
-   `frozen_mixing_above` stay on `ajs/omip-adjoint-checkerboard`). Flux smoothing merged (`1bc70878`,
-   finding 28); sharding paused (finding 27). Reactant.jl #3847 and #2234 MWE posted.
+7. Done 11-27: both handoffs closed (findings 24–29). Merged: the checkerboard and parallel work
+   (`6a775aa6`, `b38c2d84`) and the flux smoothing (`1bc70878`). Left on the branches, not merged:
+   `frozen_tke`, `frozen_mixing_above` (`ajs/omip-adjoint-checkerboard`) and the sharding-probe logs
+   (`ajs/omip-adjoint-parallel`); `adjoint/handoffs/` removed from `oc117` (logs at `74d7eb5c`, `14c43725`).
+   Not applied: the two sharding fixes (LOGBOOK, Open). Deferred: central-difference κ gradients; flux controls
+   in `calibrate.jl`.
 
 ## Constraints to remember
 
