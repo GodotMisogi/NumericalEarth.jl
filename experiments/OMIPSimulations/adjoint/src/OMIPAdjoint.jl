@@ -1,7 +1,7 @@
 module OMIPAdjoint
 
 export omip_adjoint_setup, ecco_adjoint_setup, PrescribedFluxOcean,
-       OverturningStrength, objective_host,
+       OverturningStrength, BandOverturningStrength, objective_host,
        roll_barotropic_substeps!, freeze_mixing!, freeze_buoyancy_gradients!,
        adjoint_compile_options, snapshot_state, build_primal, build_gradient, build_checkpointed_gradient,
        AdjointDamping, AdjointTrace, step_adjoint_growth, step_dot_products,

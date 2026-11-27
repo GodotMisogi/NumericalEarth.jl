@@ -93,6 +93,9 @@ advection = Symbol(get(P, "advection", "weno"))
 frozen_gradients = get(P, "frozen_buoyancy_gradients", false)   # stored buoyancy gradients, constant in derivatives
 date_kwargs = haskey(P, "start_date") ? (; start_date = DateTime(P["start_date"])) : (;)
 eddy_fields = get(P, "eddy_diffusivity_fields", false)   # GM/Redi diffusivities as fields, with a gradient
+section_width = get(P, "section_width", 0)   # AMOC averaged over a latitude band this wide (degrees); 0 is the staircase
+amoc_objective(cpu_grid) = iszero(section_width) ? OverturningStrength(cpu_grid) :
+                                                    BandOverturningStrength(cpu_grid; width = section_width)
 flux_smoothing_passes = get(P, "flux_smoothing_passes", 0)   # flux controls c with Q = Q₀ + S c
 if forcing == "ecco4"
     n_months = P["n_months"]
@@ -156,8 +159,8 @@ J_cpu = NaN
 if :cpu in stages
     t0 = time()
     cpu = model_setup(CPU())
-    obj_cpu = OverturningStrength(cpu.cpu_grid)
-    stamp("CPU model built in ", elapsed(t0), "; AMOC section rows ", obj_cpu.rows, ", initial AMOC ",
+    obj_cpu = amoc_objective(cpu.cpu_grid)
+    stamp("CPU model built in ", elapsed(t0), "; initial AMOC ",
           @sprintf("%.4f", objective_host(obj_cpu, cpu.model)), " Sv")
     t1 = time()
     for _ in 1:n_steps
@@ -189,7 +192,7 @@ if any(in(stages), reactant_stages)
     t0 = time()
     setup = model_setup(ReactantState())
     model = setup.model
-    obj = OverturningStrength(setup.cpu_grid)
+    obj = amoc_objective(setup.cpu_grid)
     adjoint_damping = damped ? AdjointDamping(setup.cpu_grid; viscosity = get(P, "adjoint_viscosity", 0),
                                               diffusivity = get(P, "adjoint_diffusivity", 0), Δt) : nothing
     state = snapshot_state(model)

@@ -109,4 +109,48 @@ Host-side evaluation of `obj` on `model` (pulls the section to the CPU first).
 """
 objective_host(obj::OverturningStrength, model) = overturning(obj, map(Array, section_velocities(obj, model))...)
 
+#####
+##### Overturning averaged over a latitude band
+#####
+# The average over latitudes is the flux out of a region whose southern-membership fraction varies smoothly
+# across the band. Nearby latitudes share staircases, which are merged by geometry.
+
+"""
+    BandOverturningStrength
+
+Weighted average of [`OverturningStrength`](@ref) `sections`, with `weights` summing to one, in Sverdrups.
+"""
+struct BandOverturningStrength{S, W}
+    sections :: S
+    weights :: W
+end
+
+same_section(a, b) = a.rows == b.rows && a.v_weight == b.v_weight && a.u_weight == b.u_weight
+
+"""
+$(TYPEDSIGNATURES)
+
+Build a [`BandOverturningStrength`](@ref): the [`OverturningStrength`](@ref) on `cpu_grid` averaged over the
+latitudes within `width` degrees centered on `latitude`, with Hann weights cos²(π (φ - latitude) / width) sampled
+at the midpoints of bins `spacing` degrees wide. The remaining keywords are those of `OverturningStrength`.
+"""
+function BandOverturningStrength(cpu_grid; width, latitude = 26.5, spacing = 0.05, kwargs...)
+    width > 0 || throw(ArgumentError("band width must be positive, got $width"))
+    n = max(1, round(Int, width / spacing))
+    sections = OverturningStrength[]
+    weights = Float64[]
+    for δ in ((1:n) .- (n + 1) / 2) .* (width / n)
+        section = OverturningStrength(cpu_grid; latitude = latitude + δ, kwargs...)
+        w = cos(π * δ / width)^2
+        m = findfirst(s -> same_section(s, section), sections)
+        isnothing(m) ? (push!(sections, section); push!(weights, w)) : (weights[m] += w)
+    end
+    return BandOverturningStrength(Tuple(sections), Tuple(weights ./ sum(weights)))
+end
+
+(obj::BandOverturningStrength)(model) = sum(map((s, w) -> w * s(model), obj.sections, obj.weights))
+
+objective_host(obj::BandOverturningStrength, model) =
+    sum(map((s, w) -> w * objective_host(s, model), obj.sections, obj.weights))
+
 ocean_model(model) = model.ocean.model
