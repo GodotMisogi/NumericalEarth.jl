@@ -1,9 +1,9 @@
 # OMIP adjoint: status as of 2026-11-27
 
-Branch `ajs/omip-adjoint-oc117` (fork GodotMisogi, Oceananigans 0.117.2, Reactant 0.2.309), shared by Vista and LS6
-through `/work/09603/ajseth/vista/.julia/dev/NumericalEarth-oc117`. Reactant 0.2.309 test branch
-`ajs/omip-adjoint-r309` (worktree `NumericalEarth-r309`). The pre-0.117.2 code (Oceananigans 0.113.5,
-`ss/for-omip`) is `ajs/omip-adjoint`, worktree `NumericalEarth-adjoint` on TACC. Records: `LOGBOOK.md`
+Branch `ajs/omip-adjoint-oc117` (fork GodotMisogi, Oceananigans 0.117.2, Reactant 0.2.309), checked out in the
+main checkouts only: `~/.julia/dev/NumericalEarth.jl` on the Mac and `/work/09603/ajseth/vista/.julia/dev/NumericalEarth.jl`,
+shared by Vista and LS6 (no other worktrees since 11-27). The pre-0.117.2 code (Oceananigans 0.113.5, `ss/for-omip`)
+is branch `ajs/omip-adjoint`; its TACC outputs are in `adjoint/{logs,results}/omip-adjoint-0113/`. Records: `LOGBOOK.md`
 (decisions, dead ends, jobs), `experiments/OMIPSimulations/adjoint/PROGRESS.md` (detail to 11-06),
 `adjoint/REACTANT_ENZYME_ISSUES.md`, reports in `adjoint/papers/`.
 On 2026-11-23 the branch was squashed into nine commits on `ss/omip-prototype` (`c5ad24b9`); the commit

@@ -1069,3 +1069,8 @@ not attributed yet. Container: `$WORK/containers/julia_1.12_ls6.sif` links to a 
   `ajs/omip-adjoint-parallel`). `frozen_tke` and `frozen_mixing_above` stay on `ajs/omip-adjoint-checkerboard`.
   The agents' worktrees are removed; their job logs and results are in `adjoint/logs/{checkerboard,parallel}/`
   and `adjoint/results/{checkerboard,parallel}/` of the shared worktree, and the IFRT manifest in `adjoint/ifrt/`.
+- One checkout per machine (user, 11-27): `ajs/omip-adjoint-oc117` is checked out in `NumericalEarth.jl` on the Mac
+  and on `/work` (Vista and LS6); the worktrees `NumericalEarth-oc117`, `-adjoint`, `-r309`, `-prs` are removed
+  (branches kept on the fork). Their untracked outputs moved in: 0.113.5 logs and results under
+  `adjoint/{logs,results}/omip-adjoint-0113/` (with its Manifest, preferences and an uncommitted Slurm mail patch),
+  r309's under `r309/`. The main checkouts' previous local state is in `git stash` there.
