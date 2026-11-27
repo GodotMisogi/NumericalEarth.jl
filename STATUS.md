@@ -1,4 +1,4 @@
-# OMIP adjoint: status as of 2026-11-26
+# OMIP adjoint: status as of 2026-11-27
 
 Branch `ajs/omip-adjoint-oc117` (fork GodotMisogi, Oceananigans 0.117.2, Reactant 0.2.309), shared by Vista and LS6
 through `/work/09603/ajseth/vista/.julia/dev/NumericalEarth-oc117`. Reactant 0.2.309 test branch
@@ -20,7 +20,7 @@ hashes cited in these records before then are on `ajs/omip-adjoint-oc117-history
 | Adjoint-only damping (`AdjointDamping`, `939d9986`) | implemented and verified (dot product 2.6e-15 LS6, 3.9e-14 Vista; zero damping reproduces the 8-step gradient to 2e-12); does **not** contain the growth |
 | Reactant 0.2.309 (git `2bb32e28`, Reactant_jll 0.0.445) | **on `oc117` since 11-19** (`8cfba671`): 2-step Taylor verified (1153869); 8-step gradient matches 3577970 to 1.7e-12 (stress) and 5e-10 (fluxes), compile 21.6 min, **first call 27 s instead of 14 min** (1153870); under Julia 1.13 the first compile stalls > 3 h 49 min (1147598) |
 | 1° (360 × 180) | forward model NaN by day 1 at Δt = 2 h, 50 substeps (3591885, 1158106); finite for 90 days with 100 substeps (1158107) or Δt = 1 h (1158108); 90-day adjoint NaN even with frozen mixing and buoyancy gradients (1158947); one-step Jacobian 19–24 per step with frozen gradients, 6.5–10 with GM/Redi off, in momentum (1160770/1, 1160555), 0.99 with upwind3 advection (1161247); **90-day adjoint bounded with upwind3** and frozen gradients: ≤ 7.2e2, max\|g\| 1.2, J 14.51 Sv (1161433) |
-| Calibration of GM/Redi κ (twin, 2° 90 days, upwind3, frozen) | BFGS recovers κ = 1000, 1000 from 600, 600 to 0.05 % in 9 iterations (1164314); the frozen adjoint's ∂J/∂log κ is 0.31 and 0.76 of the central difference (LOGBOOK finding 22), and the 14-day misfit is rough in κ; **4 windows over MPI recover κ = 1000.0, 1000.0** by iteration 8 (1166675); with MPICH's progress thread and preallocated checkpoints **an iteration of 4 windows costs one window, ~1.5 min** (1170933, finding 26). The frozen-CATKE adjoint is the right one: the CATKE-differentiated adjoint is wrong from ~120 steps (finding 24). The flux sensitivities' grid-scale part is real; the stress gradient is smoothed by its face interpolation (finding 25); flux controls through 2 passes of the smoothing S are as smooth as the stress (`flux_smoothing_passes`, finding 28). The frozen-CATKE bias in convecting columns is accepted (11-26). J(κ) scans of the 14- and 90-day twins against the frozen gradient: KapScan14/90 (1172435, 1172436) pending |
+| Calibration of GM/Redi κ (twin, 2° 90 days, upwind3, frozen) | BFGS recovers κ = 1000, 1000 from 600, 600 to 0.05 % in 9 iterations (1164314); the frozen adjoint's ∂J/∂log κ is 0.31 and 0.76 of the central difference (LOGBOOK finding 22), and the 14-day misfit is rough in κ; **4 windows over MPI recover κ = 1000.0, 1000.0** by iteration 8 (1166675); with MPICH's progress thread and preallocated checkpoints **an iteration of 4 windows costs one window, ~1.5 min** (1170933, finding 26). The frozen-CATKE adjoint is the right one: the CATKE-differentiated adjoint is wrong from ~120 steps (finding 24). The flux sensitivities' grid-scale part is real; the stress gradient is smoothed by its face interpolation (finding 25); flux controls through 2 passes of the smoothing S are as smooth as the stress (`flux_smoothing_passes`, finding 28). The frozen-CATKE bias in convecting columns is accepted (11-26). J(κ) scans (1172435, 1172436, finding 29): J has a derivative at h ≥ 0.0125, and the frozen adjoint is 0.25–0.6 of it in κ_skew and 0.6–0.9 in κ_symmetric; central differences are exact and cheaper for κ |
 | Sharding within a window | **paused 11-26** (finding 27): PJRT corrupts sharded copies (Reactant.jl #3844); under IFRT the build fails across processes (`copyto!` to a non-addressable device, 1171559) and in one process (aliased reshard, `TODO(#2234)`, 3615047), and each gradient call is ~4× slower. Reactant.jl #3847 and an MWE on #2234 posted |
 
 ## The long-window adjoint growth
@@ -91,8 +91,8 @@ before the end of the window, near coasts and fronts. What is known:
    `adjoint/papers/`.
 5. Optional: Julia 1.13 + 0.2.309 rerun with the SIGUSR1 profile, for an upstream report.
 6. Calibration (11-23 to 11-26): twin recovery works with 1 and 4 windows (1166514, 1166675) and uses the
-   frozen-CATKE adjoint (finding 24). Chosen 11-26: a J(κ) scan rather than a slope taper; KapScan14/90
-   (1172435, 1172436) pending.
+   frozen-CATKE adjoint (finding 24). Chosen 11-26: a J(κ) scan rather than a slope taper; done 11-27
+   (finding 29). Proposed: central-difference gradients for κ in `calibrate.jl`.
 7. Done 11-26: both handoffs (`adjoint/handoffs/`) merged (`6a775aa6`, `b38c2d84`; `frozen_tke` and
    `frozen_mixing_above` stay on `ajs/omip-adjoint-checkerboard`). Flux smoothing merged (`1bc70878`,
    finding 28); sharding paused (finding 27). Reactant.jl #3847 and #2234 MWE posted.

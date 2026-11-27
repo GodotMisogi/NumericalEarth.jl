@@ -396,6 +396,19 @@ Reference numbers (LS6 A100, Nz = 20):
    convecting columns (the raw cell, in stable columns, gave 0.999); along white heat- and freshwater-flux
    directions the central differences do not converge (5× spread over h), so those two say nothing. The accuracy
    limit is the frozen-CATKE adjoint in convecting columns (findings 24–25), with or without S.
+29. **J(κ) has a derivative at h ≥ 0.0125; the frozen adjoint is 0.25–0.6 of it in κ_skew (11-27).** Twin
+   misfit surfaces (truth 1000, 1000; frozen mixing and buoyancy gradients, upwind3) on a 17 × 17 log grid from 250
+   to 4000 m² s⁻¹ and on cuts through 600, 600 in log steps of 0.0125, by forward windows (`scan` stage of
+   `calibrate.jl`; KapScan14 1172435, KapScan90 1172436). The grid minimum is the truth; the surface is a bowl,
+   steeper above the truth than below. At 600, 600, central differences of ∂J/∂log κ_skew agree within ±10 % from
+   h = 0.0125 to 0.35: −1.39e4 to −1.67e4 (14 days), −1.88e5 to −2.27e5 (90 days); one-step slopes scatter ±30 %
+   (14 days) and ±50 % (90 days), so the roughness is below h ≈ 0.01, not 0.2 as finding 22 read it. Adjoint /
+   central difference for κ_skew 0.35–0.42 (14 days) and 0.31–0.37 (90 days), steady over h. κ_symmetric: 90 days
+   0.57–0.90 (settling at 0.82–0.90 for h ≥ 0.1); 14 days its slope is 1 % of κ_skew's and rough, with the
+   adjoint's sign wrong. At the other points (against the nearest grid node, h = 0.17–0.35): κ_skew 0.25–0.6,
+   κ_symmetric 0.6–0.9, signs right. The bias differs per component, so the frozen gradient points in a rotated
+   direction and its zero is not J's minimum away from a twin. Cost per gradient: adjoint 17 s (14 days) and
+   93 s (90 days); central differences with 4 forward windows 6 s and 36 s.
 ## Tooling added
 
 | File | Purpose |
@@ -521,7 +534,7 @@ Reference numbers (LS6 A100, Nz = 20):
 | Vista 1168099–1170933, LS6 3612502 (`Par…`) | Parallel agent: per-rank timing, MPICH progress thread, kernel cache, sharding probe, preallocated slots; `handoffs/parallelization.md` | findings 26, 27 |
 | Vista 1171559, LS6 3615047 | `ParShardV` (2 nodes, IFRT, multi-process), `ParShardI` (two A100s, IFRT) | both fail in the sharded build (finding 27) |
 | Vista 1171615 | `ChkSmooth`: central differences along smoothed flux directions, 1 pass | finding 28 |
-| Vista 1172435, 1172436 | `KapScan14`, `KapScan90`: J on κ grids (17 × 17 from 250 to 4000 m² s⁻¹, cuts through 600, 600 in log steps of 0.0125) and the frozen adjoint at five points, 14- and 90-day twins (`calibration_twin_ecco4_nz20_{14,90}day_scan.json`, `50fd79d6`) | pending on 11-26 |
+| Vista 1172435, 1172436 | `KapScan14`, `KapScan90`: J on κ grids (17 × 17 from 250 to 4000 m² s⁻¹, cuts through 600, 600 in log steps of 0.0125) and the frozen adjoint at five points, 14- and 90-day twins (`calibration_twin_ecco4_nz20_{14,90}day_scan.json`, `50fd79d6`) | finding 29 |
 | Vista 1164314 | Calibration phase 1: twin, 2° 90 days from 1993-01, upwind3, frozen | compile 12.8 min, window 16 s, gradient ~130 s; check ratios 0.31, 0.76 (finding 22); BFGS 600, 600 → 1000.5, 999.7 in 9 iterations, then out of GPU memory (discarded shadow models; `GC.gc()` before each evaluation) |
 
 ## Open
@@ -540,8 +553,8 @@ Reference numbers (LS6 A100, Nz = 20):
   from ReactOcean).
 - Calibration: the frozen adjoint's κ gradient is biased over 90 days, and the 14-day misfit is rough in κ
   (finding 22; its unfrozen reference is itself wrong past ~120 steps, finding 24). Twin recovery works with 1
-  and 4 windows (1166514, 1166675). The J(κ) scans KapScan14/KapScan90 (1172435, 1172436) test the frozen
-  gradient against secants at every scale.
+  and 4 windows (1166514, 1166675). The J(κ) scans (finding 29): the frozen adjoint is 0.25–0.9 of the true
+  slope, and central differences in log κ (h ≈ 0.1–0.2) are exact and cheaper for the two κ.
 - Flux controls: smoothing merged (finding 28); `calibrate.jl` does not use flux controls yet.
 - Sharding: paused 11-26 (finding 27). Resume when a window no longer fits on one GPU, after the two Reactant
   gaps are fixed and IFRT's per-call cost is understood; then `Partition(3, 1)`, 1°, and windows × shards.
@@ -1040,3 +1053,7 @@ not attributed yet. Container: `$WORK/containers/julia_1.12_ls6.sif` links to a 
 - Calibration keeps the frozen-CATKE adjoint. Reactant.jl #3844 and #3845 filed.
 - Flux smoothing merged (`1bc70878`, finding 28). Convecting-column bias accepted; sharding paused after both
   IFRT probes failed in the build (finding 27). κ scan stage (`50fd79d6`); KapScan14/90 submitted.
+
+### 2026-11-27
+
+- KapScan14/90 (finding 29): J(κ) is smooth at h ≥ 0.0125; the frozen adjoint is 0.25–0.9 of its slope.
