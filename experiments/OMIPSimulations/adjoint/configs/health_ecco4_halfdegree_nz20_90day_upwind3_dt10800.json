@@ -1,0 +1,16 @@
+{
+  "_comment": "0.5° (720×360×20 tripolar) ECCO4 prescribed-flux ocean, forward only, 90 days from 1993-01, Δt = 3 h with 300 barotropic substeps (36 s, half the 72 s that is stable at 1°, finding 14), upwind3: does this time step run 90 days at this resolution and level count.",
+  "forcing": "ecco4",
+  "n_months": 5,
+  "Nx": 720,
+  "Ny": 360,
+  "Nz": 20,
+  "steps": 720,
+  "dt": 10800.0,
+  "substeps": 300,
+  "backend": "gpu",
+  "roll_barotropic_substeps": true,
+  "snapshot_days": 1,
+  "advection": "upwind3",
+  "output": "results/forward_health_ecco4_halfdegree_nz20_90day_upwind3_dt10800.jld2"
+}

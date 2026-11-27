@@ -228,7 +228,9 @@ records = [snapshot(0)]
 t0 = time()
 for n in 1:n_steps
     step(model, Δt)
-    n % every == 0 && push!(records, snapshot(n))
+    n % every == 0 || continue
+    push!(records, snapshot(n))
+    isfinite(records[end].J) || (stamp("non-finite objective at step $n; stopping"); break)
 end
 stamp(@sprintf("%d steps in %.1f min", n_steps, (time() - t0) / 60))
 
