@@ -99,7 +99,7 @@ before the end of the window, near coasts and fronts. What is known:
    (`ajs/omip-adjoint-parallel`); `adjoint/handoffs/` removed from `oc117` (logs at `74d7eb5c`, `14c43725`).
    Not applied: the two sharding fixes (LOGBOOK, Open). Deferred: central-difference κ gradients; flux controls
    in `calibrate.jl`.
-8. Open (11-27): a smooth convective-mixing surrogate used only in the adjoint, for the frozen-CATKE bias in
+8. Set aside (user, 11-28): a smooth convective-mixing surrogate used only in the adjoint, for the frozen-CATKE bias in
    grid-scale convecting directions (findings 25, 28); along smoothed regional directions the bias is inside the
    finite differences' noise (finding 31).
 
