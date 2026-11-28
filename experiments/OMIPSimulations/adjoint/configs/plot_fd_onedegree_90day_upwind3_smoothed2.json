@@ -1,0 +1,13 @@
+{
+  "results": "results/ecco4_fd_onedegree_nz20_90day_upwind3_smoothed2.jld2",
+  "panels": [
+    ["heat_flux_convecting", "Heat flux, convecting columns 30–70°N"],
+    ["heat_flux_labrador", "Heat flux, Labrador Sea"],
+    ["heat_flux_subpolar_east", "Heat flux, eastern subpolar gyre"],
+    ["heat_flux_stable", "Heat flux, stable columns 18–70°N"],
+    ["freshwater_flux_convecting", "Freshwater flux, convecting columns"],
+    ["freshwater_flux_stable", "Freshwater flux, stable columns"]
+  ],
+  "title": "Finite differences along smoothed regional flux directions (1°, 90 days, 2 passes of S; ChkFDSm2 1175918)",
+  "output": "papers/figures/fd_directions_onedegree_90day_upwind3_smoothed2.png"
+}
