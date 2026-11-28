@@ -409,6 +409,27 @@ Reference numbers (LS6 A100, Nz = 20):
    κ_symmetric 0.6–0.9, signs right. The bias differs per component, so the frozen gradient points in a rotated
    direction and its zero is not J's minimum away from a twin. Cost per gradient: adjoint 17 s (14 days) and
    93 s (90 days); central differences with 4 forward windows 6 s and 36 s.
+30. **The flux sensitivities' grid-scale structure is the section, the boundary paths, and a row-to-row stripe in
+   convecting columns at 2° and 1° (11-27).** Alternation is flagged by 5 × 5-window lag-1 correlations (ρy < −0.4
+   alternates in rows, ρx < −0.4 in columns, both a checker) where the local energy is in the Atlantic's top 40 %;
+   the 2 × 2 share (finding 23) scores a single spike like noise and cannot tell the two apart. 2° 14 days, frozen
+   CATKE (1167068): 334 heat-flux cells alternate in rows, 1 in columns, 3 as a checker; of the slice-summed
+   heat-flux energy, 7 % is in the staircase corners, 23 % in the section line's dipole, 55 % in the coastal end
+   cells and 13 % in convecting columns. A 3° Hann band-averaged AMOC (`BandOverturningStrength`, `section_width`,
+   prototype; 1174907, J 15.02 against 15.56 Sv) removes the corners (0.00) and halves the line (0.11) but raises
+   the ends to 0.78 and the 22–32°N share (0.75, 0.84 → 0.83, 0.87); the row stripe away from the section is
+   unchanged. Atlantic beyond 5° of the section, heat flux by slice: ρy −0.30, −0.48 (2° 14 days); +0.04 to −0.18
+   (2° 90 days from 1993-01, upwind3); +0.66 to +0.44 (1° 1161433, same window and objective). At 1° the corners and
+   coastal ends hold 91 % of the last slice's heat-flux energy: the Florida Straits and the Gulf Stream to 42°N, and
+   the African coast to the equator and the Gulf of Guinea (Jan, Feb slices), one or two cells wide. The basin
+   average hides the 1° stripe: in 60–10°W, 30–65°N per unit area (the lead figure's region; 81 % of the cells
+   convect), heat-flux ρy −0.37, −0.30, −0.01 at leads 31, 59, 90 days with ρx +0.58 to +0.67, share 0.62–0.78,
+   91–98 % of the box's energy in convecting columns, 1–4 % of the Atlantic energy at 4–19 % of its peak;
+   freshwater flux likewise, weaker (ρy −0.26 to +0.36). Through S (finding 28) the box's share is 0.22–0.24
+   (1 pass) and 0.11–0.12 (2 passes), ρy +0.66 and +0.86. So the stripe sits where the frozen-CATKE adjoint is
+   biased (findings 24–25), at both resolutions; S takes it out of the controls without changing that bias.
+   Unexplained, 1° only: a column-to-column stripe at 5–24°N, 20–45°W, west of the African coastal column in the
+   Mar and Apr slices (~10 % of the coastal peak; ρx −0.33 beyond 5° of the section).
 ## Tooling added
 
 | File | Purpose |
@@ -1074,3 +1095,5 @@ not attributed yet. Container: `$WORK/containers/julia_1.12_ls6.sif` links to a 
   (branches kept on the fork). Their untracked outputs moved in: 0.113.5 logs and results under
   `adjoint/{logs,results}/omip-adjoint-0113/` (with its Manifest, preferences and an uncommitted Slurm mail patch),
   r309's under `r309/`. The main checkouts' previous local state is in `git stash` there.
+- Checkerboard regions mapped (finding 30). The band-averaged AMOC objective (`92136b15`, 1174907) stays a
+  prototype: it does not remove the row stripe, which is in convecting columns at 2° and 1°.

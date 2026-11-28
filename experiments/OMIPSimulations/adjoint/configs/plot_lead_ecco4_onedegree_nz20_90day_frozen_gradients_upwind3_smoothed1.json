@@ -1,0 +1,5 @@
+{
+  "_comment": "As plot_lead_ecco4_onedegree_nz20_90day_frozen_gradients_upwind3 with the flux controls through 1 passes of the smoothing S (LOGBOOK findings 28, 30): the results file is 1161433's with the flux gradients replaced by Sᵀ g (results/checkerboard/smoothed_1deg_90day_passes1.jld2, equal to smooth_flux_controls(g; passes = 1, transpose = true)).",
+  "results": "results/checkerboard/ecco4_adjoint_onedegree_nz20_90day_frozen_gradients_upwind3_smoothed1.jld2",
+  "output": "papers/figures/lead_sensitivity_ecco4_onedegree_nz20_90day_frozen_gradients_upwind3_smoothed1.png"
+}

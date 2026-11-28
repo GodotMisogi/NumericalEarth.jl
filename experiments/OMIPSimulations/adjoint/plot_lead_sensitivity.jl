@@ -11,6 +11,7 @@
 #   output   the image to write
 #   slices   optional forcing-slice indices to draw, one row each (default: every slice at least 15 days
 #            before the end of the window); the row label is the slice's lead before the window's end
+# A results file with `flux_smoothing_passes` > 0 holds smoothed flux-control gradients Sᵀ g; the title says so.
 #
 # Columns: zonal and meridional stress, heat flux and freshwater flux. Values are per unit area (the gradient
 # with respect to a cell's flux divided by the cell's area) with Pillar's signs: positive means more eastward
@@ -128,8 +129,10 @@ for (c, (key, sgn, title, units)) in enumerate(columns)
     Colorbar(fig[n_rows + 1, c]; colormap, limits = (-1, 1), vertical = false, flipaxis = false,
              ticks = (ticks, labels), label = units, width = Relative(0.9))
 end
-Label(fig[0, :], @sprintf("Sensitivity of the %.0f-day-mean AMOC at 26.5°N (ψ at 1000 m, J = %.2f Sv) to surface fluxes per unit area, by lead",
-                          R["average_seconds"] / 86400, R["J"]); fontsize = 18, font = :bold)
+passes = get(R, "flux_smoothing_passes", 0)
+smoothing = passes > 0 ? " (flux controls smoothed, $passes passes)" : ""
+Label(fig[0, :], @sprintf("Sensitivity of the %.0f-day-mean AMOC at 26.5°N (ψ at 1000 m, J = %.2f Sv) to surface fluxes per unit area, by lead%s",
+                          R["average_seconds"] / 86400, R["J"], smoothing); fontsize = 18, font = :bold)
 rowgap!(fig.layout, 8)
 colgap!(fig.layout, 8)
 
