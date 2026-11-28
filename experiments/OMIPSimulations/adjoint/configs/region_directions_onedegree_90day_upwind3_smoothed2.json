@@ -1,0 +1,14 @@
+{
+  "_comment": "Regional directions in the 2-pass smoothed flux-control space of the 1° 90-day frozen upwind3 window (1161433): the smoothed gradient Sᵀ g restricted to convecting and stable columns of the North Atlantic (forward state of health_ecco4_onedegree_nz20_90day_upwind3) and to the Labrador Sea and the eastern subpolar gyre, for finite-difference error bars of the frozen-CATKE adjoint (LOGBOOK finding 30). The box 98-5°W, 18-70°N leaves out the Pacific, the Mediterranean and the Nordic seas.",
+  "gradient": "results/checkerboard/ecco4_adjoint_onedegree_nz20_90day_frozen_gradients_upwind3_smoothed2.jld2",
+  "output": "results/checkerboard/directions_onedegree_90day_upwind3_smoothed2",
+  "health": "results/checkerboard/forward_health_ecco4_onedegree_nz20_90day_upwind3.jld2",
+  "regions": {
+    "heat_flux_convecting": {"flux": "heat_flux", "longitudes": [-98, -5], "latitudes": [30, 70], "columns": "convecting"},
+    "heat_flux_stable": {"flux": "heat_flux", "longitudes": [-98, -5], "latitudes": [18, 70], "columns": "stable"},
+    "heat_flux_labrador": {"flux": "heat_flux", "longitudes": [-65, -45], "latitudes": [50, 66], "columns": "all"},
+    "heat_flux_subpolar_east": {"flux": "heat_flux", "longitudes": [-45, -10], "latitudes": [45, 65], "columns": "all"},
+    "freshwater_flux_convecting": {"flux": "freshwater_flux", "longitudes": [-98, -5], "latitudes": [30, 70], "columns": "convecting"},
+    "freshwater_flux_stable": {"flux": "freshwater_flux", "longitudes": [-98, -5], "latitudes": [18, 70], "columns": "stable"}
+  }
+}
