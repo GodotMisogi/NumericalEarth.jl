@@ -430,6 +430,21 @@ Reference numbers (LS6 A100, Nz = 20):
    biased (findings 24–25), at both resolutions; S takes it out of the controls without changing that bias.
    Unexplained, 1° only: a column-to-column stripe at 5–24°N, 20–45°W, west of the African coastal column in the
    Mar and Apr slices (~10 % of the coastal peak; ρx −0.33 beyond 5° of the section).
+31. **Along smoothed regional flux directions the frozen-CATKE adjoint is within the finite differences' noise,
+   ±5–25 %, convecting columns included (11-27).** 1° 90 days (1161433's window and gradient), 2 passes of S:
+   central differences along the gradient restricted to a box and to convecting columns (mean unstable
+   interfaces ≥ 1 over days 0–90) or stable ones (none), moved through S (`region_directions.jl`, ChkFDSm2
+   1175918, six halvings of h). FD / adjoint, central: heat flux in convecting columns 30–70°N 1.04, 1.04 at
+   h₀/4 and h₀/8 (0.92–1.46 over the six); heat flux in stable columns 18–70°N 1.03 at the smallest h, 1.16–3.1
+   above it; Labrador Sea (65–45°W, 50–66°N) 0.98 at the smallest h, its backward differences 1.00–1.07 at every
+   h; eastern subpolar gyre (45–10°W, 45–65°N) 0.89–1.23 with one-sided 0.2–2.3, not converged; freshwater flux
+   in convecting columns 0.99, 0.94, 0.89 at h₀/2 to h₀/8; in stable columns 0.93 at the smallest h, 1.08–3.5
+   above. The scatter is discrete, not curvature: single perturbed runs land 1e-4 to 4e-3 Sv off the linear
+   response, of either sign and at no consistent h (in the stable directions at every h but the smallest), the
+   live forward model's CATKE switches (finding 24), as large as the response at the small steps. So the 2× of
+   finding 25 (grid-scale parts of convecting blocks) and the 0.86 of finding 28 (one smoothed cell) do not show
+   along region-wide smoothed directions, to the noise's ±5–10 % (heat and freshwater in convecting columns,
+   Labrador) and ±25 % (eastern subpolar gyre).
 ## Tooling added
 
 | File | Purpose |
@@ -556,6 +571,7 @@ Reference numbers (LS6 A100, Nz = 20):
 | Vista 1171559, LS6 3615047 | `ParShardV` (2 nodes, IFRT, multi-process), `ParShardI` (two A100s, IFRT) | both fail in the sharded build (finding 27) |
 | Vista 1171615 | `ChkSmooth`: central differences along smoothed flux directions, 1 pass | finding 28 |
 | Vista 1172435, 1172436 | `KapScan14`, `KapScan90`: J on κ grids (17 × 17 from 250 to 4000 m² s⁻¹, cuts through 600, 600 in log steps of 0.0125) and the frozen adjoint at five points, 14- and 90-day twins (`calibration_twin_ecco4_nz20_{14,90}day_scan.json`, `50fd79d6`) | finding 29 |
+| Vista 1175918 | `ChkFDSm2`: central differences along six regional flux directions through 2 passes of S, 1° 90 days (`ecco4_onedegree_nz20_90day_upwind3_smoothed2_fd.json`, `b36cb06a`) | finding 31 |
 | Vista 1164314 | Calibration phase 1: twin, 2° 90 days from 1993-01, upwind3, frozen | compile 12.8 min, window 16 s, gradient ~130 s; check ratios 0.31, 0.76 (finding 22); BFGS 600, 600 → 1000.5, 999.7 in 9 iterations, then out of GPU memory (discarded shadow models; `GC.gc()` before each evaluation) |
 
 ## Open
@@ -1097,3 +1113,6 @@ not attributed yet. Container: `$WORK/containers/julia_1.12_ls6.sif` links to a 
   r309's under `r309/`. The main checkouts' previous local state is in `git stash` there.
 - Checkerboard regions mapped (finding 30). The band-averaged AMOC objective (`92136b15`, 1174907) stays a
   prototype: it does not remove the row stripe, which is in convecting columns at 2° and 1°.
+- Error bars for the smoothed flux controls (finding 31, ChkFDSm2 1175918): FD / adjoint 0.9–1.05 along
+  regional directions in convecting and stable columns, inside the live model's switch noise. To discuss with the
+  user: a smooth convective-mixing surrogate in the adjoint only.
